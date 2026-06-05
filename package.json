@@ -1,0 +1,129 @@
+{
+  "name": "gitable",
+  "displayName": "Gitable",
+  "description": "AI-powered Git workflow panel for VS Code. Generate commit messages, review changes, and manage Git visually using your own AI API key.",
+  "version": "0.0.1",
+  "publisher": "piyushdoorwar",
+  "license": "MIT",
+  "author": {
+    "name": "Piyush Doorwar"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/piyushdoorwar/gitable.git"
+  },
+  "engines": {
+    "vscode": "^1.96.0",
+    "node": ">=24"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "ai",
+    "commit",
+    "github desktop",
+    "openai",
+    "gemini",
+    "claude"
+  ],
+  "main": "./dist/extension.js",
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitable",
+          "title": "Gitable",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitable": [
+        {
+          "id": "gitable.panel",
+          "name": "Gitable",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitable.refresh",
+        "title": "Gitable: Refresh",
+        "category": "Gitable",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitable.generateCommitMessage",
+        "title": "Gitable: Generate AI Commit Message",
+        "category": "Gitable",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "gitable.commit",
+        "title": "Gitable: Commit",
+        "category": "Gitable",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gitable.stageAll",
+        "title": "Gitable: Stage All Changes",
+        "category": "Gitable"
+      },
+      {
+        "command": "gitable.unstageAll",
+        "title": "Gitable: Unstage All Changes",
+        "category": "Gitable"
+      },
+      {
+        "command": "gitable.openSettings",
+        "title": "Gitable: Open Settings",
+        "category": "Gitable",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "gitable.validateApiKey",
+        "title": "Gitable: Validate API Key",
+        "category": "Gitable"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitable.refresh",
+          "when": "view == gitable.panel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitable.openSettings",
+          "when": "view == gitable.panel",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"(no linter configured)\" && exit 0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

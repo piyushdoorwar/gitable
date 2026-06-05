@@ -1,0 +1,201 @@
+import { execFile } from "child_process";
+import * as path from "path";
+import * as vscode from "vscode";
+import { Logger } from "../utils/Logger";
+import { GitService, GitServiceError } from "./GitService";
+import { cliStatusToLetter, CommitInfo, FileChange, RepoChanges, RepoSummary } from "./models";
+
+/**
+ * Git implementation backed by the `git` CLI via {@link execFile}.
+ *
+ * `execFile` (not `exec`) is used everywhere so arguments are passed as an array
+ * and never interpreted by a shell — this keeps behaviour identical and safe on
+ * Windows, macOS, and Linux regardless of paths containing spaces.
+ *
+ * Serves both as the fallback for {@link VsCodeGitService} and as a standalone
+ * GitService when the built-in Git API is unavailable.
+ */
+export class GitCliService implements GitService {
+  private activeRoot: string | undefined;
+
+  constructor(private readonly logger: Logger) {}
+
+  getActiveRoot(): string | undefined {
+    return this.activeRoot;
+  }
+
+  setActiveRoot(root: string): void {
+    this.activeRoot = root;
+  }
+
+  async listRepositories(): Promise<RepoSummary[]> {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const seen = new Map<string, RepoSummary>();
+
+    for (const folder of folders) {
+      try {
+        const root = (await this.run(["rev-parse", "--show-toplevel"], folder.uri.fsPath)).trim();
+        if (root && !seen.has(root)) {
+          seen.set(root, {
+            name: path.basename(root),
+            root,
+            branch: await this.readBranch(root)
+          });
+        }
+      } catch {
+        // Folder is not a Git repository — skip it.
+      }
+    }
+    return Array.from(seen.values());
+  }
+
+  async getRepoSummary(): Promise<RepoSummary | undefined> {
+    const root = this.requireRoot();
+    return {
+      name: path.basename(root),
+      root,
+      branch: await this.readBranch(root)
+    };
+  }
+
+  async getChanges(): Promise<RepoChanges> {
+    const root = this.requireRoot();
+    const output = await this.run(["-c", "core.quotepath=false", "status", "--porcelain"], root);
+    const staged: FileChange[] = [];
+    const unstaged: FileChange[] = [];
+
+    for (const line of output.split("\n")) {
+      if (!line.trim()) {
+        continue;
+      }
+      const x = line.charAt(0);
+      const y = line.charAt(1);
+      let filePath = line.slice(3);
+      let originalPath: string | undefined;
+
+      const arrow = filePath.indexOf(" -> ");
+      if (arrow !== -1) {
+        originalPath = filePath.slice(0, arrow);
+        filePath = filePath.slice(arrow + 4);
+      }
+
+      if (x !== " " && x !== "?") {
+        staged.push({
+          path: filePath,
+          displayPath: filePath,
+          status: cliStatusToLetter(x),
+          staged: true,
+          originalPath
+        });
+      }
+      if (y !== " ") {
+        const status = x === "?" && y === "?" ? "U" : cliStatusToLetter(y);
+        unstaged.push({ path: filePath, displayPath: filePath, status, staged: false, originalPath });
+      }
+    }
+    return { staged, unstaged };
+  }
+
+  async getStagedDiff(): Promise<string> {
+    return this.run(["-c", "core.quotepath=false", "diff", "--staged"], this.requireRoot());
+  }
+
+  async getUnstagedDiff(): Promise<string> {
+    return this.run(["-c", "core.quotepath=false", "diff"], this.requireRoot());
+  }
+
+  async getStagedDiffStat(): Promise<string> {
+    return this.run(["-c", "core.quotepath=false", "diff", "--staged", "--stat"], this.requireRoot());
+  }
+
+  async stageFiles(paths: string[]): Promise<void> {
+    if (!paths.length) {
+      return;
+    }
+    await this.run(["add", "--", ...paths], this.requireRoot());
+  }
+
+  async unstageFiles(paths: string[]): Promise<void> {
+    if (!paths.length) {
+      return;
+    }
+    await this.run(["reset", "HEAD", "--", ...paths], this.requireRoot());
+  }
+
+  async stageAll(): Promise<void> {
+    await this.run(["add", "-A"], this.requireRoot());
+  }
+
+  async unstageAll(): Promise<void> {
+    await this.run(["reset"], this.requireRoot());
+  }
+
+  async commit(summary: string, description?: string): Promise<void> {
+    const args = ["commit", "-m", summary];
+    if (description && description.trim()) {
+      args.push("-m", description);
+    }
+    await this.run(args, this.requireRoot());
+  }
+
+  async getHistory(limit: number): Promise<CommitInfo[]> {
+    const root = this.requireRoot();
+    try {
+      const output = await this.run(
+        ["log", `--pretty=format:%h%x09%an%x09%ar%x09%s`, "-n", String(limit)],
+        root
+      );
+      return output
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .map((line) => {
+          const [hash, author, relativeDate, ...subjectParts] = line.split("\t");
+          return {
+            hash: hash ?? "",
+            author: author ?? "",
+            relativeDate: relativeDate ?? "",
+            subject: subjectParts.join("\t")
+          };
+        });
+    } catch {
+      // A brand-new repository with no commits makes `git log` fail — treat as empty.
+      return [];
+    }
+  }
+
+  private async readBranch(root: string): Promise<string> {
+    try {
+      const branch = (await this.run(["rev-parse", "--abbrev-ref", "HEAD"], root)).trim();
+      return branch === "HEAD" ? "(detached)" : branch;
+    } catch {
+      return "(no branch)";
+    }
+  }
+
+  private requireRoot(): string {
+    if (!this.activeRoot) {
+      throw new GitServiceError("No active Git repository.");
+    }
+    return this.activeRoot;
+  }
+
+  /** Runs `git <args>` in `cwd` and resolves with stdout. */
+  private run(args: string[], cwd: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFile(
+        "git",
+        args,
+        { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+        (error, stdout, stderr) => {
+          if (error) {
+            const message = (stderr || error.message || "git command failed").toString().trim();
+            this.logger.error(`git ${args.join(" ")}`, message);
+            reject(new GitServiceError(message, error));
+            return;
+          }
+          resolve(stdout.toString());
+        }
+      );
+    });
+  }
+}
