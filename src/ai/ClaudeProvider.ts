@@ -6,6 +6,7 @@ import {
   parseGeneratedMessage,
   throwForStatus
 } from "./AiProvider";
+import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
 
 const BASE_URL = "https://api.anthropic.com/v1";
@@ -46,12 +47,14 @@ export class ClaudeProvider implements AiProvider {
     }
     const data: any = await response.json();
     const items: any[] = Array.isArray(data?.data) ? data.data : [];
+    // Anthropic's list is already only Claude chat models — sort newest first by
+    // created_at (string ids don't order opus/sonnet/haiku correctly).
     return items
       .filter((m) => String(m?.id ?? "").toLowerCase().startsWith("claude-"))
       .sort((a, b) => String(b?.created_at ?? "").localeCompare(String(a?.created_at ?? "")))
       .map((m) => String(m.id))
       .filter(Boolean)
-      .slice(0, 30);
+      .slice(0, MODEL_FETCH_LIMIT);
   }
 
   async generateCommitMessage(

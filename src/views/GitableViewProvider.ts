@@ -2,13 +2,7 @@ import * as vscode from "vscode";
 import { AiProviderFactory } from "../ai/AiProviderFactory";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
-import {
-  FALLBACK_MODELS,
-  HISTORY_LIMIT,
-  PROVIDER_IDS,
-  ProviderId,
-  VIEW_ID
-} from "../constants";
+import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
 import { RepoChanges } from "../git/models";
 import { DiffLimiter } from "../utils/DiffLimiter";
@@ -206,6 +200,14 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const model = this.settings.getModel(provider);
+    if (!model) {
+      this.fail("Select a model in Settings before generating a commit message.");
+      await this.focusAndOpenTab("settings");
+      await this.postState();
+      return;
+    }
+
     let stagedDiff: string;
     try {
       stagedDiff = await this.git.getStagedDiff();
@@ -231,7 +233,6 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     this.setLoading(true);
     await this.postState();
     try {
-      const model = this.settings.getModel(provider);
       const ai = AiProviderFactory.create(provider);
       const result = await ai.generateCommitMessage(
         { diff: prepared.diff, diffStat, provider, model },
@@ -347,8 +348,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     try {
       const ai = AiProviderFactory.create(provider);
       const models = await ai.listModels(apiKey);
-      this.modelsCache[provider] = models.length ? models : FALLBACK_MODELS[provider];
-      this.pendingNotice = `Loaded ${models.length} model(s).`;
+      this.modelsCache[provider] = models;
+      this.pendingNotice = models.length
+        ? `Loaded ${models.length} model(s).`
+        : "No models returned for this key.";
     } catch (error) {
       this.fail(error);
     } finally {
@@ -420,7 +423,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.logger.error("Failed to read Git state", error);
     }
 
-    const models = this.modelsCache[provider] ?? FALLBACK_MODELS[provider];
+    // Models are never hardcoded — only what the provider's API returned.
+    const models = this.modelsCache[provider] ?? [];
 
     return {
       repositoryName,
@@ -433,10 +437,24 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       model,
       models,
       hasApiKey,
+      providerIcons: this.providerIcons(),
       isLoading: this.isLoading,
       error: stateError,
       notice: this.pendingNotice
     };
+  }
+
+  /** Webview-safe URIs for the provider brand icons (computed once). */
+  private providerIcons(): Record<string, string> {
+    if (!this.view) {
+      return {};
+    }
+    const webview = this.view.webview;
+    const uri = (file: string) =>
+      webview
+        .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "media", "providers", file))
+        .toString();
+    return { openai: uri("openai.svg"), gemini: uri("gemini.svg"), claude: uri("claude.svg") };
   }
 
   private isProviderId(value: unknown): value is ProviderId {

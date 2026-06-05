@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-06-05
+
+### Added
+
+- Brand redesign of the panel using the Gitable logo palette (navy + pastel pink).
+- Provider brand icons (OpenAI, Gemini, Claude) shown in the provider dropdown and settings status.
+- Inline SVG icons throughout (no emojis/unicode glyphs).
+
+### Changed
+
+- Replaced native `<select>` elements with custom dropdowns that work reliably in the webview.
+- Models are fetched **live** from the provider and filtered with regex to main chat models (max 12); the model dropdown now appears only after the API returns models. Nothing is hardcoded.
+
+### Removed
+
+- Static `FALLBACK_MODELS` / `DEFAULT_MODELS` lists.
+
 ## [0.0.1] - 2026-06-05
 
 ### Added
@@ -22,5 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git integration preferring the built-in VS Code Git API with a cross-platform `execFile`-based CLI fallback.
 - Commands: `gitable.refresh`, `gitable.generateCommitMessage`, `gitable.commit`, `gitable.stageAll`, `gitable.unstageAll`, `gitable.openSettings`, `gitable.validateApiKey`.
 
-[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/piyushdoorwar/gitable/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/piyushdoorwar/gitable/releases/tag/v0.0.1

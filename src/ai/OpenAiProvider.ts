@@ -6,9 +6,31 @@ import {
   parseGeneratedMessage,
   throwForStatus
 } from "./AiProvider";
+import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
 
 const BASE_URL = "https://api.openai.com/v1";
+
+/** Dated snapshot suffixes, e.g. gpt-4o-2024-08-06, gpt-4-0613. */
+const DATED_SNAPSHOT = /-\d{4}(-\d{2}-\d{2})?$/;
+
+/**
+ * Keeps the live list to "main" general-purpose chat models so the dropdown
+ * stays small as OpenAI keeps adding SKUs (mirrors the prompt-optimizer rules).
+ */
+function isMainOpenAIModel(id: string): boolean {
+  const s = String(id || "").toLowerCase();
+  if (!/^gpt-/.test(s) && !/^o\d/.test(s)) {
+    return false;
+  }
+  if (/(audio|realtime|transcribe|tts|search|image|embedding|moderation|instruct|vision|-16k|chat-latest)/.test(s)) {
+    return false;
+  }
+  if (DATED_SNAPSHOT.test(s)) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * OpenAI provider. Validation and model listing use `GET /v1/models`; commit
@@ -34,12 +56,14 @@ export class OpenAiProvider implements AiProvider {
     }
     const data: any = await response.json();
     const items: any[] = Array.isArray(data?.data) ? data.data : [];
+    // Sort newest first by the API's `created` timestamp so flagships order
+    // correctly without maintaining a version list.
     return items
-      .filter((m) => OpenAiProvider.isChatModel(String(m?.id ?? "")))
+      .filter((m) => isMainOpenAIModel(String(m?.id ?? "")))
       .sort((a, b) => (Number(b?.created) || 0) - (Number(a?.created) || 0))
       .map((m) => String(m.id))
       .filter(Boolean)
-      .slice(0, 30);
+      .slice(0, MODEL_FETCH_LIMIT);
   }
 
   async generateCommitMessage(
@@ -73,13 +97,5 @@ export class OpenAiProvider implements AiProvider {
       throw new AiProviderError("OpenAI returned an empty response.");
     }
     return parseGeneratedMessage(content);
-  }
-
-  /** Keeps text-capable GPT models and drops audio/realtime/embeddings/etc. */
-  private static isChatModel(id: string): boolean {
-    if (!id.startsWith("gpt-")) {
-      return false;
-    }
-    return !/(audio|realtime|transcribe|tts|whisper|image|embedding|moderation)/i.test(id);
   }
 }

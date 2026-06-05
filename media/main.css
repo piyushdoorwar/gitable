@@ -1,6 +1,18 @@
 :root {
-  --gitable-gap: 8px;
-  --gitable-radius: 4px;
+  /* Brand palette (from the Gitable logo) */
+  --gx-navy: #09244b;
+  --gx-navy-2: #0d2f63;
+  --gx-pink: #f98b9e;
+  --gx-pink-strong: #f76d85;
+  --gx-pink-ink: #09244b;
+  --gx-pink-soft: rgba(249, 139, 158, 0.14);
+  --gx-pink-line: rgba(249, 139, 158, 0.32);
+  --gx-navy-card: rgba(13, 47, 99, 0.22);
+  --gx-line: rgba(249, 139, 158, 0.16);
+
+  --gx-radius: 8px;
+  --gx-radius-sm: 6px;
+  --gx-gap: 10px;
 }
 
 * {
@@ -9,194 +21,286 @@
 
 body {
   margin: 0;
-  padding: 0;
+  padding: 0 0 16px;
   font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
+  font-size: 12.5px;
+  line-height: 1.45;
   color: var(--vscode-foreground);
-  background: var(--vscode-sideBar-background);
+  background:
+    radial-gradient(120% 60% at 80% -10%, rgba(249, 139, 158, 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(9, 36, 75, 0.28), rgba(9, 36, 75, 0.06) 140px),
+    var(--vscode-sideBar-background);
 }
 
 .hidden {
   display: none !important;
 }
 
-/* ---------- Header ---------- */
-.header {
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Icons -------------------------------------------------------------- */
+.gx-ic,
+.gx-ic svg {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  vertical-align: middle;
+}
+.gx-ic.sm,
+.gx-ic.sm svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Header ------------------------------------------------------------- */
+.gx-header {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, transparent);
+  gap: 8px;
+  padding: 12px 12px 10px;
 }
 
-.repo-row {
+.gx-repo-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.repo-select {
-  flex: 1;
-  min-width: 0;
-  background: var(--vscode-dropdown-background);
-  color: var(--vscode-dropdown-foreground);
-  border: 1px solid var(--vscode-dropdown-border, transparent);
-  border-radius: var(--gitable-radius);
-  padding: 4px 6px;
-  font-size: 12px;
-}
-
-.branch-row {
-  display: flex;
+.gx-branch {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--vscode-descriptionForeground);
-}
-
-.branch-name {
-  font-weight: 600;
-  color: var(--vscode-foreground);
-}
-
-.icon-button {
-  background: transparent;
-  color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  border: none;
-  cursor: pointer;
-  padding: 3px 5px;
-  border-radius: var(--gitable-radius);
-  line-height: 1;
-}
-
-.icon-button:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.2));
-}
-
-/* ---------- Tabs ---------- */
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(127, 127, 127, 0.25));
-}
-
-.tab {
-  flex: 1;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--vscode-foreground);
-  padding: 8px 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.tab:hover {
-  background: var(--vscode-list-hoverBackground);
-}
-
-.tab.active {
-  border-bottom-color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
-  font-weight: 600;
-}
-
-.tab-panel {
-  padding: 10px 12px;
-}
-
-/* ---------- Notices ---------- */
-.notice {
-  padding: 6px 8px;
-  border-radius: var(--gitable-radius);
+  align-self: flex-start;
+  padding: 3px 9px 3px 7px;
   font-size: 11.5px;
-  margin-bottom: var(--gitable-gap);
+  font-weight: 600;
+  color: var(--gx-pink);
+  background: var(--gx-pink-soft);
+  border: 1px solid var(--gx-pink-line);
+  border-radius: 999px;
 }
 
-.notice.error {
-  background: var(--vscode-inputValidation-errorBackground, rgba(255, 80, 80, 0.15));
-  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+.gx-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--gx-radius-sm);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.gx-iconbtn:hover {
+  color: var(--gx-pink);
+  background: var(--gx-pink-soft);
+  border-color: var(--gx-pink-line);
 }
 
-.notice.info {
-  background: var(--vscode-inputValidation-infoBackground, rgba(80, 150, 255, 0.12));
-  border: 1px solid var(--vscode-inputValidation-infoBorder, #1f6feb);
+/* Tabs --------------------------------------------------------------- */
+.gx-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--gx-line);
 }
 
-.notice.warning {
-  background: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 80, 0.12));
-  border: 1px solid var(--vscode-inputValidation-warningBorder, #b89500);
+.gx-tab {
+  position: relative;
+  flex: 1;
+  padding: 9px 4px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.12s;
+}
+.gx-tab:hover {
+  color: var(--vscode-foreground);
+}
+.gx-tab.active {
+  color: var(--gx-pink);
+}
+.gx-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gx-pink);
 }
 
-/* ---------- Section headers ---------- */
-.section-title {
+.gx-panel {
+  padding: 12px;
+}
+
+/* Notices ------------------------------------------------------------ */
+.gx-notice {
+  display: flex;
+  gap: 7px;
+  padding: 7px 10px;
+  margin-bottom: var(--gx-gap);
+  border-radius: var(--gx-radius-sm);
+  font-size: 11.5px;
+  border: 1px solid transparent;
+}
+.gx-notice.error {
+  color: var(--vscode-inputValidation-errorForeground, #ffd7d7);
+  background: rgba(247, 109, 133, 0.14);
+  border-color: rgba(247, 109, 133, 0.5);
+}
+.gx-notice.info {
+  color: var(--gx-pink);
+  background: var(--gx-pink-soft);
+  border-color: var(--gx-pink-line);
+}
+
+.gx-spinner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  gap: 8px;
   color: var(--vscode-descriptionForeground);
-  margin: 10px 0 4px;
+  font-size: 12px;
+  padding: 6px 2px;
+  margin-bottom: var(--gx-gap);
+}
+.gx-spinner .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gx-pink);
+  animation: gx-pulse 0.9s ease-in-out infinite;
+}
+@keyframes gx-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
-.section-title:first-child {
+/* Sections ----------------------------------------------------------- */
+.gx-section-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 2px 6px;
+}
+.gx-section-head:first-child {
   margin-top: 0;
 }
-
-.link-button {
+.gx-section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gx-pink-ink);
+  background: var(--gx-pink);
+  border-radius: 999px;
+}
+.gx-section-head .spacer {
+  flex: 1;
+}
+.gx-mini-action {
   background: none;
   border: none;
-  color: var(--vscode-textLink-foreground);
-  cursor: pointer;
+  color: var(--gx-pink);
   font-size: 11px;
-  padding: 0;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.gx-mini-action:hover {
+  background: var(--gx-pink-soft);
 }
 
-.link-button:hover {
-  text-decoration: underline;
-}
-
-/* ---------- File list ---------- */
-.file-list {
+/* File list ---------------------------------------------------------- */
+.gx-files {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
-
-.file-item {
+.gx-file {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 4px;
-  border-radius: var(--gitable-radius);
-  font-size: 12.5px;
-  cursor: default;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--gx-radius-sm);
+  transition: background 0.1s;
 }
-
-.file-item:hover {
-  background: var(--vscode-list-hoverBackground);
+.gx-file:hover {
+  background: var(--gx-navy-card);
 }
-
-.file-item input[type="checkbox"] {
-  margin: 0;
-  flex-shrink: 0;
-}
-
-.file-status {
-  flex-shrink: 0;
+.gx-check {
+  appearance: none;
   width: 14px;
-  text-align: center;
-  font-weight: 700;
-  font-family: var(--vscode-editor-font-family, monospace);
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1.5px solid var(--gx-pink-line);
+  border-radius: 4px;
+  background: transparent;
+  position: relative;
+  cursor: pointer;
 }
+.gx-check:checked {
+  background: var(--gx-pink);
+  border-color: var(--gx-pink);
+}
+.gx-check:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--gx-pink-ink);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.gx-status {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 800;
+  border-radius: 4px;
+  background: var(--gx-navy-2);
+}
+.gx-status-A, .gx-status-U { color: #62d39a; }
+.gx-status-M { color: #e7bd57; }
+.gx-status-D { color: var(--gx-pink-strong); }
+.gx-status-R, .gx-status-C { color: #7aa2ff; }
 
-.status-A { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); }
-.status-M { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
-.status-D { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); }
-.status-R { color: var(--vscode-gitDecoration-renamedResourceForeground, #4caf50); }
-.status-C { color: var(--vscode-gitDecoration-renamedResourceForeground, #4caf50); }
-.status-U { color: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991); }
-
-.file-path {
+.gx-path {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -204,167 +308,356 @@ body {
   white-space: nowrap;
   direction: rtl;
   text-align: left;
+  font-size: 12px;
 }
-
-.file-action {
-  flex-shrink: 0;
+.gx-row-action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
   opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s, border-color 0.1s;
 }
-
-.file-item:hover .file-action {
+.gx-file:hover .gx-row-action {
   opacity: 1;
 }
-
-.empty {
-  color: var(--vscode-descriptionForeground);
+.gx-row-action:hover {
+  color: var(--gx-pink);
+  background: var(--gx-pink-soft);
+  border-color: var(--gx-pink-line);
+}
+.gx-empty {
+  padding: 8px 6px;
   font-size: 12px;
   font-style: italic;
-  padding: 6px 4px;
-}
-
-/* ---------- Buttons ---------- */
-.button-row {
-  display: flex;
-  gap: 6px;
-  margin: 8px 0;
-}
-
-button.btn {
-  flex: 1;
-  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
-  border: none;
-  border-radius: var(--gitable-radius);
-  padding: 5px 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-button.btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
-}
-
-button.btn.primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-}
-
-button.btn.primary:hover {
-  background: var(--vscode-button-hoverBackground);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ---------- Inputs ---------- */
-.field {
-  margin-bottom: var(--gitable-gap);
-}
-
-.field label {
-  display: block;
-  font-size: 11px;
   color: var(--vscode-descriptionForeground);
-  margin-bottom: 3px;
 }
 
+/* Buttons ------------------------------------------------------------ */
+.gx-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 10px;
+}
+.gx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--gx-radius-sm);
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.04s;
+}
+.gx-btn:active {
+  transform: translateY(0.5px);
+}
+.gx-btn-primary {
+  color: var(--gx-pink-ink);
+  background: var(--gx-pink);
+}
+.gx-btn-primary:hover {
+  background: var(--gx-pink-strong);
+}
+.gx-btn-ghost {
+  color: var(--gx-pink);
+  background: transparent;
+  border-color: var(--gx-pink-line);
+}
+.gx-btn-ghost:hover {
+  background: var(--gx-pink-soft);
+  border-color: var(--gx-pink);
+}
+.gx-btn-soft {
+  color: var(--vscode-foreground);
+  background: var(--gx-navy-card);
+  border-color: var(--gx-line);
+}
+.gx-btn-soft:hover {
+  border-color: var(--gx-pink-line);
+  color: var(--gx-pink);
+}
+.gx-btn-block {
+  width: 100%;
+}
+
+/* Fields ------------------------------------------------------------- */
+.gx-field {
+  margin-bottom: var(--gx-gap);
+}
+.gx-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 5px;
+}
 input[type="text"],
 input[type="password"],
-textarea,
-select {
+textarea {
   width: 100%;
-  background: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border, transparent);
-  border-radius: var(--gitable-radius);
-  padding: 5px 7px;
+  padding: 7px 9px;
   font-family: inherit;
   font-size: 12.5px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
-
+input::placeholder,
+textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--gx-pink);
+  box-shadow: 0 0 0 2px var(--gx-pink-soft);
+}
 textarea {
   resize: vertical;
-  min-height: 60px;
+  min-height: 62px;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
+/* Commit card -------------------------------------------------------- */
+.gx-card {
+  margin-top: 14px;
+  padding: 12px;
+  background: var(--gx-navy-card);
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius);
+}
+.gx-card .gx-field:last-child {
+  margin-bottom: 0;
 }
 
-/* ---------- History ---------- */
-.commit-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* Custom dropdown ---------------------------------------------------- */
+.gx-select {
+  position: relative;
+  width: 100%;
 }
-
-.commit-item {
-  padding: 6px 4px;
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(127, 127, 127, 0.15));
-}
-
-.commit-subject {
-  font-size: 12.5px;
-  margin-bottom: 2px;
-  word-break: break-word;
-}
-
-.commit-meta {
+.gx-select-btn {
   display: flex;
+  align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground);
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
-
-.commit-hash {
-  font-family: var(--vscode-editor-font-family, monospace);
-  color: var(--vscode-textLink-foreground);
+.gx-select-btn:hover {
+  border-color: var(--gx-pink-line);
 }
-
-/* ---------- Settings ---------- */
-.status-line {
-  font-size: 11.5px;
-  color: var(--vscode-descriptionForeground);
-  margin: 6px 0;
+.gx-select.open .gx-select-btn {
+  border-color: var(--gx-pink);
+  box-shadow: 0 0 0 2px var(--gx-pink-soft);
 }
-
-.status-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 10.5px;
+.gx-select-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gx-select-label.placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+.gx-chevron {
+  color: var(--gx-pink);
+  transition: transform 0.15s;
+}
+.gx-select.open .gx-chevron {
+  transform: rotate(180deg);
+}
+.gx-select.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.gx-select-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--vscode-dropdown-background, var(--vscode-input-background));
+  border: 1px solid var(--gx-pink-line);
+  border-radius: var(--gx-radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: none;
+}
+.gx-select.open .gx-select-list {
+  display: block;
+}
+.gx-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  font-size: 12.5px;
+  border-radius: 5px;
+  color: var(--vscode-foreground);
+}
+.gx-option > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.gx-option:hover {
+  background: var(--gx-pink-soft);
+  color: var(--gx-pink);
+}
+.gx-option.selected {
+  color: var(--gx-pink);
   font-weight: 600;
 }
 
-.status-badge.ok {
-  background: var(--vscode-testing-iconPassed, #4caf50);
-  color: #fff;
+/* Provider brand icons */
+.gx-select-ic {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.gx-select-ic:empty {
+  display: none;
+}
+.gx-opt-ic {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  object-fit: contain;
 }
 
-.status-badge.missing {
-  background: var(--vscode-descriptionForeground);
-  color: var(--vscode-sideBar-background);
-}
-
-.privacy-note {
+.gx-hint {
   margin-top: 14px;
-  padding: 8px;
-  font-size: 11px;
-  line-height: 1.5;
+  padding: 9px 11px;
+  font-size: 11.5px;
   color: var(--vscode-descriptionForeground);
-  background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.08));
-  border-left: 3px solid var(--vscode-textBlockQuote-border, var(--vscode-focusBorder));
-  border-radius: var(--gitable-radius);
+  background: var(--gx-navy-card);
+  border: 1px dashed var(--gx-pink-line);
+  border-radius: var(--gx-radius-sm);
 }
 
-.spinner {
-  text-align: center;
+/* History ------------------------------------------------------------ */
+.gx-commits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gx-commit {
+  display: flex;
+  gap: 9px;
+  padding: 9px 10px;
+  background: var(--gx-navy-card);
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+}
+.gx-commit .rail {
+  color: var(--gx-pink);
+  padding-top: 1px;
+}
+.gx-commit .body {
+  min-width: 0;
+  flex: 1;
+}
+.gx-commit-subject {
+  font-size: 12.5px;
+  margin-bottom: 3px;
+  word-break: break-word;
+}
+.gx-commit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 10.5px;
   color: var(--vscode-descriptionForeground);
-  font-size: 12px;
-  padding: 8px;
+}
+.gx-hash {
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--gx-pink);
+}
+
+/* Settings status + privacy ----------------------------------------- */
+.gx-status-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--vscode-descriptionForeground);
+  margin: 8px 0 2px;
+}
+.gx-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+.gx-badge.ok {
+  color: var(--gx-pink-ink);
+  background: var(--gx-pink);
+}
+.gx-badge.missing {
+  color: var(--gx-pink);
+  background: var(--gx-pink-soft);
+  border: 1px solid var(--gx-pink-line);
+}
+.gx-strong {
+  color: var(--vscode-foreground);
+  font-weight: 600;
+}
+
+.gx-privacy {
+  display: flex;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 11px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--vscode-descriptionForeground);
+  background: var(--gx-navy-card);
+  border: 1px solid var(--gx-line);
+  border-left: 3px solid var(--gx-pink);
+  border-radius: var(--gx-radius-sm);
+}
+.gx-privacy .gx-ic {
+  color: var(--gx-pink);
+  margin-top: 1px;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gx-pink-line);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gx-pink);
 }

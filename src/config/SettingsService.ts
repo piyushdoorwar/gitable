@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DEFAULT_MODELS, DEFAULT_PROVIDER, ProviderId, PROVIDER_IDS, StateKeys } from "../constants";
+import { DEFAULT_PROVIDER, ProviderId, PROVIDER_IDS, StateKeys } from "../constants";
 
 /**
  * Persists non-sensitive preferences (selected provider and per-provider model)
@@ -20,8 +20,9 @@ export class SettingsService {
     await this.state.update(StateKeys.provider, provider);
   }
 
+  /** Returns the saved model, or "" when the user has not chosen one yet. */
   getModel(provider: ProviderId): string {
-    return this.state.get<string>(StateKeys.modelFor(provider)) ?? DEFAULT_MODELS[provider];
+    return this.state.get<string>(StateKeys.modelFor(provider)) ?? "";
   }
 
   async setModel(provider: ProviderId, model: string): Promise<void> {

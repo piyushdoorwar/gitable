@@ -44,17 +44,8 @@ export const MAX_DIFF_CHARS = 40000;
 export const HISTORY_LIMIT = 30;
 
 /**
- * Static fallback model lists, used when the provider's /models endpoint
- * cannot be reached (e.g. no key yet or a network error).
+ * Maximum number of models shown in the model dropdown after filtering, so the
+ * list stays small as providers keep adding SKUs. Models are never hardcoded —
+ * they are fetched live from the provider once the API key is set.
  */
-export const FALLBACK_MODELS: Record<ProviderId, string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"],
-  gemini: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
-  claude: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5-20251001"]
-};
-
-export const DEFAULT_MODELS: Record<ProviderId, string> = {
-  openai: "gpt-4o-mini",
-  gemini: "gemini-1.5-flash",
-  claude: "claude-sonnet-4-6"
-};
+export const MODEL_FETCH_LIMIT = 12;

@@ -6,9 +6,31 @@ import {
   parseGeneratedMessage,
   throwForStatus
 } from "./AiProvider";
+import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+/** Dated preview suffix, e.g. gemini-2.5-flash-preview-05-20. */
+const DATED_PREVIEW = /-\d{2}-\d{2}$/;
+
+/** Keeps the dropdown to main Gemini chat models (mirrors prompt-optimizer). */
+function isMainGeminiModel(id: string): boolean {
+  const s = String(id || "").toLowerCase();
+  if (!s.startsWith("gemini-")) {
+    return false; // drop gemma / learnlm / imagen / veo / aqa
+  }
+  if (/(embedding|aqa|imagen|veo|vision|tuning|thinking)/.test(s)) {
+    return false;
+  }
+  if (/(^|-)exp(-|$)/.test(s)) {
+    return false;
+  }
+  if (DATED_PREVIEW.test(s)) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Google Gemini provider. Auth uses the `x-goog-api-key` header. Validation and
@@ -41,10 +63,10 @@ export class GeminiProvider implements AiProvider {
           m.supportedGenerationMethods.includes("generateContent")
       )
       .map((m) => String(m?.name ?? "").replace(/^models\//, ""))
-      .filter((id) => id.startsWith("gemini-"))
+      .filter(isMainGeminiModel)
       .sort()
       .reverse()
-      .slice(0, 30);
+      .slice(0, MODEL_FETCH_LIMIT);
   }
 
   async generateCommitMessage(
