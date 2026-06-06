@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.12] - 2026-06-06
+
+### Changed
+
+- Expanded tooltips and accessibility labels across webview controls, including AI generation, push/pull, branch management, file actions, stage/unstage controls, and settings actions.
+
 ## [0.0.11] - 2026-06-06
 
 ### Changed
@@ -120,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git integration preferring the built-in VS Code Git API with a cross-platform `execFile`-based CLI fallback.
 - Commands: `gitable.refresh`, `gitable.generateCommitMessage`, `gitable.commit`, `gitable.stageAll`, `gitable.unstageAll`, `gitable.openSettings`, `gitable.validateApiKey`.
 
-[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.11...HEAD
+[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.12...HEAD
+[0.0.12]: https://github.com/piyushdoorwar/gitable/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/piyushdoorwar/gitable/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/piyushdoorwar/gitable/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/piyushdoorwar/gitable/compare/v0.0.8...v0.0.9

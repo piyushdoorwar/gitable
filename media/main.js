@@ -204,6 +204,8 @@
       label.textContent = current ? current.label : placeholder;
       label.classList.toggle("placeholder", !current);
       iconSlot.innerHTML = current ? optIcon(current) : "";
+      button.title = current ? `Selected: ${current.label}` : placeholder;
+      button.setAttribute("aria-label", button.title);
     }
     function paintList() {
       list.innerHTML = "";
@@ -253,17 +255,17 @@
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
         </div>
         <div class="gx-branch-row">
-          <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" type="button">
+          <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
             ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>
           </button>
-          <button id="pullBtn" class="gx-iconbtn gx-sync-btn" data-action="pull" title="Pull" type="button">${ICONS.pull}<span id="behindBadge" class="gx-sync-badge hidden"></span></button>
-          <button id="pushBtn" class="gx-iconbtn gx-sync-btn" data-action="push" title="Push" type="button">${ICONS.push}<span id="aheadBadge" class="gx-sync-badge hidden"></span></button>
+          <button id="pullBtn" class="gx-iconbtn gx-sync-btn" data-action="pull" title="Pull" aria-label="Pull" type="button">${ICONS.pull}<span id="behindBadge" class="gx-sync-badge hidden"></span></button>
+          <button id="pushBtn" class="gx-iconbtn gx-sync-btn" data-action="push" title="Push" aria-label="Push" type="button">${ICONS.push}<span id="aheadBadge" class="gx-sync-badge hidden"></span></button>
         </div>
       </div>
 
       <div class="gx-tabs">
-        <button class="gx-tab" data-tab="changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
-        <button class="gx-tab" data-tab="history" type="button">${icon("history", "sm")}<span>History</span></button>
+        <button class="gx-tab" data-tab="changes" title="Show working tree changes" aria-label="Show working tree changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
+        <button class="gx-tab" data-tab="history" title="Show commit history" aria-label="Show commit history" type="button">${icon("history", "sm")}<span>History</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -274,8 +276,8 @@
           <span id="stagedCount" class="gx-count">0</span>
           <span class="spacer"></span>
           <span class="gx-section-actions">
-            <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected" aria-label="Unstage selected" type="button">${ICONS.minus}</button>
-            <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all" aria-label="Unstage all" type="button">${ICONS.unstageAll}</button>
+            <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
+            <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
           </span>
         </div>
         <ul id="stagedList" class="gx-files"></ul>
@@ -285,8 +287,8 @@
           <span id="unstagedCount" class="gx-count">0</span>
           <span class="spacer"></span>
           <span class="gx-section-actions">
-            <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected" aria-label="Stage selected" type="button">${ICONS.plus}</button>
-            <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all" aria-label="Stage all" type="button">${ICONS.stageAll}</button>
+            <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
+            <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
           </span>
         </div>
         <ul id="unstagedList" class="gx-files"></ul>
@@ -296,7 +298,7 @@
             <label class="gx-label" for="commitSummary">Summary</label>
             <div class="gx-input-wrap">
               <input id="commitSummary" class="has-action" type="text" placeholder="Summary (required)" maxlength="120" />
-              <button id="generateBtn" class="gx-input-action" data-action="generate" type="button" title="Generate with AI">
+              <button id="generateBtn" class="gx-input-action" data-action="generate" type="button" title="Generate commit message with AI" aria-label="Generate commit message with AI">
                 <span class="gx-vsep"></span><span class="gx-ic">${ICONS.sparkle}</span>
               </button>
             </div>
@@ -306,7 +308,7 @@
             <textarea id="commitDescription" placeholder="Description (optional)"></textarea>
           </div>
           <div class="gx-actions">
-            <button id="commitBtn" class="gx-btn gx-btn-primary" data-action="commit" type="button">
+            <button id="commitBtn" class="gx-btn gx-btn-primary" data-action="commit" title="Commit staged changes" aria-label="Commit staged changes" type="button">
               ${icon("commit")}<span>Commit</span>
             </button>
           </div>
@@ -320,7 +322,7 @@
       <div id="panel-branches" class="gx-panel hidden">
         <div class="gx-newbranch">
           <input id="newBranchInput" type="text" placeholder="New branch name" autocomplete="off" spellcheck="false" />
-          <button class="gx-btn gx-btn-primary" data-action="createBranchNamed" type="button">${icon("plus", "sm")}<span>Create</span></button>
+          <button class="gx-btn gx-btn-primary" data-action="createBranchNamed" title="Create and switch to new branch" aria-label="Create and switch to new branch" type="button">${icon("plus", "sm")}<span>Create</span></button>
         </div>
         <input id="branchFilter" type="text" class="gx-branch-filter" placeholder="Filter branches" autocomplete="off" spellcheck="false" />
         <ul id="branchList" class="gx-branch-list"></ul>
@@ -336,8 +338,8 @@
           <input id="apiKeyInput" type="password" placeholder="Paste your API key" autocomplete="off" spellcheck="false" />
         </div>
         <div class="gx-actions">
-          <button class="gx-btn gx-btn-primary" data-action="saveApiKey" type="button">${icon("lock")}<span>Save key</span></button>
-          <button class="gx-btn gx-btn-ghost" data-action="validateApiKey" type="button">${icon("check")}<span>Validate</span></button>
+          <button class="gx-btn gx-btn-primary" data-action="saveApiKey" title="Save API key securely in VS Code" aria-label="Save API key securely in VS Code" type="button">${icon("lock")}<span>Save key</span></button>
+          <button class="gx-btn gx-btn-ghost" data-action="validateApiKey" title="Validate saved API key and load models" aria-label="Validate saved API key and load models" type="button">${icon("check")}<span>Validate</span></button>
         </div>
         <div id="modelHint" class="gx-hint">Save or validate your API key to load the available models.</div>
         <div id="modelSection" class="hidden gx-model-block">
@@ -346,8 +348,8 @@
             <div id="modelSlot"></div>
           </div>
           <div class="gx-actions">
-            <button class="gx-btn gx-btn-soft" data-action="refreshModels" type="button">${icon("refresh", "sm")}<span>Refresh</span></button>
-            <button class="gx-btn gx-btn-primary" data-action="saveModel" type="button">${icon("check")}<span>Save model</span></button>
+            <button class="gx-btn gx-btn-soft" data-action="refreshModels" title="Refresh models from selected provider" aria-label="Refresh models from selected provider" type="button">${icon("refresh", "sm")}<span>Refresh</span></button>
+            <button class="gx-btn gx-btn-primary" data-action="saveModel" title="Save selected AI model" aria-label="Save selected AI model" type="button">${icon("check")}<span>Save model</span></button>
           </div>
         </div>
         <div id="settingsStatus" class="gx-status-line"></div>
@@ -506,6 +508,14 @@
   function selectedPaths(files) {
     return files.filter((f) => ui.selected.has(f.path)).map((f) => f.path);
   }
+  function setHint(elm, text) {
+    if (!elm) return;
+    elm.title = text;
+    elm.setAttribute("aria-label", text);
+  }
+  function plural(count, singular, pluralForm) {
+    return `${count} ${count === 1 ? singular : pluralForm || singular + "s"}`;
+  }
   function flashNotice(message, kind) {
     byId("changesNotice").innerHTML = `<div class="gx-notice ${kind}">${escapeHtml(message)}</div>`;
   }
@@ -517,6 +527,10 @@
     // Header
     byId("repoName").textContent = s.repositoryName || "—";
     byId("branchName").textContent = s.branchName || "—";
+    setHint(
+      document.querySelector(".gx-branch-btn"),
+      s.branchName ? `Manage branches · current: ${s.branchName}` : "Manage branches"
+    );
     renderBranches(s);
     updateSync(s);
 
@@ -534,20 +548,27 @@
     const hasStaged = stagedFiles.length > 0;
     const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
     const genBtn = byId("generateBtn");
+    const generateHint = hasStaged
+      ? `Generate commit message with ${provLabel}${s.model ? " · " + s.model : " · select a model first"}`
+      : "Stage files to generate an AI commit message";
     genBtn.innerHTML =
       `<span class="gx-vsep"></span>` +
       (s.busyKind === "generate"
         ? `<span class="gx-spin"></span>`
         : `<span class="gx-ic">${ICONS.sparkle}</span>`);
-    genBtn.title = hasStaged
-      ? `Generate with ${provLabel}${s.model ? " · " + s.model : " · select a model"}`
-      : "Stage changes to generate a message";
+    setHint(genBtn, generateHint);
     // Generate reads the staged diff and Commit commits the index — both need staged changes.
     genBtn.toggleAttribute("disabled", busy || !hasStaged);
     const commitBtn = byId("commitBtn");
     commitBtn.innerHTML = `${icon("commit")}<span>Commit${
       s.branchName ? " to " + escapeHtml(s.branchName) : ""
     }</span>`;
+    setHint(
+      commitBtn,
+      hasStaged
+        ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
+        : "Stage files before committing"
+    );
     commitBtn.toggleAttribute("disabled", busy || !hasStaged);
     byId("pushBtn").toggleAttribute("disabled", busy || !s.branchName);
     byId("pullBtn").toggleAttribute("disabled", busy || !s.branchName);
@@ -561,10 +582,36 @@
     const busy = !!s.isLoading;
     const stagedFiles = s.changes.staged || [];
     const unstagedFiles = s.changes.unstaged || [];
-    byId("unstageSelectedBtn").toggleAttribute("disabled", busy || selectedPaths(stagedFiles).length === 0);
-    byId("unstageAllBtn").toggleAttribute("disabled", busy || stagedFiles.length === 0);
-    byId("stageSelectedBtn").toggleAttribute("disabled", busy || selectedPaths(unstagedFiles).length === 0);
-    byId("stageAllBtn").toggleAttribute("disabled", busy || unstagedFiles.length === 0);
+    const selectedStaged = selectedPaths(stagedFiles).length;
+    const selectedUnstaged = selectedPaths(unstagedFiles).length;
+    const unstageSelected = byId("unstageSelectedBtn");
+    const unstageAll = byId("unstageAllBtn");
+    const stageSelected = byId("stageSelectedBtn");
+    const stageAll = byId("stageAllBtn");
+    setHint(
+      unstageSelected,
+      selectedStaged
+        ? `Unstage ${plural(selectedStaged, "selected file")}`
+        : "Select staged files to unstage"
+    );
+    setHint(
+      unstageAll,
+      stagedFiles.length ? `Unstage all ${plural(stagedFiles.length, "file")}` : "No staged files to unstage"
+    );
+    setHint(
+      stageSelected,
+      selectedUnstaged
+        ? `Stage ${plural(selectedUnstaged, "selected file")}`
+        : "Select changed files to stage"
+    );
+    setHint(
+      stageAll,
+      unstagedFiles.length ? `Stage all ${plural(unstagedFiles.length, "file")}` : "No changed files to stage"
+    );
+    unstageSelected.toggleAttribute("disabled", busy || selectedStaged === 0);
+    unstageAll.toggleAttribute("disabled", busy || stagedFiles.length === 0);
+    stageSelected.toggleAttribute("disabled", busy || selectedUnstaged === 0);
+    stageAll.toggleAttribute("disabled", busy || unstagedFiles.length === 0);
   }
 
   function renderBranches(s) {
@@ -582,7 +629,9 @@
         const current = b === s.branchName;
         return `<li class="gx-branch-item${current ? " current" : ""}" data-action="switchBranchTo" data-name="${escapeHtml(
           b
-        )}" title="${current ? "Current branch" : "Switch to " + escapeHtml(b)}">
+        )}" title="${current ? "Current branch: " + escapeHtml(b) : "Switch to " + escapeHtml(b)}" aria-label="${
+          current ? "Current branch: " + escapeHtml(b) : "Switch to " + escapeHtml(b)
+        }">
             <span class="gx-ic sm gx-branch-ic">${ICONS.branch}</span>
             <span class="gx-branch-name">${escapeHtml(b)}</span>
             ${current ? `<span class="gx-ic sm gx-branch-check">${ICONS.check}</span>` : ""}
@@ -594,10 +643,32 @@
   function updateSync(s) {
     const ahead = byId("aheadBadge");
     const behind = byId("behindBadge");
+    const push = byId("pushBtn");
+    const pull = byId("pullBtn");
     ahead.textContent = s.ahead > 0 ? String(s.ahead) : "";
     behind.textContent = s.behind > 0 ? String(s.behind) : "";
     ahead.classList.toggle("hidden", !(s.ahead > 0));
     behind.classList.toggle("hidden", !(s.behind > 0));
+    setHint(
+      pull,
+      !s.branchName
+        ? "Pull disabled · no current branch"
+        : s.behind > 0
+          ? `Pull ${plural(s.behind, "commit")} from upstream`
+          : s.hasUpstream
+            ? "Pull from upstream"
+            : "Pull from remote"
+    );
+    setHint(
+      push,
+      !s.branchName
+        ? "Push disabled · no current branch"
+        : s.ahead > 0
+          ? `Push ${plural(s.ahead, "commit")} to upstream`
+          : s.hasUpstream
+            ? "Push to upstream"
+            : "Push current branch"
+    );
   }
 
   function renderNotice(s) {
@@ -646,10 +717,13 @@
     return files
       .map((f) => {
         const checked = ui.selected.has(f.path) ? "checked" : "";
-        const title = action === "stageOne" ? "Stage file" : "Unstage file";
+        const title = action === "stageOne" ? `Stage ${f.displayPath || f.path}` : `Unstage ${f.displayPath || f.path}`;
+        const selectTitle = `Select ${f.displayPath || f.path}`;
         return `
           <li class="gx-file">
-            <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" ${checked} />
+            <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" title="${escapeHtml(
+          selectTitle
+        )}" aria-label="${escapeHtml(selectTitle)}" ${checked} />
             ${fileIcon(f.path)}
             <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${
           staged ? 1 : 0
@@ -659,7 +733,7 @@
             <span class="gx-right">
               <button class="gx-row-action" data-action="${action}" data-path="${escapeHtml(
           f.path
-        )}" title="${title}" type="button">${ICONS[actionIcon]}</button>
+        )}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" type="button">${ICONS[actionIcon]}</button>
               ${statusGlyph(f.status)}
             </span>
           </li>`;
