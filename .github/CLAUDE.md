@@ -7,15 +7,16 @@ or AI) can orient quickly.
 ## Overview
 
 Gitable is a VS Code extension that renders a GitHub Desktop–style Git workflow
-panel in the left sidebar (a Webview View) and can generate commit messages from
-the staged diff using a user-supplied AI provider key. It has **no backend, no
+panel in the left sidebar (a Webview View). It can generate commit messages,
+explain commits in plain English, and review staged/unstaged diffs for security
+risks — all using a user-supplied AI provider key. It has **no backend, no
 telemetry, and no database** — everything runs in the VS Code extension host.
 
 ## Tech stack
 
 - **TypeScript** (target ES2022), compiled/bundled with **esbuild** (`target: node24`) to `dist/extension.js`.
 - **Node.js 24** dev toolchain (see `.nvmrc`); VS Code 1.96+ (`engines.vscode`).
-- **VS Code Extension API** for the view container, webview, commands, secrets, and state.
+- **VS Code Extension API** for the view container, webview, commands, secrets, state, and badges.
 - **Built-in `vscode.git` extension API** for repository state, staging, committing, and change events.
 - **`child_process.execFile`** as a cross-platform Git CLI fallback (no shell strings).
 - **Global `fetch`** (available in the Node 18+ extension host) for AI provider HTTP calls — no SDKs, no runtime dependencies.
@@ -26,22 +27,24 @@ telemetry, and no database** — everything runs in the VS Code extension host.
 media/                     Webview assets (vanilla JS/CSS) + Activity Bar icon
   icon.svg, main.css, main.js
 src/
-  extension.ts             activate(): wires services, registers the view + 11 commands, Git watchers
+  extension.ts             activate(): wires services, registers the view + commands, Git watchers
   constants.ts             command ids, secret/state keys, MAX_DIFF_CHARS, HISTORY_LIMIT, MODEL_FETCH_LIMIT
+  analytics/
+    UsageStore.ts          records AI call history in globalState (provider, model, type, timestamp)
   views/
     GitableViewProvider.ts WebviewViewProvider: message protocol + orchestration + state
   git/
-    models.ts              FileChange / CommitInfo / RepoSummary + status mapping
+    models.ts              FileChange / CommitInfo / CommitStat / RepoSummary / SyncInfo
     GitService.ts          GitService interface + GitServiceError
-    VsCodeGitService.ts    primary: Git API for read/stage/commit/watch; delegates the rest to CLI
+    VsCodeGitService.ts    primary: Git API for read/stage/commit/watch; delegates rest to CLI
     GitCliService.ts       execFile-based implementation of the full contract (fallback)
   ai/
-    AiProvider.ts          AiProvider interface, error mapping, defensive JSON parsing
+    AiProvider.ts          AiProvider interface, error mapping, SecurityFinding/SecurityReview types
     OpenAiProvider.ts      chat/completions (JSON mode) + /v1/models
     GeminiProvider.ts      :generateContent (JSON mime) + /v1beta/models
     ClaudeProvider.ts      /v1/messages + /v1/models
     AiProviderFactory.ts   create(providerId) -> AiProvider
-    prompts.ts             buildCommitPrompt(diff, diffStat)
+    prompts.ts             buildCommitPrompt / buildCommitSummaryPrompt / buildSecurityReviewPrompt
   config/
     SecretService.ts       API keys via context.secrets (SecretStorage only)
     SettingsService.ts     provider + per-provider model via context.globalState
@@ -51,102 +54,165 @@ src/
 tests/
   git/
     GitCliService.test.ts  integration tests for all CLI operations (real git repo via mkdtemp)
-    models.test.ts         unit tests for vscodeStatusToLetter + cliStatusToLetter
+    models.test.ts         unit tests for status letter mapping
   ai/
-    AiProvider.test.ts     unit tests for parseGeneratedMessage + mapStatusToMessage + throwForStatus
+    AiProvider.test.ts     unit tests for parseGeneratedMessage + error mapping
     prompts.test.ts        unit tests for buildCommitPrompt
   utils/
-    DiffLimiter.test.ts    unit tests for isIgnored + prepare (ignore, truncate, empty)
+    DiffLimiter.test.ts    unit tests for isIgnored + prepare
   mocks/
-    vscode.ts              minimal vscode API stub (workspace, window) for the test environment
+    vscode.ts              minimal vscode API stub for the test environment
 ```
 
 ## Services & data flow
 
-1. **`extension.ts`** instantiates the services, creates `GitableViewProvider`,
-   registers it for the `gitable.panel` view, registers the seven commands, and
-   subscribes to Git change events (`VsCodeGitService.registerChangeListener`).
+1. **`extension.ts`** instantiates all services, creates `GitableViewProvider`,
+   registers it for `gitable.panel`, registers commands, and subscribes to Git
+   change events. On panel visibility change the provider auto-fetches from origin.
 2. **`GitableViewProvider`** is the single orchestrator. The webview posts intent
-   messages; the provider performs the work via the Git/AI/config services and
-   posts back **one `state` object** that fully describes the UI.
-3. **Git layer** prefers the built-in API (`VsCodeGitService`) and falls back to
-   the CLI (`GitCliService`) for diffs, `--stat`, unstaging, and history — or
-   entirely, if the Git API is unavailable.
-4. **AI layer** is reached only for validate / list-models / generate, always with
-   a key read from `SecretService` at call time.
+   messages; the provider performs work and posts back **one `state` object** that
+   fully describes the UI.
+3. **Git layer** prefers the built-in API (`VsCodeGitService`) and falls back to the
+   CLI (`GitCliService`) for diffs, stat, unstaging, history, fetch, and revert.
+4. **AI layer** is reached for validate / list-models / generate, with a key read
+   from `SecretService` at call time. Successful calls are recorded in `UsageStore`.
+5. **`UsageStore`** persists AI call history in `context.globalState` under
+   `gitable.usageLog` (max 5,000 entries, 90-day retention). Separate from
+   workspace files — never committed to the repo.
 
 ### Webview message protocol
 
-- **Webview → host:** `ready`, `refresh`, `selectRepo`, `stageFile`, `unstageFile`,
-  `stageFiles`, `unstageFiles`, `stageAll`, `unstageAll`, `discard`, `commit`,
-  `generateCommitMessage`, `saveProvider`, `saveApiKey`, `validateApiKey`,
-  `saveModel`, `fetchModels`, `openDiff`, `toggleCommit`, `openCommitFile`,
-  `push`, `pull`, `createBranch`, `switchBranch`, `checkoutBranchWithChanges`,
-  `checkoutBranchKeepingChanges`, `restoreBranchChanges`.
-- **Host → webview:** `state` (full snapshot), `setCommitFields`,
-  `clearCommitFields`, `switchTab`, `commitFiles`.
+**Webview → host:**
+- Git: `ready`, `refresh`, `selectRepo`, `stageFile`, `unstageFile`, `stageFiles`,
+  `unstageFiles`, `stageAll`, `unstageAll`, `discardFiles`, `commit`, `openDiff`,
+  `openCommitFile`, `toggleCommit`, `push`, `pull`, `fetchOrigin`, `createBranch`,
+  `switchBranch`, `checkoutBranchWithChanges`, `checkoutBranchKeepingChanges`,
+  `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`,
+  `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`
+- AI: `generateCommitMessage`, `summarizeCommit`, `securityReview`,
+  `saveAndValidate`, `saveProvider`, `saveModel`, `fetchModels`, `copySummaryText`
+- Analytics: `getReports`
 
-The `state` payload: `{ repositoryName, branchName, activeRoot, repositories,
-changes:{staged,unstaged}, history, branches, syncInfo, provider, model, models,
-hasApiKey, busyKind, busyText, error, notice }`.
+**Host → webview:**
+- `state` (full snapshot on every change)
+- `setCommitFields`, `clearCommitFields`, `switchTab`
+- `commitFiles` (lazy-loaded on first expand of a commit row)
+- `commitSummary` (AI result for a specific commit hash)
+- `securityReview` (AI security findings)
+- `reports` (30-day usage entries array)
 
-The `commitFiles` message carries `{ type:"commitFiles", hash, files:FileChange[] }` —
-sent lazily on first expand of a commit row in the History tab.
+**`state` payload:**
+```
+repositoryName, branchName, activeRoot, repositories,
+changes:{staged,unstaged}, history, branches,
+ahead, behind, hasUpstream, syncAction, lastFetchedAt,
+provider, model, models, hasApiKey,
+busyKind, busyText, isLoading, error, notice
+```
 
-## Conventions (mirrors the author's other projects)
+### AI result panels (overlays)
+
+AI summary and security review are shown as **absolute-position overlays** that
+cover the full panel area, not as new tabs. They use `position: absolute; inset: 0;
+z-index: 20` over the `#app` container (which has `position: relative`). The main
+tab bar always has only Changes and History — overlays stack on top when the user
+triggers an AI action.
+
+### Sync combo button
+
+The pull/push icon buttons are replaced by a single full-width **sync combo
+button** (`#syncBtn`) that changes label/icon/badge based on state:
+
+| State | Label | Badge |
+|---|---|---|
+| `syncAction` set | e.g. "Fetching origin" + spinning icon + "Hang on…" | — |
+| No upstream | "Publish branch" | — |
+| `behind > 0` | "Pull origin" | `N↓` |
+| `ahead > 0` | "Push origin" | `N↑` |
+| Clean | "Fetch origin" | — |
+
+On panel visibility change the provider calls `silentFetchAndRefresh()` which
+fetches from origin and sets `syncAction = "Refreshing repository"` while doing
+so, keeping ahead/behind counts fresh without user interaction.
+
+Pull/push/fetch each use `runSyncOp(label, globalBusy, fn)`:
+- Sets `syncAction` for inline button feedback.
+- When `globalBusy=true` (pull/push) also sets `busyKind` to disable the commit UI.
+- Clears both after completion.
+- Sync operations do not show info/error notification popups — feedback is inline.
+
+## Conventions
 
 - Concrete, single-responsibility `{Domain}Service` classes; interfaces only where
   polymorphism is real (`GitService`, `AiProvider`).
 - One class/concern per file, named after the class.
-- User-facing errors surface in both a VS Code notification **and** the webview
-  (`state.error`); internals go to the `Logger` output channel.
+- User-facing errors surface in both a VS Code notification **and** `state.error`;
+  internals go to the `Logger` output channel.
+- Sync operations (fetch/pull/push) surface feedback inline in the sync button
+  rather than info notifications.
 - No secrets outside SecretStorage; no network calls from the webview (tight CSP).
 
 ## Security & privacy
 
-- API keys: **SecretStorage only** (`gitable.<provider>.apiKey`). Never in settings,
-  globalState, or files.
-- Only the prepared staged diff is sent to the selected provider; `DiffLimiter`
-  strips generated/noisy files and caps size (default 40,000 chars).
+- API keys: **SecretStorage only** (`gitable.<provider>.apiKey`). Never in
+  settings, globalState, or files.
+- Only the prepared diff is sent to the selected provider; `DiffLimiter` strips
+  generated/noisy files and caps size (default 40,000 chars).
 - The webview uses a strict CSP with a per-load nonce; all AI HTTP happens in the
-  extension host, so the webview needs no external `connect-src`.
+  extension host.
 - Git CLI calls use `execFile` with argument arrays — no shell interpolation.
+- `CommitInfo.hash` stores the full 40-char SHA (`%H`). The webview truncates to
+  7 chars for display (`.slice(0, 7)`) but passes the full hash for all operations
+  (copy, diff, summarize, revert, cherry-pick).
 
 ## Build, run, package, test
 
 ```bash
 npm install
-npm run compile      # esbuild -> dist/extension.js  (npm run watch to rebuild on change)
+npm run compile      # esbuild -> dist/extension.js
+npm run watch        # rebuild on change
 npm run typecheck    # tsc --noEmit
-npm test             # vitest run  (unit + integration tests)
+npm test             # vitest run (unit + integration)
 # F5 in VS Code -> Extension Development Host
-vsce package         # produce a .vsix
+vsce package         # produce .vsix
 ```
 
-Tests live in `tests/` and are run by **Vitest** (`vitest.config.mts`). The `vscode`
-module is aliased to `tests/mocks/vscode.ts` so host-side TypeScript compiles and
-runs outside VS Code. Git integration tests create a real temporary repository via
-`mkdtemp` and clean it up with `rm -rf` in `afterEach`.
+Tests live in `tests/` and run under **Vitest**. The `vscode` module is aliased
+to `tests/mocks/vscode.ts`. Git integration tests create real temporary
+repositories via `mkdtemp` and clean up in `afterEach`. The `fetchOrigin` tests
+set up a local bare remote to verify remote-tracking ref updates.
+
+## Analytics (UsageStore)
+
+Every successful AI call records `{ ts, provider, model, type }` where
+`type` is `"commitMessage" | "commitSummary" | "security"`. The Reports panel
+(opened via the bar-chart icon in the webview header) shows:
+- Total call count for the last 30 days
+- Sparkline (30-day daily bar chart, CSS-only)
+- Breakdown by type and by provider (CSS horizontal bars)
+- Top models list
+
+Data lives in `context.globalState` under `gitable.usageLog` — outside the
+workspace, never committed to the repo.
 
 ## Notable design decisions
 
-- **Hybrid Git access.** All local mutations (stage/unstage/commit/discard) go through
-  the CLI because the stable VS Code Git API's command execution is unreliable on some
-  setups. Reads, watches, and push/pull prefer the API (credential/UI integration) with
-  a transparent CLI fallback via `apiOrCli()`.
-- **OpenAI uses `chat/completions` JSON mode** (rather than `/v1/responses`) because
-  commit generation needs reliable structured `{summary, description}` output. Auth,
-  validation, and model-listing patterns follow the same conventions as the other
-  providers.
-- **Live model lists only.** `FALLBACK_MODELS`/`DEFAULT_MODELS` were removed. Models
-  are fetched from the provider on validate and then cached via `preloadModels()` on
-  webview ready, so the dropdown is always fresh and the user never sees stale data.
-- **Expandable commit history.** Clicking a commit in the History tab expands it
-  inline (like VS Code's built-in Git view). Files are lazy-loaded on first expand
-  using `git diff-tree --no-commit-id --name-status -r --root <hash>` (the `--root`
-  flag handles the initial commit). Results are cached in the webview so background
-  refreshes do not collapse expanded rows. Clicking a file opens the parent↔commit
-  diff via `toGitUri` + `vscode.diff`.
-- **API keys in SecretStorage only.** Keys are written with `context.secrets` under
-  `gitable.<provider>.apiKey` and read back at call time — they never touch settings,
-  globalState, or any file.
+- **Hybrid Git access.** Local mutations go through CLI; reads, watches, and
+  push/pull prefer the built-in API for credential/UI integration, with a
+  transparent CLI fallback via `apiOrCli()`.
+- **Full SHA in history.** `git log` uses `%H` (40-char). Display truncates to 7
+  chars. All git operations (diff, revert, cherry-pick, AI summary) use the full hash.
+- **Live model lists only.** No hardcoded fallback lists. Models are fetched from
+  the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
+- **Expandable commit history.** Files are lazy-loaded on first expand and cached
+  in the webview so refreshes do not collapse expanded rows.
+- **Settings UX.** "Save key" + "Validate" are merged into one "Save & Validate"
+  button (enabled when the input has text or a key is already saved). Model
+  auto-saves on dropdown change. Refresh is a small icon next to the Model label.
+  The settings icon lives inside the webview header (top-right), not in the VS Code
+  toolbar.
+- **AI key storage.** Keys are written with `context.secrets` under
+  `gitable.<provider>.apiKey` and read back at call time — never touch settings,
+  globalState, or files.
+- **Activity bar badge.** The Gitable icon shows the count of changed files
+  (staged + unstaged) as a badge, mirroring VS Code's built-in SCM indicator.

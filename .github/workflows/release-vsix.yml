@@ -100,3 +100,13 @@ jobs:
               --notes "Gitable $TAG" \
               "${RELEASE_ARGS[@]}"
           fi
+
+      - name: Publish to VS Code Marketplace
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          PUBLISH_ARGS=(--packagePath "gitable-${VERSION}.vsix" --pat "$AZURE_DEVOPS_PAT")
+          if [[ "$VERSION" == *-* ]]; then
+            PUBLISH_ARGS+=(--pre-release)
+          fi
+          npx vsce publish "${PUBLISH_ARGS[@]}"
