@@ -355,30 +355,32 @@
       </div>
 
       <div id="panel-changes" class="gx-panel">
-        <div id="changesNotice"></div>
+        <div class="gx-changes-scroll">
+          <div id="changesNotice"></div>
 
-        <div class="gx-section-head">
-          <span class="gx-section-title">Staged</span>
-          <span id="stagedCount" class="gx-count">0</span>
-          <span class="spacer"></span>
-          <span class="gx-section-actions">
-            <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
-            <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
-          </span>
-        </div>
-        <ul id="stagedList" class="gx-files"></ul>
+          <div class="gx-section-head">
+            <span class="gx-section-title">Staged</span>
+            <span id="stagedCount" class="gx-count">0</span>
+            <span class="spacer"></span>
+            <span class="gx-section-actions">
+              <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
+              <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
+            </span>
+          </div>
+          <ul id="stagedList" class="gx-files"></ul>
 
-        <div class="gx-section-head">
-          <span class="gx-section-title">Changes</span>
-          <span id="unstagedCount" class="gx-count">0</span>
-          <span class="spacer"></span>
-          <span class="gx-section-actions">
-            <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
-            <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
-            <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
-          </span>
+          <div class="gx-section-head">
+            <span class="gx-section-title">Changes</span>
+            <span id="unstagedCount" class="gx-count">0</span>
+            <span class="spacer"></span>
+            <span class="gx-section-actions">
+              <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
+              <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
+              <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
+            </span>
+          </div>
+          <ul id="unstagedList" class="gx-files"></ul>
         </div>
-        <ul id="unstagedList" class="gx-files"></ul>
 
         <div class="gx-card">
           <div class="gx-field">

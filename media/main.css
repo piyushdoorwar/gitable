@@ -19,9 +19,14 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  padding: 0 0 16px;
+  padding: 0;
   font-family: var(--vscode-font-family);
   font-size: 12.5px;
   line-height: 1.45;
@@ -30,6 +35,14 @@ body {
     radial-gradient(120% 60% at 80% -10%, rgba(249, 139, 158, 0.08), transparent 60%),
     linear-gradient(180deg, rgba(9, 36, 75, 0.28), rgba(9, 36, 75, 0.06) 140px),
     var(--vscode-sideBar-background);
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .hidden {
@@ -88,6 +101,7 @@ button[aria-disabled="true"],
 
 /* Header ------------------------------------------------------------- */
 .gx-header {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -266,6 +280,7 @@ button[aria-disabled="true"],
 
 /* Tabs --------------------------------------------------------------- */
 .gx-tabs {
+  flex: 0 0 auto;
   display: flex;
   gap: 2px;
   padding: 0 10px;
@@ -306,7 +321,21 @@ button[aria-disabled="true"],
 }
 
 .gx-panel {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 12px;
+  overflow: auto;
+}
+#panel-changes {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gx-changes-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 /* Notices ------------------------------------------------------------ */
@@ -790,7 +819,8 @@ textarea {
 
 /* Commit card -------------------------------------------------------- */
 .gx-card {
-  margin-top: 14px;
+  flex: 0 0 auto;
+  margin-top: 12px;
   padding: 12px;
   background: var(--gx-navy-card);
   border: 1px solid var(--gx-line);
