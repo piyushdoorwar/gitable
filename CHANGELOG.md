@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.14] - 2026-06-06
+
 ### Added
 
+- Vitest-based Git integration tests now cover real temporary repositories for staging, unstaging, discarding, and branch-switch stash flows.
 - File rows now have a right-click menu for discarding a file, copying absolute/relative paths, and revealing the file in the OS file manager.
 - The Changes section shows a discard-selected action when one or more changed files are selected.
 
@@ -137,7 +140,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git integration preferring the built-in VS Code Git API with a cross-platform `execFile`-based CLI fallback.
 - Commands: `gitable.refresh`, `gitable.generateCommitMessage`, `gitable.commit`, `gitable.stageAll`, `gitable.unstageAll`, `gitable.openSettings`, `gitable.validateApiKey`.
 
-[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.13...HEAD
+[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.14...HEAD
+[0.0.14]: https://github.com/piyushdoorwar/gitable/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/piyushdoorwar/gitable/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/piyushdoorwar/gitable/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/piyushdoorwar/gitable/compare/v0.0.10...v0.0.11

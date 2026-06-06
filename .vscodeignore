@@ -9,5 +9,6 @@ out/**
 esbuild.js
 *.vsix
 tsconfig.json
+vitest.config.*
 **/*.map
 **/*.ts

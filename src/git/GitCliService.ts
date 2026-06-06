@@ -144,8 +144,14 @@ export class GitCliService implements GitService {
 
     const changes = await this.getChanges();
     const statusByPath = new Map(changes.unstaged.map((change) => [change.path, change.status]));
-    const untracked = unique.filter((filePath) => statusByPath.get(filePath) === "U");
-    const tracked = unique.filter((filePath) => statusByPath.get(filePath) !== "U");
+    const untracked = unique.filter((filePath) => {
+      const status = statusByPath.get(filePath);
+      return status === "U" || status == null;
+    });
+    const tracked = unique.filter((filePath) => {
+      const status = statusByPath.get(filePath);
+      return status != null && status !== "U";
+    });
     if (tracked.length) {
       await this.run(["restore", "--worktree", "--", ...tracked], root);
     }

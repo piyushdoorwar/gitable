@@ -2,7 +2,7 @@
   "name": "gitable",
   "displayName": "Gitable",
   "description": "AI-powered Git workflow panel for VS Code. Generate commit messages, review changes, and manage Git visually using your own AI API key.",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "icon": "media/icon.png",
   "publisher": "piyushdoorwar",
   "license": "MIT",
@@ -137,6 +137,7 @@
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "package": "node esbuild.js --production",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "echo \"(no linter configured)\" && exit 0"
   },
@@ -145,6 +146,7 @@
     "@types/vscode": "^1.96.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.8"
   }
 }
