@@ -615,6 +615,10 @@ button[aria-disabled="true"],
   justify-content: center;
   transition: opacity 0.1s;
 }
+.gx-stat {
+  pointer-events: none;
+  z-index: 1;
+}
 .gx-stat svg,
 .gx-row-action svg {
   width: 13px;
@@ -632,6 +636,7 @@ button[aria-disabled="true"],
   border-radius: 5px;
   opacity: 0;
   pointer-events: none;
+  z-index: 2;
 }
 .gx-file:hover .gx-stat {
   opacity: 0;
