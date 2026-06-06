@@ -9,6 +9,7 @@ import { DiffLimiter } from "../utils/DiffLimiter";
 import { Logger } from "../utils/Logger";
 
 type TabName = "changes" | "history" | "settings";
+type BranchSwitchChoice = "bring" | "keep";
 
 /**
  * Backs the Gitable sidebar webview. Owns the bidirectional message protocol,
@@ -256,15 +257,86 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async switchBranch(name: string): Promise<void> {
-    if (!name) {
+    const targetBranch = String(name ?? "").trim();
+    if (!targetBranch) {
       return;
     }
-    await this.runBusyGit(
-      "git",
-      `Switching to ${name}…`,
-      () => this.git.checkoutBranch(name),
-      `Switched to ${name}.`
+    const summary = await this.git.getRepoSummary().catch(() => undefined);
+    const currentBranch = summary?.branch ?? "";
+    if (currentBranch === targetBranch) {
+      return;
+    }
+
+    const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [] }));
+    const hasLocalChanges = changes.staged.length > 0 || changes.unstaged.length > 0;
+    const choice = hasLocalChanges
+      ? await this.pickBranchSwitchChoice(currentBranch, targetBranch)
+      : undefined;
+    if (hasLocalChanges && !choice) {
+      await this.refresh();
+      return;
+    }
+
+    await this.runBranchSwitch(targetBranch, async () => {
+      if (choice === "bring") {
+        await this.git.checkoutBranchWithLocalChanges(targetBranch);
+        return `Switched to ${targetBranch} with your changes.`;
+      }
+      if (choice === "keep" && currentBranch) {
+        await this.git.checkoutBranchKeepingLocalChanges(currentBranch, targetBranch);
+        return `Switched to ${targetBranch}. Changes stayed on ${currentBranch}.`;
+      }
+
+      await this.git.checkoutBranch(targetBranch);
+      const restored = await this.git.restoreSavedBranchChanges(targetBranch);
+      return restored
+        ? `Switched to ${targetBranch} and restored saved changes.`
+        : `Switched to ${targetBranch}.`;
+    });
+  }
+
+  private async pickBranchSwitchChoice(
+    currentBranch: string,
+    targetBranch: string
+  ): Promise<BranchSwitchChoice | undefined> {
+    const bring = `Bring changes to ${targetBranch}`;
+    const keep = currentBranch ? `Keep changes on ${currentBranch}` : "Keep changes on current branch";
+    const picked = await vscode.window.showWarningMessage(
+      `You have local changes. What should happen when switching to ${targetBranch}?`,
+      {
+        modal: true,
+        detail: currentBranch
+          ? `Bring your changes to ${targetBranch}, or save them for ${currentBranch} and switch with a clean working tree.`
+          : `Bring your changes to ${targetBranch}, or save them for the current branch and switch with a clean working tree.`
+      },
+      bring,
+      keep
     );
+    if (picked === bring) {
+      return "bring";
+    }
+    if (picked === keep) {
+      return "keep";
+    }
+    return undefined;
+  }
+
+  private async runBranchSwitch(
+    targetBranch: string,
+    action: () => Promise<string>
+  ): Promise<void> {
+    this.setBusy("git", `Switching to ${targetBranch}…`);
+    await this.postState();
+    try {
+      const successMessage = await action();
+      this.pendingNotice = successMessage;
+      vscode.window.showInformationMessage(`Gitable: ${successMessage}`);
+    } catch (error) {
+      this.fail(error);
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
   }
 
   private async createBranchNamed(name: string): Promise<void> {

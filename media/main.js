@@ -17,6 +17,10 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
     minus:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    stageAll:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h7"/><path d="M4 12h7"/><path d="M4 17h7"/><path d="M17 6v12"/><path d="M11 12h12"/></svg>',
+    unstageAll:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h7"/><path d="M4 12h7"/><path d="M4 17h7"/><path d="M12 12h10"/></svg>',
     lock:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     check:
@@ -250,7 +254,7 @@
         </div>
         <div class="gx-branch-row">
           <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" type="button">
-            ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>${icon("chevron", "sm")}
+            ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>
           </button>
           <button id="pullBtn" class="gx-iconbtn gx-sync-btn" data-action="pull" title="Pull" type="button">${ICONS.pull}<span id="behindBadge" class="gx-sync-badge hidden"></span></button>
           <button id="pushBtn" class="gx-iconbtn gx-sync-btn" data-action="push" title="Push" type="button">${ICONS.push}<span id="aheadBadge" class="gx-sync-badge hidden"></span></button>
@@ -260,7 +264,6 @@
       <div class="gx-tabs">
         <button class="gx-tab" data-tab="changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
         <button class="gx-tab" data-tab="history" type="button">${icon("history", "sm")}<span>History</span></button>
-        <button class="gx-tab" data-tab="branches" type="button">${icon("branch", "sm")}<span>Branches</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -270,8 +273,10 @@
           <span class="gx-section-title">Staged</span>
           <span id="stagedCount" class="gx-count">0</span>
           <span class="spacer"></span>
-          <button class="gx-mini-action" data-action="unstageSelected" type="button">Unstage selected</button>
-          <button class="gx-mini-action" data-action="unstageAll" type="button">Unstage all</button>
+          <span class="gx-section-actions">
+            <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected" aria-label="Unstage selected" type="button">${ICONS.minus}</button>
+            <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all" aria-label="Unstage all" type="button">${ICONS.unstageAll}</button>
+          </span>
         </div>
         <ul id="stagedList" class="gx-files"></ul>
 
@@ -279,8 +284,10 @@
           <span class="gx-section-title">Changes</span>
           <span id="unstagedCount" class="gx-count">0</span>
           <span class="spacer"></span>
-          <button class="gx-mini-action" data-action="stageSelected" type="button">Stage selected</button>
-          <button class="gx-mini-action" data-action="stageAll" type="button">Stage all</button>
+          <span class="gx-section-actions">
+            <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected" aria-label="Stage selected" type="button">${ICONS.plus}</button>
+            <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all" aria-label="Stage all" type="button">${ICONS.stageAll}</button>
+          </span>
         </div>
         <ul id="unstagedList" class="gx-files"></ul>
 
@@ -388,6 +395,7 @@
         const path = box.getAttribute("data-path");
         if (box.checked) ui.selected.add(path);
         else ui.selected.delete(path);
+        updateChangeActionButtons(ui.state);
       });
     });
   }
@@ -398,6 +406,10 @@
     document.querySelectorAll(".gx-tab").forEach((t) => {
       t.classList.toggle("active", t.getAttribute("data-tab") === tab);
     });
+    const branchButton = document.querySelector(".gx-branch-btn");
+    if (branchButton) {
+      branchButton.classList.toggle("active", tab === "branches");
+    }
     ["changes", "history", "branches", "settings"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
@@ -517,7 +529,9 @@
     byId("unstagedCount").textContent = String((s.changes.unstaged || []).length);
 
     const busy = !!s.isLoading;
-    const hasStaged = (s.changes.staged || []).length > 0;
+    const stagedFiles = s.changes.staged || [];
+    const unstagedFiles = s.changes.unstaged || [];
+    const hasStaged = stagedFiles.length > 0;
     const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
     const genBtn = byId("generateBtn");
     genBtn.innerHTML =
@@ -537,9 +551,20 @@
     commitBtn.toggleAttribute("disabled", busy || !hasStaged);
     byId("pushBtn").toggleAttribute("disabled", busy || !s.branchName);
     byId("pullBtn").toggleAttribute("disabled", busy || !s.branchName);
+    updateChangeActionButtons(s);
 
     renderHistory(s);
     renderSettings(s);
+  }
+
+  function updateChangeActionButtons(s) {
+    const busy = !!s.isLoading;
+    const stagedFiles = s.changes.staged || [];
+    const unstagedFiles = s.changes.unstaged || [];
+    byId("unstageSelectedBtn").toggleAttribute("disabled", busy || selectedPaths(stagedFiles).length === 0);
+    byId("unstageAllBtn").toggleAttribute("disabled", busy || stagedFiles.length === 0);
+    byId("stageSelectedBtn").toggleAttribute("disabled", busy || selectedPaths(unstagedFiles).length === 0);
+    byId("stageAllBtn").toggleAttribute("disabled", busy || unstagedFiles.length === 0);
   }
 
   function renderBranches(s) {

@@ -110,7 +110,7 @@ button:disabled {
   color: var(--gx-pink);
 }
 
-/* Header branch chip (opens the Branches tab) */
+/* Header branch button (opens the branch panel) */
 .gx-branch-btn {
   flex: 1;
   min-width: 0;
@@ -125,14 +125,13 @@ button:disabled {
   border-radius: var(--gx-radius-sm);
   transition: border-color 0.12s, background 0.12s;
 }
-.gx-branch-btn:hover {
+.gx-branch-btn:hover,
+.gx-branch-btn.active {
   border-color: var(--gx-pink-line);
+  background: var(--gx-pink-soft);
 }
 .gx-branch-btn > .gx-ic:first-child {
   color: var(--gx-pink);
-}
-.gx-branch-btn > .gx-ic:last-child {
-  color: var(--vscode-descriptionForeground);
 }
 .gx-branch-cur {
   flex: 1;
@@ -383,17 +382,33 @@ button:disabled {
 .gx-section-head .spacer {
   flex: 1;
 }
-.gx-mini-action {
-  background: none;
-  border: none;
-  color: var(--gx-pink);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 4px;
-  border-radius: 4px;
+.gx-section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
 }
-.gx-mini-action:hover {
+.gx-mini-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.gx-mini-action svg {
+  width: 14px;
+  height: 14px;
+}
+.gx-mini-action:hover:not(:disabled) {
+  color: var(--gx-pink);
   background: var(--gx-pink-soft);
+  border-color: var(--gx-pink-line);
 }
 
 /* File list ---------------------------------------------------------- */

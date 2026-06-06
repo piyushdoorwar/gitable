@@ -223,11 +223,14 @@ export class VsCodeGitService implements GitService {
   }
 
   async getBranches(): Promise<string[]> {
-    const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.getBranches();
+    this.syncCliRoot();
+    try {
+      return await this.cli.getBranches();
+    } catch (error) {
+      this.logger.warn(`Git CLI branch list failed; using Git API refs: ${(error as Error).message}`);
     }
-    return repo.state.refs
+    const repo = this.getActiveRepository();
+    return (repo?.state.refs ?? [])
       .filter((ref) => ref.type === 0 && !!ref.name)
       .map((ref) => ref.name as string);
   }
@@ -258,6 +261,21 @@ export class VsCodeGitService implements GitService {
     return this.apiOrCli(repo ? () => repo.checkout(name) : undefined, () =>
       this.cli.checkoutBranch(name)
     );
+  }
+
+  checkoutBranchWithLocalChanges(name: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.checkoutBranchWithLocalChanges(name);
+  }
+
+  checkoutBranchKeepingLocalChanges(sourceBranch: string, targetBranch: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.checkoutBranchKeepingLocalChanges(sourceBranch, targetBranch);
+  }
+
+  restoreSavedBranchChanges(branch: string): Promise<boolean> {
+    this.syncCliRoot();
+    return this.cli.restoreSavedBranchChanges(branch);
   }
 
   push(): Promise<void> {

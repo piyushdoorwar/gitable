@@ -16,6 +16,7 @@ import { cliStatusToLetter, CommitInfo, FileChange, RepoChanges, RepoSummary, Sy
  * GitService when the built-in Git API is unavailable.
  */
 export class GitCliService implements GitService {
+  private static readonly branchStashPrefix = "Gitable saved changes for ";
   private activeRoot: string | undefined;
 
   constructor(private readonly logger: Logger) {}
@@ -197,6 +198,50 @@ export class GitCliService implements GitService {
     await this.run(["checkout", name], this.requireRoot());
   }
 
+  async checkoutBranchWithLocalChanges(name: string): Promise<void> {
+    const root = this.requireRoot();
+    const stashed = await this.stashLocalChanges(`Gitable carry changes to ${name}`, root);
+    try {
+      await this.run(["checkout", name], root);
+    } catch (error) {
+      if (stashed) {
+        await this.popLatestStash(root).catch((restoreError) => {
+          this.logger.error("Failed to restore stashed changes after checkout failure.", restoreError);
+        });
+      }
+      throw error;
+    }
+    if (stashed) {
+      await this.popLatestStash(root);
+    }
+  }
+
+  async checkoutBranchKeepingLocalChanges(sourceBranch: string, targetBranch: string): Promise<void> {
+    const root = this.requireRoot();
+    const stashed = await this.stashLocalChanges(this.branchStashMessage(sourceBranch), root);
+    try {
+      await this.run(["checkout", targetBranch], root);
+    } catch (error) {
+      if (stashed) {
+        await this.popLatestStash(root).catch((restoreError) => {
+          this.logger.error("Failed to restore stashed changes after checkout failure.", restoreError);
+        });
+      }
+      throw error;
+    }
+  }
+
+  async restoreSavedBranchChanges(branch: string): Promise<boolean> {
+    const root = this.requireRoot();
+    const stash = await this.findBranchStash(branch, root);
+    if (!stash) {
+      return false;
+    }
+    await this.run(["stash", "apply", "--index", stash], root);
+    await this.run(["stash", "drop", stash], root);
+    return true;
+  }
+
   async push(): Promise<void> {
     await this.run(["push"], this.requireRoot());
   }
@@ -212,6 +257,34 @@ export class GitCliService implements GitService {
     } catch {
       return "(no branch)";
     }
+  }
+
+  private branchStashMessage(branch: string): string {
+    return `${GitCliService.branchStashPrefix}${branch}`;
+  }
+
+  private async stashLocalChanges(message: string, root: string): Promise<boolean> {
+    const output = await this.run(["stash", "push", "--include-untracked", "-m", message], root);
+    return !/No local changes to save/i.test(output);
+  }
+
+  private async popLatestStash(root: string): Promise<void> {
+    await this.run(["stash", "pop", "--index"], root);
+  }
+
+  private async findBranchStash(branch: string, root: string): Promise<string | undefined> {
+    const output = await this.run(["stash", "list", "--format=%gd%x09%s"], root);
+    const marker = this.branchStashMessage(branch);
+    const match = output
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [ref, ...subjectParts] = line.split("\t");
+        return { ref, subject: subjectParts.join("\t") };
+      })
+      .find((item) => item.subject.endsWith(marker));
+    return match?.ref;
   }
 
   private requireRoot(): string {

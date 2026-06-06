@@ -64,6 +64,15 @@ export interface GitService {
   /** Switches to an existing branch. */
   checkoutBranch(name: string): Promise<void>;
 
+  /** Switches branches by stashing, checking out, then applying local changes on the target. */
+  checkoutBranchWithLocalChanges(name: string): Promise<void>;
+
+  /** Saves local changes for the source branch, then switches to the target branch. */
+  checkoutBranchKeepingLocalChanges(sourceBranch: string, targetBranch: string): Promise<void>;
+
+  /** Restores local changes previously saved for the named branch. */
+  restoreSavedBranchChanges(branch: string): Promise<boolean>;
+
   /** Pushes the current branch to its remote. */
   push(): Promise<void>;
 

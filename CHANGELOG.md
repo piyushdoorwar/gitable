@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11] - 2026-06-06
+
+### Changed
+
+- Replaced verbose stage/unstage section actions with compact icon buttons and hover labels.
+
+## [0.0.10] - 2026-06-06
+
+### Added
+
+- Branch switching now prompts when local changes exist, with options to bring changes to the target branch or keep them saved on the current branch.
+
+## [0.0.9] - 2026-06-06
+
+### Changed
+
+- The header branch name is now a plain button that opens branch management; the visible tab bar is back to **Changes** and **History**.
+- Branch lists now read local heads from the Git CLI, so branches like `test` appear even when VS Code's Git API refs are stale.
+
 ## [0.0.8] - 2026-06-06
 
 ### Added
@@ -101,7 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git integration preferring the built-in VS Code Git API with a cross-platform `execFile`-based CLI fallback.
 - Commands: `gitable.refresh`, `gitable.generateCommitMessage`, `gitable.commit`, `gitable.stageAll`, `gitable.unstageAll`, `gitable.openSettings`, `gitable.validateApiKey`.
 
-[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.8...HEAD
+[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.11...HEAD
+[0.0.11]: https://github.com/piyushdoorwar/gitable/compare/v0.0.10...v0.0.11
+[0.0.10]: https://github.com/piyushdoorwar/gitable/compare/v0.0.9...v0.0.10
+[0.0.9]: https://github.com/piyushdoorwar/gitable/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/piyushdoorwar/gitable/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/piyushdoorwar/gitable/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/piyushdoorwar/gitable/compare/v0.0.5...v0.0.6
