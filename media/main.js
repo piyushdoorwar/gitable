@@ -1201,11 +1201,13 @@
         return `
         <li class="gx-commit${expanded ? " expanded" : ""}">
           <div class="gx-commit-head" data-action="toggleCommit" data-hash="${escapeHtml(c.hash)}" title="Show changed files" aria-label="Show changed files in ${escapeHtml(c.hash)}">
-            <span class="gx-commit-left">
-              <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
-              <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>
+            <span class="gx-commit-col-left">
+              <span class="rail gx-ic">${ICONS.commit}</span>
+              <span class="gx-commit-col-bottom">
+                <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
+                <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>
+              </span>
             </span>
-            <span class="rail gx-ic">${ICONS.commit}</span>
             <span class="body">
               <div class="gx-commit-title">
                 <span class="gx-commit-subject">${escapeHtml(c.subject)}</span>
