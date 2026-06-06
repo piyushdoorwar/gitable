@@ -3,7 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError } from "./GitService";
-import { cliStatusToLetter, CommitInfo, FileChange, RepoChanges, RepoSummary } from "./models";
+import { cliStatusToLetter, CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
 
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
@@ -161,6 +161,48 @@ export class GitCliService implements GitService {
       // A brand-new repository with no commits makes `git log` fail — treat as empty.
       return [];
     }
+  }
+
+  async getBranches(): Promise<string[]> {
+    const output = await this.run(
+      ["for-each-ref", "--format=%(refname:short)", "refs/heads"],
+      this.requireRoot()
+    );
+    return output
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+
+  async getSyncInfo(): Promise<SyncInfo> {
+    const root = this.requireRoot();
+    try {
+      // left = upstream-only (behind), right = HEAD-only (ahead)
+      const output = await this.run(
+        ["rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
+        root
+      );
+      const [behind, ahead] = output.trim().split(/\s+/).map((n) => Number(n) || 0);
+      return { ahead: ahead || 0, behind: behind || 0, hasUpstream: true };
+    } catch {
+      return { ahead: 0, behind: 0, hasUpstream: false };
+    }
+  }
+
+  async createBranch(name: string): Promise<void> {
+    await this.run(["checkout", "-b", name], this.requireRoot());
+  }
+
+  async checkoutBranch(name: string): Promise<void> {
+    await this.run(["checkout", name], this.requireRoot());
+  }
+
+  async push(): Promise<void> {
+    await this.run(["push"], this.requireRoot());
+  }
+
+  async pull(): Promise<void> {
+    await this.run(["pull"], this.requireRoot());
   }
 
   private async readBranch(root: string): Promise<string> {

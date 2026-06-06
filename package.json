@@ -94,6 +94,26 @@
         "command": "gitable.validateApiKey",
         "title": "Gitable: Validate API Key",
         "category": "Gitable"
+      },
+      {
+        "command": "gitable.push",
+        "title": "Gitable: Push",
+        "category": "Gitable"
+      },
+      {
+        "command": "gitable.pull",
+        "title": "Gitable: Pull",
+        "category": "Gitable"
+      },
+      {
+        "command": "gitable.createBranch",
+        "title": "Gitable: Create Branch",
+        "category": "Gitable"
+      },
+      {
+        "command": "gitable.switchBranch",
+        "title": "Gitable: Switch Branch",
+        "category": "Gitable"
       }
     ],
     "menus": {

@@ -75,6 +75,41 @@ button:disabled {
   gap: 6px;
 }
 
+.gx-repo-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+}
+.gx-repo-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gx-repo-name .gx-ic {
+  color: var(--gx-pink);
+}
+
+.gx-branch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gx-sync-btn {
+  width: auto;
+  min-width: 28px;
+  padding: 0 7px;
+  gap: 3px;
+}
+.gx-sync-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gx-pink);
+}
+
 .gx-branch {
   display: inline-flex;
   align-items: center;
@@ -118,6 +153,10 @@ button:disabled {
 .gx-tab {
   position: relative;
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 9px 4px;
   background: transparent;
   border: none;
@@ -188,6 +227,31 @@ button:disabled {
 @keyframes gx-pulse {
   0%, 100% { opacity: 0.3; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1); }
+}
+
+/* Inline button spinner (e.g. the Generate button while working) */
+.gx-spin {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--gx-pink-line);
+  border-top-color: var(--gx-pink);
+  animation: gx-rot 0.7s linear infinite;
+}
+@keyframes gx-rot {
+  to { transform: rotate(360deg); }
+}
+
+/* Settings model block — tighter, consistent spacing */
+.gx-model-block {
+  margin-top: 12px;
+}
+.gx-model-block .gx-field {
+  margin-bottom: 8px;
+}
+.gx-model-block .gx-actions {
+  margin-top: 0;
 }
 
 /* Sections ----------------------------------------------------------- */

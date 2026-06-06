@@ -15,7 +15,11 @@ export const Commands = {
   stageAll: "gitable.stageAll",
   unstageAll: "gitable.unstageAll",
   openSettings: "gitable.openSettings",
-  validateApiKey: "gitable.validateApiKey"
+  validateApiKey: "gitable.validateApiKey",
+  push: "gitable.push",
+  pull: "gitable.pull",
+  createBranch: "gitable.createBranch",
+  switchBranch: "gitable.switchBranch"
 } as const;
 
 /** Supported AI providers. */

@@ -17,7 +17,8 @@ type TabName = "changes" | "history" | "settings";
  */
 export class GitableViewProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | undefined;
-  private isLoading = false;
+  private busyKind = "";
+  private busyText = "";
   private pendingError = "";
   private pendingNotice = "";
   private pendingTab: TabName | undefined;
@@ -95,6 +96,30 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     await this.runValidate(this.settings.getProvider());
   }
 
+  async pushCommand(): Promise<void> {
+    await this.runBusyGit("git", "Pushing…", () => this.git.push(), "Pushed to remote.");
+  }
+
+  async pullCommand(): Promise<void> {
+    await this.runBusyGit("git", "Pulling…", () => this.git.pull(), "Pulled from remote.");
+  }
+
+  async createBranchCommand(): Promise<void> {
+    await this.createBranchFromInput();
+  }
+
+  async switchBranchCommand(): Promise<void> {
+    const branches = await this.git.getBranches().catch(() => []);
+    if (!branches.length) {
+      vscode.window.showInformationMessage("Gitable: no branches found.");
+      return;
+    }
+    const pick = await vscode.window.showQuickPick(branches, { placeHolder: "Switch to branch" });
+    if (pick) {
+      await this.switchBranch(pick);
+    }
+  }
+
   // ---- Message handling ----
 
   private async handleMessage(message: any): Promise<void> {
@@ -155,6 +180,18 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "fetchModels":
         await this.fetchModels(message.provider);
         break;
+      case "push":
+        await this.runBusyGit("git", "Pushing…", () => this.git.push(), "Pushed to remote.");
+        break;
+      case "pull":
+        await this.runBusyGit("git", "Pulling…", () => this.git.pull(), "Pulled from remote.");
+        break;
+      case "switchBranch":
+        await this.switchBranch(message.name);
+        break;
+      case "createBranch":
+        await this.createBranchFromInput();
+        break;
       default:
         break;
     }
@@ -186,6 +223,57 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.fail(error);
     }
     await this.refresh();
+  }
+
+  /** Runs a slower git op (network/branch) with a busy indicator + notice. */
+  private async runBusyGit(
+    kind: string,
+    text: string,
+    action: () => Promise<void>,
+    successMessage: string
+  ): Promise<void> {
+    this.setBusy(kind, text);
+    await this.postState();
+    try {
+      await action();
+      this.pendingNotice = successMessage;
+      vscode.window.showInformationMessage(`Gitable: ${successMessage}`);
+    } catch (error) {
+      this.fail(error);
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
+  }
+
+  private async switchBranch(name: string): Promise<void> {
+    if (!name) {
+      return;
+    }
+    await this.runBusyGit(
+      "git",
+      `Switching to ${name}…`,
+      () => this.git.checkoutBranch(name),
+      `Switched to ${name}.`
+    );
+  }
+
+  private async createBranchFromInput(): Promise<void> {
+    const name = await vscode.window.showInputBox({
+      prompt: "New branch name",
+      placeHolder: "feature/my-branch",
+      validateInput: (v) => (v && /\s/.test(v) ? "Branch names cannot contain spaces." : undefined)
+    });
+    if (!name || !name.trim()) {
+      return;
+    }
+    const branch = name.trim();
+    await this.runBusyGit(
+      "git",
+      `Creating ${branch}…`,
+      () => this.git.createBranch(branch),
+      `Created and switched to ${branch}.`
+    );
   }
 
   // ---- AI operations ----
@@ -230,7 +318,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.setLoading(true);
+    this.setBusy("generate", "Generating commit message…");
     await this.postState();
     try {
       const ai = AiProviderFactory.create(provider);
@@ -256,7 +344,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       this.fail(error);
     } finally {
-      this.setLoading(false);
+      this.clearBusy();
       await this.postState();
     }
   }
@@ -268,7 +356,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       await this.postState();
       return;
     }
-    this.setLoading(true);
+    this.setBusy("validate", "Validating API key…");
     await this.postState();
     try {
       const ai = AiProviderFactory.create(provider);
@@ -283,7 +371,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       this.fail(error);
     } finally {
-      this.setLoading(false);
+      this.clearBusy();
       await this.postState();
     }
   }
@@ -343,7 +431,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       await this.postState();
       return;
     }
-    this.setLoading(true);
+    this.setBusy("models", "Loading models…");
     await this.postState();
     try {
       const ai = AiProviderFactory.create(provider);
@@ -355,7 +443,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       this.fail(error);
     } finally {
-      this.setLoading(false);
+      this.clearBusy();
       await this.postState();
     }
   }
@@ -374,8 +462,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   // ---- State ----
 
-  private setLoading(value: boolean): void {
-    this.isLoading = value;
+  private setBusy(kind: string, text: string): void {
+    this.busyKind = kind;
+    this.busyText = text;
+  }
+  private clearBusy(): void {
+    this.busyKind = "";
+    this.busyText = "";
   }
 
   private fail(error: unknown): void {
@@ -405,6 +498,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let branchName = "";
     let changes: RepoChanges = { staged: [], unstaged: [] };
     let history: unknown[] = [];
+    let branches: string[] = [];
+    let ahead = 0;
+    let behind = 0;
+    let hasUpstream = false;
     let stateError = this.pendingError;
 
     try {
@@ -415,6 +512,11 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         branchName = summary.branch;
         changes = await this.git.getChanges();
         history = await this.git.getHistory(HISTORY_LIMIT);
+        branches = await this.git.getBranches();
+        const sync = await this.git.getSyncInfo();
+        ahead = sync.ahead;
+        behind = sync.behind;
+        hasUpstream = sync.hasUpstream;
       }
     } catch (error) {
       if (!stateError) {
@@ -438,7 +540,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       models,
       hasApiKey,
       providerIcons: this.providerIcons(),
-      isLoading: this.isLoading,
+      branches,
+      ahead,
+      behind,
+      hasUpstream,
+      busyKind: this.busyKind,
+      busyText: this.busyText,
+      isLoading: !!this.busyKind,
       error: stateError,
       notice: this.pendingNotice
     };

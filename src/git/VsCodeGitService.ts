@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitCliService } from "./GitCliService";
 import { GitService, GitServiceError } from "./GitService";
-import { CommitInfo, FileChange, RepoChanges, RepoSummary, vscodeStatusToLetter } from "./models";
+import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo, vscodeStatusToLetter } from "./models";
 
 // ---- Minimal typings for the built-in `vscode.git` extension API ----
 // We only declare the members Gitable uses, to avoid depending on the full
@@ -14,8 +14,13 @@ interface GitApiChange {
   renameUri?: vscode.Uri;
   status: number;
 }
+interface GitApiRef {
+  name?: string;
+  type: number; // 0 = local head, 1 = remote head, 2 = tag
+}
 interface GitApiRepositoryState {
-  HEAD?: { name?: string };
+  HEAD?: { name?: string; ahead?: number; behind?: number; upstream?: { name?: string } };
+  refs: GitApiRef[];
   indexChanges: GitApiChange[];
   workingTreeChanges: GitApiChange[];
   mergeChanges: GitApiChange[];
@@ -26,6 +31,10 @@ interface GitApiRepository {
   state: GitApiRepositoryState;
   add(resources: vscode.Uri[]): Promise<void>;
   commit(message: string, opts?: { all?: boolean }): Promise<void>;
+  push(): Promise<void>;
+  pull(): Promise<void>;
+  checkout(treeish: string): Promise<void>;
+  createBranch(name: string, checkout: boolean): Promise<void>;
 }
 interface GitApi {
   repositories: GitApiRepository[];
@@ -185,7 +194,71 @@ export class VsCodeGitService implements GitService {
     return this.cli.getHistory(limit);
   }
 
+  async getBranches(): Promise<string[]> {
+    const repo = this.getActiveRepository();
+    if (!repo) {
+      return this.cli.getBranches();
+    }
+    return repo.state.refs
+      .filter((ref) => ref.type === 0 && !!ref.name)
+      .map((ref) => ref.name as string);
+  }
+
+  async getSyncInfo(): Promise<SyncInfo> {
+    const repo = this.getActiveRepository();
+    if (!repo) {
+      return this.cli.getSyncInfo();
+    }
+    const head = repo.state.HEAD;
+    return {
+      ahead: head?.ahead ?? 0,
+      behind: head?.behind ?? 0,
+      hasUpstream: !!head?.upstream
+    };
+  }
+
+  async createBranch(name: string): Promise<void> {
+    const repo = this.getActiveRepository();
+    if (!repo) {
+      return this.cli.createBranch(name);
+    }
+    await this.wrap(() => repo.createBranch(name, true), "Could not create branch.");
+  }
+
+  async checkoutBranch(name: string): Promise<void> {
+    const repo = this.getActiveRepository();
+    if (!repo) {
+      return this.cli.checkoutBranch(name);
+    }
+    await this.wrap(() => repo.checkout(name), "Could not switch branch.");
+  }
+
+  async push(): Promise<void> {
+    const repo = this.getActiveRepository();
+    if (!repo) {
+      return this.cli.push();
+    }
+    await this.wrap(() => repo.push(), "Push failed.");
+  }
+
+  async pull(): Promise<void> {
+    const repo = this.getActiveRepository();
+    if (!repo) {
+      return this.cli.pull();
+    }
+    await this.wrap(() => repo.pull(), "Pull failed.");
+  }
+
   // ---- internals ----
+
+  private async wrap(action: () => Promise<void>, fallbackMessage: string): Promise<void> {
+    try {
+      await action();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new GitServiceError(detail || fallbackMessage, error);
+    }
+  }
 
   private toFileChange(change: GitApiChange, root: string, staged: boolean): FileChange {
     const target = change.renameUri ?? change.uri;

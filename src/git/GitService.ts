@@ -1,4 +1,4 @@
-import { CommitInfo, RepoChanges, RepoSummary } from "./models";
+import { CommitInfo, RepoChanges, RepoSummary, SyncInfo } from "./models";
 
 /**
  * Error raised by Git operations. Carries a user-friendly message that can be
@@ -51,4 +51,22 @@ export interface GitService {
 
   /** Recent commits on the current branch. */
   getHistory(limit: number): Promise<CommitInfo[]>;
+
+  /** Local branch names for the active repository. */
+  getBranches(): Promise<string[]>;
+
+  /** Ahead/behind counts relative to the upstream of the current branch. */
+  getSyncInfo(): Promise<SyncInfo>;
+
+  /** Creates a new branch and checks it out. */
+  createBranch(name: string): Promise<void>;
+
+  /** Switches to an existing branch. */
+  checkoutBranch(name: string): Promise<void>;
+
+  /** Pushes the current branch to its remote. */
+  push(): Promise<void>;
+
+  /** Pulls the current branch from its remote. */
+  pull(): Promise<void>;
 }

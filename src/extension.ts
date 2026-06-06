@@ -49,7 +49,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
     vscode.commands.registerCommand(Commands.validateApiKey, () =>
       provider.validateActiveProviderKey()
-    )
+    ),
+    vscode.commands.registerCommand(Commands.push, () => provider.pushCommand()),
+    vscode.commands.registerCommand(Commands.pull, () => provider.pullCommand()),
+    vscode.commands.registerCommand(Commands.createBranch, () => provider.createBranchCommand()),
+    vscode.commands.registerCommand(Commands.switchBranch, () => provider.switchBranchCommand())
   );
 
   logger.info("Gitable activated.");

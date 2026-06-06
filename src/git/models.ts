@@ -30,6 +30,14 @@ export interface RepoSummary {
   branch: string;
 }
 
+export interface SyncInfo {
+  /** Commits on HEAD not yet on the upstream (to push). */
+  ahead: number;
+  /** Commits on the upstream not yet on HEAD (to pull). */
+  behind: number;
+  hasUpstream: boolean;
+}
+
 /**
  * Maps the numeric status from the VS Code Git API (`Status` enum) to a letter.
  * The enum values are stable and documented in the git extension's API typings:

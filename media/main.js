@@ -20,7 +20,19 @@
     lock:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     check:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    repo:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h11a1 1 0 0 1 1 1v14H7a2 2 0 0 0-2 2V5a2 2 0 0 1 2-2z"/><path d="M5 18a2 2 0 0 0 2 2h11"/></svg>',
+    push:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="4" x2="19" y2="4"/><line x1="12" y1="20" x2="12" y2="9"/><polyline points="7 13 12 8 17 13"/></svg>',
+    pull:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 11 12 16 17 11"/><line x1="5" y1="20" x2="19" y2="20"/></svg>',
+    changes:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+    history:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+    settings:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>'
   };
 
   const PROVIDERS = [
@@ -37,15 +49,20 @@
     state: {
       repositoryName: "",
       branchName: "",
-      activeRoot: "",
-      repositories: [],
+      branches: [],
+      ahead: 0,
+      behind: 0,
+      hasUpstream: false,
       changes: { staged: [], unstaged: [] },
       history: [],
       provider: "openai",
       model: "",
       models: [],
       hasApiKey: false,
+      providerIcons: {},
       isLoading: false,
+      busyKind: "",
+      busyText: "",
       error: "",
       notice: ""
     }
@@ -88,6 +105,7 @@
     root.append(button, list);
 
     const iconHtml = (url) => (url ? `<img class="gx-opt-ic" src="${url}" alt="" />` : "");
+    const optIcon = (it) => (it.iconSvg ? `<span class="gx-ic sm">${it.iconSvg}</span>` : iconHtml(it.icon));
 
     let items = [];
     let value = null;
@@ -112,7 +130,7 @@
       const current = items.find((i) => i.value === value);
       label.textContent = current ? current.label : placeholder;
       label.classList.toggle("placeholder", !current);
-      iconSlot.innerHTML = current ? iconHtml(current.icon) : "";
+      iconSlot.innerHTML = current ? optIcon(current) : "";
     }
     function paintList() {
       list.innerHTML = "";
@@ -120,7 +138,7 @@
         const opt = el(
           "div",
           "gx-option" + (it.value === value ? " selected" : ""),
-          iconHtml(it.icon) + `<span>${escapeHtml(it.label)}</span>`
+          optIcon(it) + `<span>${escapeHtml(it.label)}</span>`
         );
         opt.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -159,16 +177,21 @@
     app.innerHTML = `
       <div class="gx-header">
         <div class="gx-repo-row">
-          <div id="repoSlot" style="flex:1;min-width:0"></div>
+          <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
+          <span style="flex:1"></span>
           <button id="refreshBtn" class="gx-iconbtn" title="Refresh" type="button">${ICONS.refresh}</button>
         </div>
-        <span class="gx-branch">${icon("branch", "sm")}<span id="branchName">—</span></span>
+        <div class="gx-branch-row">
+          <div id="branchSlot" style="flex:1;min-width:0"></div>
+          <button id="pullBtn" class="gx-iconbtn gx-sync-btn" data-action="pull" title="Pull" type="button">${ICONS.pull}<span id="behindBadge" class="gx-sync-badge hidden"></span></button>
+          <button id="pushBtn" class="gx-iconbtn gx-sync-btn" data-action="push" title="Push" type="button">${ICONS.push}<span id="aheadBadge" class="gx-sync-badge hidden"></span></button>
+        </div>
       </div>
 
       <div class="gx-tabs">
-        <button class="gx-tab" data-tab="changes" type="button">Changes</button>
-        <button class="gx-tab" data-tab="history" type="button">History</button>
-        <button class="gx-tab" data-tab="settings" type="button">Settings</button>
+        <button class="gx-tab" data-tab="changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
+        <button class="gx-tab" data-tab="history" type="button">${icon("history", "sm")}<span>History</span></button>
+        <button class="gx-tab" data-tab="settings" type="button">${icon("settings", "sm")}<span>Settings</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -232,8 +255,8 @@
           <button class="gx-btn gx-btn-ghost" data-action="validateApiKey" type="button">${icon("check")}<span>Validate</span></button>
         </div>
         <div id="modelHint" class="gx-hint">Save or validate your API key to load the available models.</div>
-        <div id="modelSection" class="hidden">
-          <div class="gx-field" style="margin-top:14px">
+        <div id="modelSection" class="hidden gx-model-block">
+          <div class="gx-field">
             <label class="gx-label">Model</label>
             <div id="modelSlot"></div>
           </div>
@@ -252,12 +275,15 @@
     `;
 
     // Dropdowns
-    ui.dd.repo = createDropdown((root) => post({ type: "selectRepo", root }));
+    ui.dd.branch = createDropdown((value) => {
+      if (value === "__new__") post({ type: "createBranch" });
+      else post({ type: "switchBranch", name: value });
+    });
     ui.dd.provider = createDropdown((provider) => post({ type: "saveProvider", provider }));
     ui.dd.model = createDropdown(() => {
       /* value tracked in dropdown; persisted via Save model */
     });
-    byId("repoSlot").append(ui.dd.repo.root);
+    byId("branchSlot").append(ui.dd.branch.root);
     byId("providerSlot").append(ui.dd.provider.root);
     byId("modelSlot").append(ui.dd.model.root);
 
@@ -350,6 +376,12 @@
         if (model) post({ type: "saveModel", model });
         break;
       }
+      case "push":
+        post({ type: "push" });
+        break;
+      case "pull":
+        post({ type: "pull" });
+        break;
       default:
         break;
     }
@@ -367,12 +399,14 @@
     const s = ui.state;
 
     // Header
-    byId("branchName").textContent = s.branchName || "—";
-    const repos = (s.repositories || []).map((r) => ({ value: r.root, label: r.name }));
-    ui.dd.repo.update(repos, s.activeRoot, {
-      disabled: repos.length === 0,
-      placeholder: s.repositoryName || "No repository"
+    byId("repoName").textContent = s.repositoryName || "—";
+    const branchItems = (s.branches || []).map((b) => ({ value: b, label: b, iconSvg: ICONS.branch }));
+    branchItems.push({ value: "__new__", label: "Create new branch…", iconSvg: ICONS.plus });
+    ui.dd.branch.update(branchItems, s.branchName, {
+      disabled: !s.branchName,
+      placeholder: s.branchName || "—"
     });
+    updateSync(s);
 
     renderNotice(s);
 
@@ -383,11 +417,27 @@
     byId("unstagedCount").textContent = String((s.changes.unstaged || []).length);
 
     const busy = !!s.isLoading;
-    byId("generateBtn").toggleAttribute("disabled", busy);
+    const genBtn = byId("generateBtn");
+    genBtn.innerHTML =
+      s.busyKind === "generate"
+        ? `<span class="gx-spin"></span><span>Generating…</span>`
+        : `${icon("sparkle")}<span>Generate message</span>`;
+    genBtn.toggleAttribute("disabled", busy);
     byId("commitBtn").toggleAttribute("disabled", busy);
+    byId("pushBtn").toggleAttribute("disabled", busy || !s.branchName);
+    byId("pullBtn").toggleAttribute("disabled", busy || !s.branchName);
 
     renderHistory(s);
     renderSettings(s);
+  }
+
+  function updateSync(s) {
+    const ahead = byId("aheadBadge");
+    const behind = byId("behindBadge");
+    ahead.textContent = s.ahead > 0 ? String(s.ahead) : "";
+    behind.textContent = s.behind > 0 ? String(s.behind) : "";
+    ahead.classList.toggle("hidden", !(s.ahead > 0));
+    behind.classList.toggle("hidden", !(s.behind > 0));
   }
 
   function renderNotice(s) {
@@ -395,7 +445,9 @@
     if (s.error) {
       region.innerHTML = `<div class="gx-notice error">${escapeHtml(s.error)}</div>`;
     } else if (s.isLoading) {
-      region.innerHTML = `<div class="gx-spinner"><span class="dot"></span><span>Working…</span></div>`;
+      region.innerHTML = `<div class="gx-spinner"><span class="dot"></span><span>${escapeHtml(
+        s.busyText || "Working…"
+      )}</span></div>`;
     } else if (s.notice) {
       region.innerHTML = `<div class="gx-notice info">${escapeHtml(s.notice)}</div>`;
     } else {
