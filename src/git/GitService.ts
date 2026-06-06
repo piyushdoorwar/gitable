@@ -79,4 +79,10 @@ export interface GitService {
 
   /** Pulls the current branch from its remote. */
   pull(): Promise<void>;
+
+  /** Creates a revert commit that undoes the changes introduced by the given commit. */
+  revertCommit(hash: string): Promise<void>;
+
+  /** Applies the changes from the given commit onto the current branch. */
+  cherryPickCommit(hash: string): Promise<void>;
 }

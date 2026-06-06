@@ -22,6 +22,7 @@ export interface CommitInfo {
   author: string;
   relativeDate: string;
   subject: string;
+  tags: string[];
 }
 
 export interface RepoSummary {

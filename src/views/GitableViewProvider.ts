@@ -146,22 +146,30 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.refresh();
         break;
       case "stageFile":
-        await this.runGit(() => this.git.stageFiles([message.filePath]));
+        await this.runGit(() => this.git.stageFiles([message.filePath]), "stage", "Staging file…");
         break;
       case "unstageFile":
-        await this.runGit(() => this.git.unstageFiles([message.filePath]));
+        await this.runGit(() => this.git.unstageFiles([message.filePath]), "unstage", "Unstaging file…");
         break;
       case "stageFiles":
-        await this.runGit(() => this.git.stageFiles(message.filePaths ?? []));
+        await this.runGit(
+          () => this.git.stageFiles(message.filePaths ?? []),
+          "stage",
+          this.countFilesText(message.filePaths, "Staging")
+        );
         break;
       case "unstageFiles":
-        await this.runGit(() => this.git.unstageFiles(message.filePaths ?? []));
+        await this.runGit(
+          () => this.git.unstageFiles(message.filePaths ?? []),
+          "unstage",
+          this.countFilesText(message.filePaths, "Unstaging")
+        );
         break;
       case "stageAll":
-        await this.runGit(() => this.git.stageAll());
+        await this.runGit(() => this.git.stageAll(), "stage", "Staging all files…");
         break;
       case "unstageAll":
-        await this.runGit(() => this.git.unstageAll());
+        await this.runGit(() => this.git.unstageAll(), "unstage", "Unstaging all files…");
         break;
       case "commit":
         await this.runCommit(message.summary, message.description);
@@ -214,6 +222,34 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "revealFile":
         await this.revealFile(message.filePath);
         break;
+      case "copySha": {
+        const sha = String(message.hash ?? "");
+        await vscode.env.clipboard.writeText(sha);
+        this.pendingNotice = `SHA copied: ${sha.slice(0, 7)}`;
+        await this.postState();
+        break;
+      }
+      case "copyTag": {
+        const tag = String(message.tag ?? "");
+        await vscode.env.clipboard.writeText(tag);
+        this.pendingNotice = `Tag copied: ${tag}`;
+        await this.postState();
+        break;
+      }
+      case "revertCommit": {
+        const short = String(message.hash ?? "").slice(0, 7);
+        await this.runBusyGit("git", `Reverting ${short}…`, () =>
+          this.git.revertCommit(message.hash), `Reverted ${short}.`
+        );
+        break;
+      }
+      case "cherryPickCommit": {
+        const short = String(message.hash ?? "").slice(0, 7);
+        await this.runBusyGit("git", `Cherry-picking ${short}…`, () =>
+          this.git.cherryPickCommit(message.hash), `Cherry-picked ${short}.`
+        );
+        break;
+      }
       case "createBranch":
         if (message.name) {
           await this.createBranchNamed(message.name);
@@ -228,13 +264,29 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   // ---- Git operations ----
 
-  private async runGit(action: () => Promise<void>): Promise<void> {
+  private async runGit(action: () => Promise<void>, kind = "", text = ""): Promise<void> {
+    if (kind || text) {
+      this.setBusy(kind, text);
+      await this.postState();
+    }
     try {
       await action();
     } catch (error) {
       this.fail(error);
+    } finally {
+      if (kind || text) {
+        this.clearBusy();
+      }
     }
     await this.refresh();
+  }
+
+  private countFilesText(paths: unknown, verb: string): string {
+    const count = Array.isArray(paths) ? paths.length : 0;
+    if (count <= 1) {
+      return `${verb} file…`;
+    }
+    return `${verb} ${count} files…`;
   }
 
   private async runCommit(summary: string, description?: string): Promise<void> {

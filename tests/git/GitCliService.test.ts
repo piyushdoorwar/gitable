@@ -3,6 +3,7 @@ import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { GitServiceError } from "../../src/git/GitService";
 import { GitCliService } from "../../src/git/GitCliService";
 import { Logger } from "../../src/utils/Logger";
 
@@ -169,6 +170,25 @@ describe("GitCliService integration", () => {
     expect(history[2].subject).toBe("commit 1");
   });
 
+  it("getHistory includes tags attached to commits", async () => {
+    await writeFile(path.join(root, "tracked.txt"), "tagged revision\n");
+    await git(["add", "tracked.txt"], root);
+    await git(["commit", "-m", "release commit"], root);
+    await git(["tag", "v1.0.0"], root);
+    await git(["tag", "latest"], root);
+
+    await writeFile(path.join(root, "tracked.txt"), "untagged revision\n");
+    await git(["add", "tracked.txt"], root);
+    await git(["commit", "-m", "next commit"], root);
+
+    const history = await service.getHistory(3);
+
+    expect(history[0].subject).toBe("next commit");
+    expect(history[0].tags).toEqual([]);
+    expect(history[1].subject).toBe("release commit");
+    expect(history[1].tags.sort()).toEqual(["latest", "v1.0.0"]);
+  });
+
   it("getHistory respects the limit", async () => {
     for (let i = 1; i <= 5; i++) {
       await writeFile(path.join(root, "tracked.txt"), `rev ${i}\n`);
@@ -260,5 +280,213 @@ describe("GitCliService integration", () => {
     expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\nmain work\n");
     expect(await readFile(path.join(root, "kept.txt"), "utf8")).toBe("kept\n");
     expect((await git(["stash", "list"], root)).trim()).toBe("");
+  });
+
+  // ---- getRepoSummary -------------------------------------------------------
+
+  describe("getRepoSummary", () => {
+    it("returns the repository name, root path, and branch", async () => {
+      const summary = await service.getRepoSummary();
+      expect(summary?.name).toBe(path.basename(root));
+      expect(summary?.root).toBe(root);
+      expect(summary?.branch).toBe("main");
+    });
+
+    it("reflects the active branch after a checkout", async () => {
+      await git(["checkout", "-b", "feature-branch"], root);
+      const summary = await service.getRepoSummary();
+      expect(summary?.branch).toBe("feature-branch");
+    });
+  });
+
+  // ---- getChanges — status detection ----------------------------------------
+
+  describe("getChanges — status detection", () => {
+    it("reports a modified tracked file as unstaged M", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+      const changes = await service.getChanges();
+      expect(changes.unstaged).toHaveLength(1);
+      expect(changes.unstaged[0]).toMatchObject({ path: "tracked.txt", status: "M", staged: false });
+      expect(changes.staged).toHaveLength(0);
+    });
+
+    it("reports a new untracked file as unstaged U", async () => {
+      await writeFile(path.join(root, "newfile.ts"), "export const x = 1;\n");
+      const changes = await service.getChanges();
+      expect(changes.unstaged).toHaveLength(1);
+      expect(changes.unstaged[0]).toMatchObject({ path: "newfile.ts", status: "U", staged: false });
+    });
+
+    it("reports a newly staged file as staged A", async () => {
+      await writeFile(path.join(root, "added.ts"), "export const x = 1;\n");
+      await git(["add", "added.ts"], root);
+      const changes = await service.getChanges();
+      expect(changes.staged).toHaveLength(1);
+      expect(changes.staged[0]).toMatchObject({ path: "added.ts", status: "A", staged: true });
+      expect(changes.unstaged).toHaveLength(0);
+    });
+
+    it("reports a staged deletion as staged D", async () => {
+      await git(["rm", "tracked.txt"], root);
+      const changes = await service.getChanges();
+      expect(changes.staged).toHaveLength(1);
+      expect(changes.staged[0]).toMatchObject({ path: "tracked.txt", status: "D", staged: true });
+    });
+
+    it("reports a staged rename as staged R with originalPath set", async () => {
+      await git(["mv", "tracked.txt", "renamed.txt"], root);
+      const changes = await service.getChanges();
+      expect(changes.staged).toHaveLength(1);
+      const entry = changes.staged[0];
+      expect(entry.status).toBe("R");
+      expect(entry.path).toBe("renamed.txt");
+      expect(entry.originalPath).toBe("tracked.txt");
+    });
+
+    it("reports a file that is both staged and has unstaged edits in both lists", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nstagededit\n");
+      await git(["add", "tracked.txt"], root);
+      await writeFile(path.join(root, "tracked.txt"), "base\nstagededit\nunstaged\n");
+      const changes = await service.getChanges();
+      const stagedPaths = changes.staged.map((c) => c.path);
+      const unstagedPaths = changes.unstaged.map((c) => c.path);
+      expect(stagedPaths).toContain("tracked.txt");
+      expect(unstagedPaths).toContain("tracked.txt");
+    });
+  });
+
+  // ---- diff content ---------------------------------------------------------
+
+  describe("diff content", () => {
+    it("getStagedDiff includes staged change lines", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nnew line\n");
+      await service.stageFiles(["tracked.txt"]);
+      const diff = await service.getStagedDiff();
+      expect(diff).toContain("diff --git");
+      expect(diff).toContain("tracked.txt");
+      expect(diff).toContain("+new line");
+    });
+
+    it("getStagedDiff is empty when nothing is staged", async () => {
+      const diff = await service.getStagedDiff();
+      expect(diff.trim()).toBe("");
+    });
+
+    it("getUnstagedDiff includes unstaged change lines", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nunstaged line\n");
+      const diff = await service.getUnstagedDiff();
+      expect(diff).toContain("diff --git");
+      expect(diff).toContain("tracked.txt");
+      expect(diff).toContain("+unstaged line");
+    });
+
+    it("getStagedDiffStat returns a summary of staged changes", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nstatline\n");
+      await service.stageFiles(["tracked.txt"]);
+      const stat = await service.getStagedDiffStat();
+      expect(stat).toContain("tracked.txt");
+      expect(stat).toMatch(/\d+ insertion/);
+    });
+  });
+
+  // ---- branches -------------------------------------------------------------
+
+  describe("branches", () => {
+    it("getBranches lists the initial branch", async () => {
+      const branches = await service.getBranches();
+      expect(branches).toContain("main");
+    });
+
+    it("getBranches lists all local branches", async () => {
+      await git(["checkout", "-b", "feature/x"], root);
+      await git(["checkout", "main"], root);
+      await git(["checkout", "-b", "bugfix/y"], root);
+      await git(["checkout", "main"], root);
+      const branches = await service.getBranches();
+      expect(branches.sort()).toEqual(["bugfix/y", "feature/x", "main"]);
+    });
+
+    it("createBranch creates a new branch and checks it out", async () => {
+      await service.createBranch("feature/new");
+      const summary = await service.getRepoSummary();
+      expect(summary?.branch).toBe("feature/new");
+      const branches = await service.getBranches();
+      expect(branches).toContain("feature/new");
+    });
+
+    it("checkoutBranch switches to an existing branch", async () => {
+      await git(["checkout", "-b", "other"], root);
+      await git(["checkout", "main"], root);
+      await service.checkoutBranch("other");
+      const summary = await service.getRepoSummary();
+      expect(summary?.branch).toBe("other");
+    });
+  });
+
+  // ---- sync info ------------------------------------------------------------
+
+  describe("getSyncInfo", () => {
+    it("returns hasUpstream false when no remote is configured", async () => {
+      const sync = await service.getSyncInfo();
+      expect(sync.hasUpstream).toBe(false);
+      expect(sync.ahead).toBe(0);
+      expect(sync.behind).toBe(0);
+    });
+  });
+
+  // ---- getCommitFiles edge cases --------------------------------------------
+
+  describe("getCommitFiles — additional", () => {
+    it("reports renamed files as R with the destination path", async () => {
+      await git(["mv", "tracked.txt", "renamed.txt"], root);
+      await git(["commit", "-m", "rename"], root);
+      const history = await service.getHistory(1);
+      const files = await service.getCommitFiles(history[0].hash);
+      expect(files).toHaveLength(1);
+      expect(files[0].status).toBe("R");
+      expect(files[0].path).toBe("renamed.txt");
+    });
+
+    it("lists multiple changed files in a single commit", async () => {
+      await writeFile(path.join(root, "a.ts"), "a\n");
+      await writeFile(path.join(root, "b.ts"), "b\n");
+      await git(["add", "a.ts", "b.ts"], root);
+      await git(["commit", "-m", "add a and b"], root);
+      const history = await service.getHistory(1);
+      const files = await service.getCommitFiles(history[0].hash);
+      expect(files.map((f) => f.path).sort()).toEqual(["a.ts", "b.ts"]);
+      expect(files.every((f) => f.status === "A")).toBe(true);
+    });
+  });
+
+  // ---- error handling -------------------------------------------------------
+
+  describe("error handling", () => {
+    it("throws GitServiceError when no root is set", async () => {
+      const noRoot = new GitCliService(new TestLogger() as unknown as Logger);
+      await expect(noRoot.getChanges()).rejects.toBeInstanceOf(GitServiceError);
+    });
+
+    it("throws GitServiceError with readable message when no root is set", async () => {
+      const noRoot = new GitCliService(new TestLogger() as unknown as Logger);
+      await expect(noRoot.getChanges()).rejects.toThrow("No active Git repository");
+    });
+
+    it("stageFiles with an empty array is a silent no-op", async () => {
+      await expect(service.stageFiles([])).resolves.toBeUndefined();
+      const changes = await service.getChanges();
+      expect(changes.staged).toHaveLength(0);
+    });
+
+    it("unstageFiles with an empty array is a silent no-op", async () => {
+      await expect(service.unstageFiles([])).resolves.toBeUndefined();
+    });
+
+    it("discardFiles with an empty array is a silent no-op", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+      await expect(service.discardFiles([], false)).resolves.toBeUndefined();
+      // File should be untouched since we passed an empty list.
+      expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\nchanged\n");
+    });
   });
 });

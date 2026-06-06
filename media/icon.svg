@@ -1,27 +1,34 @@
 <svg width="256" height="256" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <title>Gitable Logo</title>
 
-  <!-- Git branch mark (coral), with hollow top/bottom nodes -->
-  <g
-    transform="translate(11 12.5) scale(0.46) translate(-12 -12)"
-    fill="none"
-    stroke="#F98B9E"
-    stroke-width="2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  >
-    <path
-      d="M6 8.35V15.65M6.45 12C7.1 11.38 8.42 11 9.85 11H15C17.65 11 20.3 9.15 20.3 8"
-    />
-    <circle cx="6" cy="6" r="2.35"/>
-    <circle cx="6" cy="18" r="2.35"/>
-  </g>
+  <!--
+    Outer wrapper scales everything up to fill the activity-bar icon slot.
+    Without this the branch+leaves only occupied ~46% of the viewBox and
+    appeared tiny compared to other extensions' icons.
+  -->
+  <g transform="translate(12 12) scale(1.85) translate(-12 -12)">
 
-  <!-- Three-leaf sprig (coral), softly angled from the branch tip -->
-  <g transform="translate(14.25 11.22) rotate(23)" fill="#F98B9E">
-    <circle cx="0" cy="-0.04" r="0.48"/>
-    <path transform="rotate(-18) translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
-    <path transform="rotate(18) translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
-    <path transform="rotate(54) translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
+    <!-- Git branch mark (coral), hollow top/bottom nodes -->
+    <g
+      transform="translate(11 12.5) scale(0.46) translate(-12 -12)"
+      fill="none"
+      stroke="#F98B9E"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M6 8.35V15.65M6.45 12C7.1 11.38 8.42 11 9.85 11H15C17.65 11 20.3 9.15 20.3 8"/>
+      <circle cx="6" cy="6" r="2.35"/>
+      <circle cx="6" cy="18" r="2.35"/>
+    </g>
+
+    <!-- Three-leaf sprig (coral), angled from the branch arm tip -->
+    <g transform="translate(14.25 11.22) rotate(23)" fill="#F98B9E">
+      <circle cx="0" cy="-0.04" r="0.48"/>
+      <path transform="rotate(-18) translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
+      <path transform="rotate(18)  translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
+      <path transform="rotate(54)  translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
+    </g>
+
   </g>
 </svg>

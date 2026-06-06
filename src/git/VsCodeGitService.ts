@@ -323,6 +323,16 @@ export class VsCodeGitService implements GitService {
     return this.apiOrCli(repo ? () => repo.pull() : undefined, () => this.cli.pull());
   }
 
+
+  revertCommit(hash: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.revertCommit(hash);
+  }
+
+  cherryPickCommit(hash: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.cherryPickCommit(hash);
+  }
   // ---- internals ----
 
   /**

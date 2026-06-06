@@ -172,19 +172,20 @@ export class GitCliService implements GitService {
     const root = this.requireRoot();
     try {
       const output = await this.run(
-        ["log", `--pretty=format:%h%x09%an%x09%ar%x09%s`, "-n", String(limit)],
+        ["log", "--decorate=short", `--pretty=format:%h%x09%an%x09%ar%x09%D%x09%s`, "-n", String(limit)],
         root
       );
       return output
         .split("\n")
         .filter((line) => line.trim().length > 0)
         .map((line) => {
-          const [hash, author, relativeDate, ...subjectParts] = line.split("\t");
+          const [hash, author, relativeDate, decorations, ...subjectParts] = line.split("\t");
           return {
             hash: hash ?? "",
             author: author ?? "",
             relativeDate: relativeDate ?? "",
-            subject: subjectParts.join("\t")
+            subject: subjectParts.join("\t"),
+            tags: this.parseDecoratedTags(decorations ?? "")
           };
         });
     } catch {
@@ -193,11 +194,20 @@ export class GitCliService implements GitService {
     }
   }
 
+  private parseDecoratedTags(decorations: string): string[] {
+    return decorations
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.startsWith("tag: "))
+      .map((part) => part.slice("tag: ".length).trim())
+      .filter(Boolean);
+  }
+
   /** Files changed by a single commit (vs its parent; root commit shows all). */
   async getCommitFiles(hash: string): Promise<FileChange[]> {
     const root = this.requireRoot();
     const output = await this.run(
-      ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--name-status", "-r", "--root", hash],
+      ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--name-status", "-r", "-M", "--root", hash],
       root
     );
     const files: FileChange[] = [];
@@ -306,6 +316,14 @@ export class GitCliService implements GitService {
 
   async pull(): Promise<void> {
     await this.run(["pull"], this.requireRoot());
+  }
+
+  async revertCommit(hash: string): Promise<void> {
+    await this.run(["revert", "--no-edit", hash], this.requireRoot());
+  }
+
+  async cherryPickCommit(hash: string): Promise<void> {
+    await this.run(["cherry-pick", hash], this.requireRoot());
   }
 
   private async readBranch(root: string): Promise<string> {

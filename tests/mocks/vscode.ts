@@ -1,19 +1,38 @@
+import { vi } from "vitest";
+
 export const workspace = {
-  workspaceFolders: []
+  workspaceFolders: [] as { uri: { fsPath: string } }[]
 };
 
 export const window = {
-  createOutputChannel() {
+  createOutputChannel(_name: string) {
     return {
-      appendLine() {
-        // Test mock.
-      },
-      show() {
-        // Test mock.
-      },
-      dispose() {
-        // Test mock.
-      }
+      appendLine() {},
+      show() {},
+      dispose() {}
     };
   }
 };
+
+// Spyable stubs used by VsCodeGitService tests.
+// These are vi.fn() so callers can configure return values and assert calls.
+
+export const extensions = {
+  getExtension: vi.fn((_id: string): any => undefined)
+};
+
+export const Uri = {
+  file: vi.fn((filePath: string) => ({ fsPath: filePath, scheme: "file" }))
+};
+
+export const commands = {
+  executeCommand: vi.fn((..._args: unknown[]): any => Promise.resolve())
+};
+
+/** Minimal Disposable used by VsCodeGitService.registerChangeListener. */
+export class Disposable {
+  constructor(private readonly fn: () => void) {}
+  dispose(): void {
+    this.fn();
+  }
+}

@@ -44,7 +44,15 @@
     image:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5L5 20"/></svg>',
     dot:
-      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>',
+    copy:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    tag:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+    revert:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.4"/></svg>',
+    cherryPick:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="2.5"/><line x1="3" y1="12" x2="6.5" y2="12"/><line x1="11.5" y1="12" x2="16" y2="12"/><polyline points="13 7 18 12 13 17"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -149,6 +157,7 @@
   let tooltipNode = null;
   let tooltipTarget = null;
   let contextFile = null;
+  let contextCommit = null;
 
   function post(message) {
     vscode.postMessage(message);
@@ -458,6 +467,8 @@
         <button data-menu-action="copyRelativePath" role="menuitem" type="button">${icon("file", "sm")}<span>Copy relative path</span></button>
         <button data-menu-action="revealFile" role="menuitem" type="button">${icon("repo", "sm")}<span>Show in file manager</span></button>
       </div>
+
+      <div id="commitContextMenu" class="gx-context-menu hidden" role="menu"></div>
     `;
     initTooltips();
 
@@ -493,6 +504,12 @@
       if (target) handleAction(target.getAttribute("data-action"), target);
     });
     app.addEventListener("contextmenu", (e) => {
+      const commitHead = e.target.closest(".gx-commit-head");
+      if (commitHead) {
+        e.preventDefault();
+        openCommitMenu(commitHead.getAttribute("data-hash"), e.clientX, e.clientY);
+        return;
+      }
       const row = e.target.closest(".gx-file");
       if (!row) {
         closeFileMenu();
@@ -509,12 +526,21 @@
       e.stopPropagation();
       handleMenuAction(item.getAttribute("data-menu-action"));
     });
-    document.addEventListener("click", closeFileMenu);
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeFileMenu();
+
+    const commitMenu = byId("commitContextMenu");
+    commitMenu.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-cmenu-action]");
+      if (!item) return;
+      e.stopPropagation();
+      handleCommitMenuAction(item.getAttribute("data-cmenu-action"), item);
     });
-    window.addEventListener("resize", closeFileMenu);
-    window.addEventListener("scroll", closeFileMenu, true);
+
+    document.addEventListener("click", () => { closeFileMenu(); closeCommitMenu(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { closeFileMenu(); closeCommitMenu(); }
+    });
+    window.addEventListener("resize", () => { closeFileMenu(); closeCommitMenu(); });
+    window.addEventListener("scroll", () => { closeFileMenu(); closeCommitMenu(); }, true);
 
     // Checkbox selection (delegated)
     [byId("stagedList"), byId("unstagedList")].forEach((listEl) => {
@@ -706,6 +732,64 @@
     }
   }
 
+  function openCommitMenu(hash, x, y) {
+    if (!hash) return;
+    closeFileMenu();
+    const commit = (ui.state.history || []).find((c) => c.hash === hash);
+    contextCommit = { hash, tags: (commit && commit.tags) || [] };
+    const tags = contextCommit.tags;
+    const tagItems = tags
+      .map(
+        (t) =>
+          `<button data-cmenu-action="copyTag" data-tag="${escapeHtml(t)}" role="menuitem" type="button">${icon("tag", "sm")}<span>Copy tag: ${escapeHtml(t)}</span></button>`
+      )
+      .join("");
+    const menu = byId("commitContextMenu");
+    menu.innerHTML =
+      `<button data-cmenu-action="copySha" role="menuitem" type="button">${icon("copy", "sm")}<span>Copy SHA</span></button>` +
+      (tagItems ? `<span class="gx-menu-sep"></span>${tagItems}` : "") +
+      `<span class="gx-menu-sep"></span>` +
+      `<button data-cmenu-action="revertCommit" role="menuitem" type="button">${icon("revert", "sm")}<span>Revert commit</span></button>` +
+      `<button data-cmenu-action="cherryPickCommit" role="menuitem" type="button">${icon("cherryPick", "sm")}<span>Cherry-pick commit</span></button>`;
+    menu.classList.remove("hidden");
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const margin = 6;
+    const left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin));
+    const top = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin));
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
+  function closeCommitMenu() {
+    const menu = document.getElementById("commitContextMenu");
+    if (menu) menu.classList.add("hidden");
+    contextCommit = null;
+  }
+
+  function handleCommitMenuAction(action, elm) {
+    if (!contextCommit) return;
+    const commit = contextCommit;
+    closeCommitMenu();
+    switch (action) {
+      case "copySha":
+        post({ type: "copySha", hash: commit.hash });
+        break;
+      case "copyTag":
+        post({ type: "copyTag", tag: elm.getAttribute("data-tag") });
+        break;
+      case "revertCommit":
+        post({ type: "revertCommit", hash: commit.hash });
+        break;
+      case "cherryPickCommit":
+        post({ type: "cherryPickCommit", hash: commit.hash });
+        break;
+      default:
+        break;
+    }
+  }
+
   function selectedPaths(files) {
     return files.filter((f) => ui.selected.has(f.path)).map((f) => f.path);
   }
@@ -740,7 +824,7 @@
 
     // Lists
     byId("stagedList").innerHTML = renderFileList(s.changes.staged, "unstageOne", "minus");
-    byId("unstagedList").innerHTML = renderFileList(s.changes.unstaged, "stageOne", "plus");
+    byId("unstagedList").innerHTML = renderFileList(s.changes.unstaged);
     byId("stagedCount").textContent = String((s.changes.staged || []).length);
     byId("unstagedCount").textContent = String((s.changes.unstaged || []).length);
 
@@ -928,10 +1012,10 @@
     return files
       .map((f) => {
         const checked = ui.selected.has(f.path) ? "checked" : "";
-        const title = action === "stageOne" ? `Stage ${f.displayPath || f.path}` : `Unstage ${f.displayPath || f.path}`;
+        const title = `Unstage ${f.displayPath || f.path}`;
         const selectTitle = `Select ${f.displayPath || f.path}`;
         return `
-          <li class="gx-file" data-path="${escapeHtml(f.path)}" data-staged="${staged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
+          <li class="gx-file${staged ? " gx-file-staged" : ""}" data-path="${escapeHtml(f.path)}" data-staged="${staged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
             <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" title="${escapeHtml(
           selectTitle
         )}" aria-label="${escapeHtml(selectTitle)}" ${checked} />
@@ -942,9 +1026,13 @@
           f.displayPath || f.path
         )}</span>
             <span class="gx-right">
-              <button class="gx-row-action" data-action="${action}" data-path="${escapeHtml(
-          f.path
-        )}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" type="button">${ICONS[actionIcon]}</button>
+              ${
+                staged
+                  ? `<button class="gx-row-action" data-action="${action}" data-path="${escapeHtml(
+                      f.path
+                    )}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" type="button">${ICONS[actionIcon]}</button>`
+                  : ""
+              }
               ${statusGlyph(f.status)}
             </span>
           </li>`;
@@ -968,7 +1056,10 @@
             <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
             <span class="rail gx-ic">${ICONS.commit}</span>
             <span class="body">
-              <div class="gx-commit-subject">${escapeHtml(c.subject)}</div>
+              <div class="gx-commit-title">
+                <span class="gx-commit-subject">${escapeHtml(c.subject)}</span>
+                ${renderCommitTags(c.tags)}
+              </div>
               <div class="gx-commit-meta">
                 <span class="gx-hash">${escapeHtml(c.hash)}</span>
                 <span>${escapeHtml(c.author)}</span>
@@ -980,6 +1071,14 @@
         </li>`;
       })
       .join("");
+  }
+
+  function renderCommitTags(tags) {
+    const names = Array.isArray(tags) ? tags.filter(Boolean) : [];
+    if (!names.length) return "";
+    return `<span class="gx-commit-tags">${names
+      .map((tagName) => `<span class="gx-tag" title="Git tag ${escapeHtml(tagName)}">${escapeHtml(tagName)}</span>`)
+      .join("")}</span>`;
   }
 
   function renderCommitFiles(hash) {
