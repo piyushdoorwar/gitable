@@ -2,7 +2,7 @@
   "name": "gitable",
   "displayName": "Gitable",
   "description": "AI-powered Git workflow panel for VS Code. Generate commit messages, review changes, and manage Git visually using your own AI API key.",
-  "version": "0.0.2",
+  "version": "0.0.5",
   "publisher": "piyushdoorwar",
   "license": "MIT",
   "author": {
@@ -115,21 +115,7 @@
         "title": "Gitable: Switch Branch",
         "category": "Gitable"
       }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "gitable.refresh",
-          "when": "view == gitable.panel",
-          "group": "navigation@1"
-        },
-        {
-          "command": "gitable.openSettings",
-          "when": "view == gitable.panel",
-          "group": "navigation@2"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

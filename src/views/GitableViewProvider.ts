@@ -190,7 +190,11 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.switchBranch(message.name);
         break;
       case "createBranch":
-        await this.createBranchFromInput();
+        if (message.name) {
+          await this.createBranchNamed(message.name);
+        } else {
+          await this.createBranchFromInput();
+        }
         break;
       default:
         break;
@@ -255,6 +259,21 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       `Switching to ${name}…`,
       () => this.git.checkoutBranch(name),
       `Switched to ${name}.`
+    );
+  }
+
+  private async createBranchNamed(name: string): Promise<void> {
+    const branch = String(name).trim();
+    if (!branch || /\s/.test(branch)) {
+      this.fail("Invalid branch name (no spaces allowed).");
+      await this.postState();
+      return;
+    }
+    await this.runBusyGit(
+      "git",
+      `Creating ${branch}…`,
+      () => this.git.createBranch(branch),
+      `Created and switched to ${branch}.`
     );
   }
 

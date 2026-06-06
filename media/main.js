@@ -24,15 +24,83 @@
     repo:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h11a1 1 0 0 1 1 1v14H7a2 2 0 0 0-2 2V5a2 2 0 0 1 2-2z"/><path d="M5 18a2 2 0 0 0 2 2h11"/></svg>',
     push:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="4" x2="19" y2="4"/><line x1="12" y1="20" x2="12" y2="9"/><polyline points="7 13 12 8 17 13"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-8"/><path d="m8 16 4-4 4 4"/><path d="M4.6 14.5A6 6 0 0 1 8 3.6a6.5 6.5 0 0 1 11.7 3.4A4.8 4.8 0 0 1 19 16.4"/></svg>',
     pull:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 11 12 16 17 11"/><line x1="5" y1="20" x2="19" y2="20"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/><path d="M4.6 14.5A6 6 0 0 1 8 3.6a6.5 6.5 0 0 1 11.7 3.4A4.8 4.8 0 0 1 19 16.4"/></svg>',
     changes:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     history:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
     settings:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>',
+    file:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/></svg>',
+    image:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5L5 20"/></svg>',
+    dot:
+      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>'
+  };
+
+  /** Extension -> a colour class for the file-type icon. */
+  const EXT_CLASS = {
+    // JavaScript / TypeScript
+    ts: "ts", tsx: "ts", mts: "ts", cts: "ts",
+    js: "js", jsx: "js", mjs: "js", cjs: "js",
+    json: "json", jsonc: "json", json5: "json",
+    // Web
+    css: "css", less: "css",
+    scss: "scss", sass: "scss",
+    html: "html", htm: "html", xhtml: "html", xml: "html", vue: "html", svelte: "html", astro: "html",
+    // Docs / text
+    md: "md", markdown: "md", mdx: "md", rst: "md", txt: "md", tex: "md", adoc: "md",
+    // Images
+    svg: "img", png: "img", jpg: "img", jpeg: "img", gif: "img", webp: "img", ico: "img", bmp: "img", avif: "img",
+    // Python
+    py: "py", pyw: "py", pyi: "py", ipynb: "py",
+    // Go / Rust
+    go: "go",
+    rs: "rs",
+    // JVM
+    java: "java", jar: "java",
+    kt: "kotlin", kts: "kotlin",
+    scala: "scala", sc: "scala",
+    groovy: "groovy", gradle: "groovy",
+    clj: "clojure", cljs: "clojure", cljc: "clojure", edn: "clojure",
+    // .NET
+    cs: "cs", csx: "cs", vb: "cs", fs: "cs", fsx: "cs", fsi: "cs",
+    // C / C++ / Objective-C
+    c: "cpp", h: "cpp", cpp: "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp", hh: "cpp", ino: "cpp", m: "cpp", mm: "cpp",
+    // Other languages
+    rb: "ruby", erb: "ruby", gemspec: "ruby",
+    php: "php",
+    swift: "swift",
+    dart: "dart",
+    r: "r",
+    lua: "lua",
+    pl: "perl", pm: "perl",
+    ex: "elixir", exs: "elixir",
+    erl: "elixir", hrl: "elixir",
+    hs: "haskell",
+    jl: "julia",
+    // Shell / scripts
+    sh: "sh", bash: "sh", zsh: "sh", fish: "sh", ksh: "sh",
+    bat: "bat", cmd: "bat",
+    ps1: "ps", psm1: "ps", psd1: "ps",
+    // Data / config
+    yml: "yaml", yaml: "yaml", toml: "yaml",
+    env: "yaml", ini: "yaml", cfg: "yaml", conf: "yaml", properties: "yaml",
+    sql: "sql",
+    graphql: "gql", gql: "gql", proto: "gql",
+    csv: "sh", tsv: "sh"
+  };
+
+  /** Special files without a useful extension. */
+  const FILENAME_CLASS = {
+    dockerfile: "docker",
+    makefile: "default",
+    gemfile: "ruby",
+    rakefile: "ruby",
+    cmakelists: "cpp"
   };
 
   const PROVIDERS = [
@@ -45,6 +113,7 @@
   const ui = {
     activeTab: "changes",
     selected: new Set(),
+    branchFilter: "",
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -180,9 +249,12 @@
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
           <span style="flex:1"></span>
           <button id="refreshBtn" class="gx-iconbtn" title="Refresh" type="button">${ICONS.refresh}</button>
+          <button id="settingsBtn" class="gx-iconbtn" title="Settings" type="button">${ICONS.settings}</button>
         </div>
         <div class="gx-branch-row">
-          <div id="branchSlot" style="flex:1;min-width:0"></div>
+          <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" type="button">
+            ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>${icon("chevron", "sm")}
+          </button>
           <button id="pullBtn" class="gx-iconbtn gx-sync-btn" data-action="pull" title="Pull" type="button">${ICONS.pull}<span id="behindBadge" class="gx-sync-badge hidden"></span></button>
           <button id="pushBtn" class="gx-iconbtn gx-sync-btn" data-action="push" title="Push" type="button">${ICONS.push}<span id="aheadBadge" class="gx-sync-badge hidden"></span></button>
         </div>
@@ -191,7 +263,7 @@
       <div class="gx-tabs">
         <button class="gx-tab" data-tab="changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
         <button class="gx-tab" data-tab="history" type="button">${icon("history", "sm")}<span>History</span></button>
-        <button class="gx-tab" data-tab="settings" type="button">${icon("settings", "sm")}<span>Settings</span></button>
+        <button class="gx-tab" data-tab="branches" type="button">${icon("branch", "sm")}<span>Branches</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -218,16 +290,16 @@
         <div class="gx-card">
           <div class="gx-field">
             <label class="gx-label" for="commitSummary">Summary</label>
-            <input id="commitSummary" type="text" placeholder="Summary (required)" maxlength="120" />
+            <div class="gx-input-wrap">
+              <input id="commitSummary" class="has-action" type="text" placeholder="Summary (required)" maxlength="120" />
+              <button id="generateBtn" class="gx-input-action" data-action="generate" type="button" title="Generate with AI">
+                <span class="gx-vsep"></span><span class="gx-ic">${ICONS.sparkle}</span>
+              </button>
+            </div>
           </div>
           <div class="gx-field">
             <label class="gx-label" for="commitDescription">Description</label>
             <textarea id="commitDescription" placeholder="Description (optional)"></textarea>
-          </div>
-          <div class="gx-actions">
-            <button id="generateBtn" class="gx-btn gx-btn-ghost" data-action="generate" type="button">
-              ${icon("sparkle")}<span>Generate message</span>
-            </button>
           </div>
           <div class="gx-actions">
             <button id="commitBtn" class="gx-btn gx-btn-primary" data-action="commit" type="button">
@@ -239,6 +311,15 @@
 
       <div id="panel-history" class="gx-panel hidden">
         <ul id="commitList" class="gx-commits"></ul>
+      </div>
+
+      <div id="panel-branches" class="gx-panel hidden">
+        <div class="gx-newbranch">
+          <input id="newBranchInput" type="text" placeholder="New branch name" autocomplete="off" spellcheck="false" />
+          <button class="gx-btn gx-btn-primary" data-action="createBranchNamed" type="button">${icon("plus", "sm")}<span>Create</span></button>
+        </div>
+        <input id="branchFilter" type="text" class="gx-branch-filter" placeholder="Filter branches" autocomplete="off" spellcheck="false" />
+        <ul id="branchList" class="gx-branch-list"></ul>
       </div>
 
       <div id="panel-settings" class="gx-panel hidden">
@@ -275,23 +356,28 @@
     `;
 
     // Dropdowns
-    ui.dd.branch = createDropdown((value) => {
-      if (value === "__new__") post({ type: "createBranch" });
-      else post({ type: "switchBranch", name: value });
-    });
     ui.dd.provider = createDropdown((provider) => post({ type: "saveProvider", provider }));
     ui.dd.model = createDropdown(() => {
       /* value tracked in dropdown; persisted via Save model */
     });
-    byId("branchSlot").append(ui.dd.branch.root);
     byId("providerSlot").append(ui.dd.provider.root);
     byId("modelSlot").append(ui.dd.model.root);
+
+    // Branches tab: filter (client-side) + create-on-Enter
+    byId("branchFilter").addEventListener("input", (e) => {
+      ui.branchFilter = e.target.value;
+      renderBranches(ui.state);
+    });
+    byId("newBranchInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleAction("createBranchNamed");
+    });
 
     // Tabs
     app.querySelectorAll(".gx-tab").forEach((tab) => {
       tab.addEventListener("click", () => switchTab(tab.getAttribute("data-tab")));
     });
     byId("refreshBtn").addEventListener("click", () => post({ type: "refresh" }));
+    byId("settingsBtn").addEventListener("click", () => switchTab("settings"));
 
     // Delegated button actions
     app.addEventListener("click", (e) => {
@@ -317,9 +403,11 @@
     document.querySelectorAll(".gx-tab").forEach((t) => {
       t.classList.toggle("active", t.getAttribute("data-tab") === tab);
     });
-    ["changes", "history", "settings"].forEach((name) => {
+    ["changes", "history", "branches", "settings"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
+    const sb = byId("settingsBtn");
+    if (sb) sb.classList.toggle("active", tab === "settings");
   }
 
   function handleAction(action, elm) {
@@ -382,6 +470,21 @@
       case "pull":
         post({ type: "pull" });
         break;
+      case "openBranches":
+        switchTab("branches");
+        break;
+      case "createBranchNamed": {
+        const input = /** @type {HTMLInputElement} */ (byId("newBranchInput"));
+        const name = input.value.trim();
+        if (name) {
+          post({ type: "createBranch", name });
+          input.value = "";
+        }
+        break;
+      }
+      case "switchBranchTo":
+        post({ type: "switchBranch", name: elm.getAttribute("data-name") });
+        break;
       default:
         break;
     }
@@ -400,12 +503,8 @@
 
     // Header
     byId("repoName").textContent = s.repositoryName || "—";
-    const branchItems = (s.branches || []).map((b) => ({ value: b, label: b, iconSvg: ICONS.branch }));
-    branchItems.push({ value: "__new__", label: "Create new branch…", iconSvg: ICONS.plus });
-    ui.dd.branch.update(branchItems, s.branchName, {
-      disabled: !s.branchName,
-      placeholder: s.branchName || "—"
-    });
+    byId("branchName").textContent = s.branchName || "—";
+    renderBranches(s);
     updateSync(s);
 
     renderNotice(s);
@@ -417,18 +516,53 @@
     byId("unstagedCount").textContent = String((s.changes.unstaged || []).length);
 
     const busy = !!s.isLoading;
+    const hasStaged = (s.changes.staged || []).length > 0;
+    const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
     const genBtn = byId("generateBtn");
     genBtn.innerHTML =
-      s.busyKind === "generate"
-        ? `<span class="gx-spin"></span><span>Generating…</span>`
-        : `${icon("sparkle")}<span>Generate message</span>`;
-    genBtn.toggleAttribute("disabled", busy);
-    byId("commitBtn").toggleAttribute("disabled", busy);
+      `<span class="gx-vsep"></span>` +
+      (s.busyKind === "generate"
+        ? `<span class="gx-spin"></span>`
+        : `<span class="gx-ic">${ICONS.sparkle}</span>`);
+    genBtn.title = hasStaged
+      ? `Generate with ${provLabel}${s.model ? " · " + s.model : " · select a model"}`
+      : "Stage changes to generate a message";
+    // Generate reads the staged diff and Commit commits the index — both need staged changes.
+    genBtn.toggleAttribute("disabled", busy || !hasStaged);
+    const commitBtn = byId("commitBtn");
+    commitBtn.innerHTML = `${icon("commit")}<span>Commit${
+      s.branchName ? " to " + escapeHtml(s.branchName) : ""
+    }</span>`;
+    commitBtn.toggleAttribute("disabled", busy || !hasStaged);
     byId("pushBtn").toggleAttribute("disabled", busy || !s.branchName);
     byId("pullBtn").toggleAttribute("disabled", busy || !s.branchName);
 
     renderHistory(s);
     renderSettings(s);
+  }
+
+  function renderBranches(s) {
+    const list = byId("branchList");
+    const filter = (ui.branchFilter || "").toLowerCase();
+    const branches = (s.branches || []).filter((b) => b.toLowerCase().includes(filter));
+    if (!branches.length) {
+      list.innerHTML = `<li class="gx-empty">${
+        s.branches && s.branches.length ? "No matching branches" : "No branches"
+      }</li>`;
+      return;
+    }
+    list.innerHTML = branches
+      .map((b) => {
+        const current = b === s.branchName;
+        return `<li class="gx-branch-item${current ? " current" : ""}" data-action="switchBranchTo" data-name="${escapeHtml(
+          b
+        )}" title="${current ? "Current branch" : "Switch to " + escapeHtml(b)}">
+            <span class="gx-ic sm gx-branch-ic">${ICONS.branch}</span>
+            <span class="gx-branch-name">${escapeHtml(b)}</span>
+            ${current ? `<span class="gx-ic sm gx-branch-check">${ICONS.check}</span>` : ""}
+          </li>`;
+      })
+      .join("");
   }
 
   function updateSync(s) {
@@ -455,7 +589,30 @@
     }
   }
 
-  function renderFileList(files, action, iconName) {
+  function fileIcon(path) {
+    const base = (String(path || "").split("/").pop() || "").toLowerCase();
+    const match = /\.([a-z0-9]+)$/.exec(base);
+    const ext = match ? match[1] : "";
+    const cls = EXT_CLASS[ext] || FILENAME_CLASS[base.replace(/\..*$/, "")] || "default";
+    const glyph = cls === "img" ? ICONS.image : ICONS.file;
+    return `<span class="gx-ftype gx-ext-${cls}">${glyph}</span>`;
+  }
+
+  /** Right-side status marker: yellow dot = modified, green + = added, etc. */
+  function statusGlyph(status) {
+    if (status === "A" || status === "U") {
+      return `<span class="gx-stat gx-stat-A" title="${status === "U" ? "Untracked" : "Added"}">${ICONS.plus}</span>`;
+    }
+    if (status === "D") {
+      return `<span class="gx-stat gx-stat-D" title="Deleted">${ICONS.minus}</span>`;
+    }
+    if (status === "R" || status === "C") {
+      return `<span class="gx-stat gx-stat-R" title="${status === "R" ? "Renamed" : "Copied"}">${ICONS.dot}</span>`;
+    }
+    return `<span class="gx-stat gx-stat-M" title="Modified">${ICONS.dot}</span>`;
+  }
+
+  function renderFileList(files, action, actionIcon) {
     if (!files || !files.length) {
       return `<li class="gx-empty">No files</li>`;
     }
@@ -466,13 +623,14 @@
         return `
           <li class="gx-file">
             <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" ${checked} />
-            <span class="gx-status gx-status-${escapeHtml(f.status)}" title="${escapeHtml(f.status)}">${escapeHtml(
-          f.status
-        )}</span>
+            ${fileIcon(f.path)}
             <span class="gx-path" title="${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
-            <button class="gx-row-action" data-action="${action}" data-path="${escapeHtml(
+            <span class="gx-right">
+              <button class="gx-row-action" data-action="${action}" data-path="${escapeHtml(
           f.path
-        )}" title="${title}" type="button">${ICONS[iconName]}</button>
+        )}" title="${title}" type="button">${ICONS[actionIcon]}</button>
+              ${statusGlyph(f.status)}
+            </span>
           </li>`;
       })
       .join("");

@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-06-06
+
+### Added
+
+- A dedicated **Branches** tab: create a branch inline, filter the list, and switch with one click (the current branch is marked). Replaces the cramped header dropdown so new branches are always visible.
+
+### Changed
+
+- The header now shows the current branch as a chip that opens the Branches tab.
+- Redesigned **push / pull** icons (cloud upload / download) for clarity.
+- The Commit button now reads **"Commit to ‹branch›"**.
+
+## [0.0.4] - 2026-06-06
+
+### Fixed
+
+- Staging a file from the panel ("+") no longer fails with "Failed to execute git". Local Git mutations (stage / unstage / commit) now run through the bundled CLI path; push / pull / branch ops use the Git API with a CLI fallback.
+
+### Changed
+
+- **Settings** moved to a top-right gear icon; the tab bar now shows just **Changes** and **History**.
+- **Generate** and **Commit** are enabled only when there are staged changes.
+
+## [0.0.3] - 2026-06-06
+
+### Added
+
+- **Push** and **Pull** from the panel header, with ahead/behind counts shown on the buttons.
+- **Branch switcher** dropdown with a "Create new branch…" action, plus `Gitable: Push / Pull / Create Branch / Switch Branch` commands.
+- SVG icons on the Changes / History / Settings tabs.
+- Extension-based **file-type icons** on file rows (broad coverage across major languages — JS/TS, Python, Java, C#/.NET, C/C++, Go, Rust, Ruby, PHP, Swift, Kotlin, Dart, Scala, shells, batch/PowerShell, SQL, config — and images), and right-side **status markers** (yellow dot = modified, green + = added/untracked, red − = deleted, blue dot = renamed).
+- Visible **working indicator** (button spinner + status text) during AI generation, key validation, model loading, and push/pull.
+
+### Changed
+
+- AI generation moved **into the Summary field** as an inline action (divider + sparkle) with a hover tooltip showing the active provider and model.
+- Removed the repository switcher dropdown (the header now shows the repo name) and the redundant view-title action icons.
+
 ## [0.0.2] - 2026-06-05
 
 ### Added
@@ -39,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git integration preferring the built-in VS Code Git API with a cross-platform `execFile`-based CLI fallback.
 - Commands: `gitable.refresh`, `gitable.generateCommitMessage`, `gitable.commit`, `gitable.stageAll`, `gitable.unstageAll`, `gitable.openSettings`, `gitable.validateApiKey`.
 
-[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/piyushdoorwar/gitable/compare/v0.0.4...v0.0.5
+[0.0.4]: https://github.com/piyushdoorwar/gitable/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/piyushdoorwar/gitable/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/piyushdoorwar/gitable/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/piyushdoorwar/gitable/releases/tag/v0.0.1

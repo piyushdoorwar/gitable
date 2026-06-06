@@ -2,7 +2,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitCliService } from "./GitCliService";
-import { GitService, GitServiceError } from "./GitService";
+import { GitService } from "./GitService";
 import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo, vscodeStatusToLetter } from "./models";
 
 // ---- Minimal typings for the built-in `vscode.git` extension API ----
@@ -154,40 +154,32 @@ export class VsCodeGitService implements GitService {
     return this.cli.getStagedDiffStat();
   }
 
-  async stageFiles(paths: string[]): Promise<void> {
-    const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.stageFiles(paths);
-    }
-    const uris = paths.map((rel) => vscode.Uri.file(path.join(repo.rootUri.fsPath, rel)));
-    await repo.add(uris);
+  stageFiles(paths: string[]): Promise<void> {
+    // The built-in Git extension's command execution can fail ("Failed to
+    // execute git") even while its state monitoring works, so local mutations
+    // go straight through our own CLI, which is reliable and gives clear errors.
+    this.syncCliRoot();
+    return this.cli.stageFiles(paths);
   }
 
   unstageFiles(paths: string[]): Promise<void> {
-    // The stable Git API has no reliable "unstage"; use the CLI (`git reset HEAD`).
+    this.syncCliRoot();
     return this.cli.unstageFiles(paths);
   }
 
   stageAll(): Promise<void> {
+    this.syncCliRoot();
     return this.cli.stageAll();
   }
 
   unstageAll(): Promise<void> {
+    this.syncCliRoot();
     return this.cli.unstageAll();
   }
 
-  async commit(summary: string, description?: string): Promise<void> {
-    const message = description && description.trim() ? `${summary}\n\n${description}` : summary;
-    const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.commit(summary, description);
-    }
-    try {
-      await repo.commit(message);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new GitServiceError(detail || "Commit failed.", error);
-    }
+  commit(summary: string, description?: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.commit(summary, description);
   }
 
   getHistory(limit: number): Promise<CommitInfo[]> {
@@ -217,46 +209,59 @@ export class VsCodeGitService implements GitService {
     };
   }
 
-  async createBranch(name: string): Promise<void> {
+  createBranch(name: string): Promise<void> {
     const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.createBranch(name);
-    }
-    await this.wrap(() => repo.createBranch(name, true), "Could not create branch.");
+    return this.apiOrCli(
+      repo ? () => repo.createBranch(name, true) : undefined,
+      () => this.cli.createBranch(name)
+    );
   }
 
-  async checkoutBranch(name: string): Promise<void> {
+  checkoutBranch(name: string): Promise<void> {
     const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.checkoutBranch(name);
-    }
-    await this.wrap(() => repo.checkout(name), "Could not switch branch.");
+    return this.apiOrCli(repo ? () => repo.checkout(name) : undefined, () =>
+      this.cli.checkoutBranch(name)
+    );
   }
 
-  async push(): Promise<void> {
+  push(): Promise<void> {
     const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.push();
-    }
-    await this.wrap(() => repo.push(), "Push failed.");
+    return this.apiOrCli(repo ? () => repo.push() : undefined, () => this.cli.push());
   }
 
-  async pull(): Promise<void> {
+  pull(): Promise<void> {
     const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.pull();
-    }
-    await this.wrap(() => repo.pull(), "Pull failed.");
+    return this.apiOrCli(repo ? () => repo.pull() : undefined, () => this.cli.pull());
   }
 
   // ---- internals ----
 
-  private async wrap(action: () => Promise<void>, fallbackMessage: string): Promise<void> {
-    try {
-      await action();
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new GitServiceError(detail || fallbackMessage, error);
+  /**
+   * Prefers the Git API (it integrates credentials/UI for push/pull) but falls
+   * back to our CLI when the API call fails — the built-in extension's command
+   * execution is unreliable on some setups.
+   */
+  private async apiOrCli(
+    apiAction: (() => Promise<void>) | undefined,
+    cliAction: () => Promise<void>
+  ): Promise<void> {
+    this.syncCliRoot();
+    if (apiAction) {
+      try {
+        await apiAction();
+        return;
+      } catch (error) {
+        this.logger.warn(`Git API op failed; falling back to CLI: ${(error as Error).message}`);
+      }
+    }
+    await cliAction();
+  }
+
+  /** Keeps the CLI service pointed at the same repository as the API. */
+  private syncCliRoot(): void {
+    this.ensureActiveRoot();
+    if (this.activeRoot) {
+      this.cli.setActiveRoot(this.activeRoot);
     }
   }
 
