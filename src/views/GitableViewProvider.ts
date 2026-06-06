@@ -24,6 +24,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | undefined;
   private busyKind = "";
   private busyText = "";
+  private syncAction = "";
+  private lastFetchedAt = 0;
   private pendingError = "";
   private pendingNotice = "";
   private pendingTab: TabName | undefined;
@@ -52,7 +54,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     });
     view.onDidChangeVisibility(() => {
       if (view.visible) {
-        void this.refresh();
+        void this.silentFetchAndRefresh();
       }
     });
   }
@@ -104,11 +106,11 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   async pushCommand(): Promise<void> {
-    await this.runBusyGit("git", "Pushing…", () => this.git.push(), "Pushed to remote.");
+    await this.runSyncOp("Pushing", true, () => this.git.push());
   }
 
   async pullCommand(): Promise<void> {
-    await this.runBusyGit("git", "Pulling…", () => this.git.pull(), "Pulled from remote.");
+    await this.runSyncOp("Pulling", true, () => this.git.pull());
   }
 
   async createBranchCommand(): Promise<void> {
@@ -203,10 +205,16 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.fetchModels(message.provider);
         break;
       case "push":
-        await this.runBusyGit("git", "Pushing…", () => this.git.push(), "Pushed to remote.");
+        await this.runSyncOp("Pushing", true, () => this.git.push());
         break;
       case "pull":
-        await this.runBusyGit("git", "Pulling…", () => this.git.pull(), "Pulled from remote.");
+        await this.runSyncOp("Pulling", true, () => this.git.pull());
+        break;
+      case "fetchOrigin":
+        await this.runSyncOp("Fetching origin", false, async () => {
+          await this.git.fetchOrigin();
+          this.lastFetchedAt = Date.now();
+        });
         break;
       case "switchBranch":
         await this.switchBranch(message.name);
@@ -890,6 +898,38 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     this.busyText = "";
   }
 
+  /** Runs a sync operation (fetch/pull/push), showing state in the sync button.
+   *  When `globalBusy` is true, also sets the general busy flag to disable commit UI. */
+  private async runSyncOp(label: string, globalBusy: boolean, op: () => Promise<void>): Promise<void> {
+    this.syncAction = label;
+    if (globalBusy) this.setBusy("git", label);
+    await this.postState();
+    try {
+      await op();
+    } catch (error) {
+      this.fail(error);
+    } finally {
+      this.syncAction = "";
+      if (globalBusy) this.clearBusy();
+      await this.postState();
+    }
+  }
+
+  /** Fetches from origin silently when the panel becomes visible, then refreshes state. */
+  private async silentFetchAndRefresh(): Promise<void> {
+    this.syncAction = "Refreshing repository";
+    await this.postState();
+    try {
+      await this.git.fetchOrigin();
+      this.lastFetchedAt = Date.now();
+    } catch {
+      // no remote, no network — ignore silently
+    } finally {
+      this.syncAction = "";
+      await this.postState();
+    }
+  }
+
   private fail(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     this.pendingError = message;
@@ -966,6 +1006,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       ahead,
       behind,
       hasUpstream,
+      syncAction: this.syncAction,
+      lastFetchedAt: this.lastFetchedAt,
       busyKind: this.busyKind,
       busyText: this.busyText,
       isLoading: !!this.busyKind,

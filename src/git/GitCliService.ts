@@ -318,6 +318,10 @@ export class GitCliService implements GitService {
     await this.run(["pull"], this.requireRoot());
   }
 
+  async fetchOrigin(): Promise<void> {
+    await this.run(["fetch", "origin"], this.requireRoot());
+  }
+
   async revertCommit(hash: string): Promise<void> {
     await this.run(["revert", "--no-edit", hash], this.requireRoot());
   }

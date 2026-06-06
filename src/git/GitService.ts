@@ -80,6 +80,9 @@ export interface GitService {
   /** Pulls the current branch from its remote. */
   pull(): Promise<void>;
 
+  /** Fetches from origin without merging. */
+  fetchOrigin(): Promise<void>;
+
   /** Creates a revert commit that undoes the changes introduced by the given commit. */
   revertCommit(hash: string): Promise<void>;
 

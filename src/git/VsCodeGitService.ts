@@ -323,6 +323,10 @@ export class VsCodeGitService implements GitService {
     return this.apiOrCli(repo ? () => repo.pull() : undefined, () => this.cli.pull());
   }
 
+  fetchOrigin(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.fetchOrigin();
+  }
 
   revertCommit(hash: string): Promise<void> {
     this.syncCliRoot();

@@ -369,10 +369,17 @@
           <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
             ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>
           </button>
-          <button id="pullBtn" class="gx-iconbtn gx-sync-btn" data-action="pull" title="Pull" aria-label="Pull" type="button">${ICONS.pull}<span id="behindBadge" class="gx-sync-badge hidden"></span></button>
-          <button id="pushBtn" class="gx-iconbtn gx-sync-btn" data-action="push" title="Push" aria-label="Push" type="button">${ICONS.push}<span id="aheadBadge" class="gx-sync-badge hidden"></span></button>
         </div>
       </div>
+
+      <button id="syncBtn" class="gx-sync-combo" data-action="syncAction" type="button" disabled>
+        <span id="syncIcon" class="gx-ic sm"></span>
+        <span class="gx-sync-combo-body">
+          <span id="syncLabel">Fetch origin</span>
+          <span id="syncSubtitle" class="gx-sync-combo-sub"></span>
+        </span>
+        <span id="syncBadge" class="gx-sync-combo-badge hidden"></span>
+      </button>
 
       <div class="gx-tabs">
         <button class="gx-tab" data-tab="changes" title="Show working tree changes" aria-label="Show working tree changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
@@ -678,12 +685,20 @@
       case "refreshModels":
         post({ type: "fetchModels", provider: ui.dd.provider.getValue() });
         break;
-      case "push":
-        post({ type: "push" });
+      case "syncAction": {
+        const s = ui.state;
+        if (s.syncAction) break;
+        if (!s.hasUpstream) {
+          post({ type: "push" });
+        } else if (s.behind > 0) {
+          post({ type: "pull" });
+        } else if (s.ahead > 0) {
+          post({ type: "push" });
+        } else {
+          post({ type: "fetchOrigin" });
+        }
         break;
-      case "pull":
-        post({ type: "pull" });
-        break;
+      }
       case "openBranches":
         switchTab("branches");
         break;
@@ -1002,8 +1017,6 @@
         : "Stage files before committing"
     );
     setDisabled(commitBtn, busy || !hasStaged);
-    setDisabled(byId("pushBtn"), busy || !s.branchName);
-    setDisabled(byId("pullBtn"), busy || !s.branchName);
     updateChangeActionButtons(s);
 
     renderHistory(s);
@@ -1087,35 +1100,64 @@
       .join("");
   }
 
+  function timeAgo(ts) {
+    if (!ts) return "";
+    const mins = Math.floor((Date.now() - ts) / 60000);
+    if (mins < 1) return "Last fetched just now";
+    if (mins === 1) return "Last fetched 1 minute ago";
+    return `Last fetched ${mins} minutes ago`;
+  }
+
   function updateSync(s) {
-    const ahead = byId("aheadBadge");
-    const behind = byId("behindBadge");
-    const push = byId("pushBtn");
-    const pull = byId("pullBtn");
-    ahead.textContent = s.ahead > 0 ? String(s.ahead) : "";
-    behind.textContent = s.behind > 0 ? String(s.behind) : "";
-    ahead.classList.toggle("hidden", !(s.ahead > 0));
-    behind.classList.toggle("hidden", !(s.behind > 0));
-    setHint(
-      pull,
-      !s.branchName
-        ? "Pull disabled · no current branch"
-        : s.behind > 0
-          ? `Pull ${plural(s.behind, "commit")} from upstream`
-          : s.hasUpstream
-            ? "Pull from upstream"
-            : "Pull from remote"
-    );
-    setHint(
-      push,
-      !s.branchName
-        ? "Push disabled · no current branch"
-        : s.ahead > 0
-          ? `Push ${plural(s.ahead, "commit")} to upstream`
-          : s.hasUpstream
-            ? "Push to upstream"
-            : "Push current branch"
-    );
+    const btn = byId("syncBtn");
+    const iconEl = byId("syncIcon");
+    const labelEl = byId("syncLabel");
+    const subtitleEl = byId("syncSubtitle");
+    const badgeEl = byId("syncBadge");
+
+    const syncAction = s.syncAction || "";
+
+    if (syncAction) {
+      iconEl.innerHTML = `<span class="gx-spin"></span>`;
+      labelEl.textContent = syncAction;
+      subtitleEl.textContent = "Hang on…";
+      badgeEl.classList.add("hidden");
+      setDisabled(btn, true);
+      return;
+    }
+
+    setDisabled(btn, !!s.isLoading || !s.branchName);
+
+    const fetchedText = timeAgo(s.lastFetchedAt || 0);
+
+    if (!s.branchName) {
+      iconEl.innerHTML = ICONS.refresh;
+      labelEl.textContent = "Fetch origin";
+      subtitleEl.textContent = fetchedText;
+      badgeEl.classList.add("hidden");
+    } else if (!s.hasUpstream) {
+      iconEl.innerHTML = ICONS.push;
+      labelEl.textContent = "Publish branch";
+      subtitleEl.textContent = "No upstream set";
+      badgeEl.classList.add("hidden");
+    } else if (s.behind > 0) {
+      iconEl.innerHTML = ICONS.pull;
+      labelEl.textContent = "Pull origin";
+      subtitleEl.textContent = fetchedText;
+      badgeEl.textContent = `${s.behind}↓`;
+      badgeEl.classList.remove("hidden");
+    } else if (s.ahead > 0) {
+      iconEl.innerHTML = ICONS.push;
+      labelEl.textContent = "Push origin";
+      subtitleEl.textContent = fetchedText;
+      badgeEl.textContent = `${s.ahead}↑`;
+      badgeEl.classList.remove("hidden");
+    } else {
+      iconEl.innerHTML = ICONS.refresh;
+      labelEl.textContent = "Fetch origin";
+      subtitleEl.textContent = fetchedText;
+      badgeEl.classList.add("hidden");
+    }
   }
 
   function renderNotice(s) {

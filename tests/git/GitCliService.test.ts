@@ -142,7 +142,7 @@ describe("GitCliService integration", () => {
     const history = await service.getHistory(1);
     expect(history).toHaveLength(1);
     expect(history[0].subject).toBe("fix: update tracked file");
-    expect(history[0].hash).toMatch(/^[a-f0-9]{7}$/);
+    expect(history[0].hash).toMatch(/^[a-f0-9]{40}$/);
   });
 
   it("commits with a summary and description", async () => {
@@ -487,6 +487,58 @@ describe("GitCliService integration", () => {
       await expect(service.discardFiles([], false)).resolves.toBeUndefined();
       // File should be untouched since we passed an empty list.
       expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\nchanged\n");
+    });
+  });
+
+  // ---- fetchOrigin ----------------------------------------------------------
+
+  describe("fetchOrigin", () => {
+    let remoteDir: string;
+
+    beforeEach(async () => {
+      // Create a bare clone of the test repo to serve as a local "remote"
+      remoteDir = await mkdtemp(path.join(os.tmpdir(), "gitable-remote-"));
+      await git(["clone", "--bare", root, remoteDir], os.tmpdir());
+      await git(["remote", "add", "origin", remoteDir], root);
+    });
+
+    afterEach(async () => {
+      await rm(remoteDir, { recursive: true, force: true });
+    });
+
+    it("fetches from origin without error", async () => {
+      await expect(service.fetchOrigin()).resolves.toBeUndefined();
+    });
+
+    it("updates remote-tracking refs after a new commit is pushed to origin", async () => {
+      // Initial fetch + tracking setup so getSyncInfo can compare against origin/main
+      await git(["fetch", "origin"], root);
+      await git(["branch", "--set-upstream-to=origin/main", "main"], root);
+
+      // Simulate a contributor pushing a new commit to the bare remote
+      const contributorDir = await mkdtemp(path.join(os.tmpdir(), "gitable-contrib-"));
+      try {
+        await git(["clone", remoteDir, contributorDir], os.tmpdir());
+        await git(["config", "user.email", "contrib@example.com"], contributorDir);
+        await git(["config", "user.name", "Contributor"], contributorDir);
+        await writeFile(path.join(contributorDir, "remote-change.txt"), "from remote\n");
+        await git(["add", "remote-change.txt"], contributorDir);
+        await git(["commit", "-m", "remote commit"], contributorDir);
+        await git(["push"], contributorDir);
+      } finally {
+        await rm(contributorDir, { recursive: true, force: true });
+      }
+
+      // Before our fetch the local remote-tracking ref is stale — we look in sync
+      const beforeFetch = await service.getSyncInfo();
+      expect(beforeFetch.behind).toBe(0);
+
+      // After fetchOrigin() the remote-tracking ref is updated
+      await service.fetchOrigin();
+      const afterFetch = await service.getSyncInfo();
+      expect(afterFetch.hasUpstream).toBe(true);
+      expect(afterFetch.behind).toBe(1);
+      expect(afterFetch.ahead).toBe(0);
     });
   });
 });
