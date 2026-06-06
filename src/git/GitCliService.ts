@@ -172,7 +172,7 @@ export class GitCliService implements GitService {
     const root = this.requireRoot();
     try {
       const output = await this.run(
-        ["log", "--decorate=short", `--pretty=format:%h%x09%an%x09%ar%x09%D%x09%s`, "-n", String(limit)],
+        ["log", "--decorate=short", `--pretty=format:%H%x09%an%x09%ar%x09%D%x09%s`, "-n", String(limit)],
         root
       );
       return output

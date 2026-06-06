@@ -889,6 +889,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
     const data = await this.buildState();
     this.view.webview.postMessage({ type: "state", data });
+    const changes = data.changes as { staged: unknown[]; unstaged: unknown[] } | undefined;
+    const count = (changes?.staged?.length ?? 0) + (changes?.unstaged?.length ?? 0);
+    this.view.badge = count > 0 ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` } : undefined;
     this.pendingError = "";
     this.pendingNotice = "";
   }

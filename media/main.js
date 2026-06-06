@@ -1203,7 +1203,7 @@
                 ${renderCommitTags(c.tags)}
               </div>
               <div class="gx-commit-meta">
-                <span class="gx-hash">${escapeHtml(c.hash)}</span>
+                <span class="gx-hash">${escapeHtml(c.hash.slice(0, 7))}</span>
                 <span>${escapeHtml(c.author)}</span>
                 <span>${escapeHtml(c.relativeDate)}</span>
               </div>
@@ -1221,7 +1221,7 @@
     const s = ui.activeSummary;
     if (!s) { el.innerHTML = ""; return; }
 
-    const hashEl = `<span class="gx-hash">${escapeHtml(s.hash)}</span>`;
+    const hashEl = `<span class="gx-hash">${escapeHtml(s.hash.slice(0, 7))}</span>`;
     const subjectEl = s.subject ? `<span class="gx-ai-subject">${escapeHtml(s.subject)}</span>` : "";
 
     if (s.loading) {
