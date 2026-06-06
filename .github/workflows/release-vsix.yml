@@ -11,7 +11,7 @@ on:
         default: "0.0.0-dev"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: release-vsix-${{ github.ref }}
@@ -80,3 +80,23 @@ jobs:
           name: gitable-${{ env.VERSION }}-vsix
           path: gitable-${{ env.VERSION }}.vsix
           if-no-files-found: error
+
+      - name: Attach VSIX to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${VERSION}"
+          VSIX="gitable-${VERSION}.vsix"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$VSIX" --clobber
+          else
+            RELEASE_ARGS=()
+            if [[ "$VERSION" == *-* ]]; then
+              RELEASE_ARGS+=(--prerelease)
+            fi
+            gh release create "$TAG" "$VSIX" \
+              --title "$TAG" \
+              --notes "Gitable $TAG" \
+              "${RELEASE_ARGS[@]}"
+          fi
