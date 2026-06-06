@@ -498,7 +498,8 @@ button[aria-disabled="true"],
   color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
   background: var(--vscode-menu-selectionBackground, var(--gx-pink-soft));
 }
-.gx-context-menu button:first-child:hover {
+.gx-context-menu button:first-child:hover,
+.gx-context-menu button.gx-menu-danger:hover {
   color: var(--vscode-errorForeground, var(--gx-pink-strong));
 }
 .gx-menu-sep {

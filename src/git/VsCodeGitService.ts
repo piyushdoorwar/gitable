@@ -338,6 +338,16 @@ export class VsCodeGitService implements GitService {
     this.syncCliRoot();
     return this.cli.getCommitStat(hash);
   }
+
+  renameBranch(oldName: string, newName: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.renameBranch(oldName, newName);
+  }
+
+  deleteBranch(name: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.deleteBranch(name);
+  }
   // ---- internals ----
 
   /**

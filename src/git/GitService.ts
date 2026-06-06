@@ -88,4 +88,10 @@ export interface GitService {
 
   /** Files-changed / insertion / deletion counts for a single commit. */
   getCommitStat(hash: string): Promise<CommitStat>;
+
+  /** Renames a local branch. */
+  renameBranch(oldName: string, newName: string): Promise<void>;
+
+  /** Deletes a local branch (safe delete — fails if unmerged). */
+  deleteBranch(name: string): Promise<void>;
 }

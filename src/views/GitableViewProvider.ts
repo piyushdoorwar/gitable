@@ -257,6 +257,19 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           await this.createBranchFromInput();
         }
         break;
+      case "renameBranch":
+        await this.renameBranch(String(message.name ?? ""));
+        break;
+      case "deleteBranch":
+        await this.deleteBranch(String(message.name ?? ""));
+        break;
+      case "copyBranchName": {
+        const name = String(message.name ?? "");
+        await vscode.env.clipboard.writeText(name);
+        this.pendingNotice = `Branch name copied: ${name}`;
+        await this.postState();
+        break;
+      }
       default:
         break;
     }
@@ -501,6 +514,39 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       `Creating ${branch}…`,
       () => this.git.createBranch(branch),
       `Created and switched to ${branch}.`
+    );
+  }
+
+  private async renameBranch(oldName: string): Promise<void> {
+    if (!oldName) return;
+    const newName = await vscode.window.showInputBox({
+      prompt: "New branch name",
+      value: oldName,
+      validateInput: (v) =>
+        !v || !v.trim() ? "Branch name cannot be empty." : /\s/.test(v) ? "Branch names cannot contain spaces." : undefined
+    });
+    if (!newName || newName.trim() === oldName) return;
+    await this.runBusyGit(
+      "git",
+      `Renaming branch…`,
+      () => this.git.renameBranch(oldName, newName.trim()),
+      `Branch renamed to ${newName.trim()}.`
+    );
+  }
+
+  private async deleteBranch(name: string): Promise<void> {
+    if (!name) return;
+    const answer = await vscode.window.showWarningMessage(
+      `Delete branch "${name}"? This cannot be undone.`,
+      { modal: true },
+      "Delete"
+    );
+    if (answer !== "Delete") return;
+    await this.runBusyGit(
+      "git",
+      `Deleting ${name}…`,
+      () => this.git.deleteBranch(name),
+      `Branch ${name} deleted.`
     );
   }
 

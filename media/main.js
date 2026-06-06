@@ -52,7 +52,9 @@
     revert:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.4"/></svg>',
     cherryPick:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="2.5"/><line x1="3" y1="12" x2="6.5" y2="12"/><line x1="11.5" y1="12" x2="16" y2="12"/><polyline points="13 7 18 12 13 17"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="2.5"/><line x1="3" y1="12" x2="6.5" y2="12"/><line x1="11.5" y1="12" x2="16" y2="12"/><polyline points="13 7 18 12 13 17"/></svg>',
+    pencil:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -159,6 +161,7 @@
   let tooltipTarget = null;
   let contextFile = null;
   let contextCommit = null;
+  let contextBranch = null;
 
   function post(message) {
     vscode.postMessage(message);
@@ -470,6 +473,7 @@
       </div>
 
       <div id="commitContextMenu" class="gx-context-menu hidden" role="menu"></div>
+      <div id="branchContextMenu" class="gx-context-menu hidden" role="menu"></div>
     `;
     initTooltips();
 
@@ -505,6 +509,18 @@
       if (target) handleAction(target.getAttribute("data-action"), target);
     });
     app.addEventListener("contextmenu", (e) => {
+      const branchBtn = e.target.closest(".gx-branch-btn");
+      if (branchBtn) {
+        const name = ui.state.branchName;
+        if (name) { e.preventDefault(); openBranchMenu(name, true, e.clientX, e.clientY); }
+        return;
+      }
+      const branchItem = e.target.closest(".gx-branch-item");
+      if (branchItem) {
+        const name = branchItem.getAttribute("data-name");
+        if (name) { e.preventDefault(); openBranchMenu(name, branchItem.classList.contains("current"), e.clientX, e.clientY); }
+        return;
+      }
       const commitHead = e.target.closest(".gx-commit-head");
       if (commitHead) {
         e.preventDefault();
@@ -536,12 +552,19 @@
       handleCommitMenuAction(item.getAttribute("data-cmenu-action"), item);
     });
 
-    document.addEventListener("click", () => { closeFileMenu(); closeCommitMenu(); });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { closeFileMenu(); closeCommitMenu(); }
+    const branchMenu = byId("branchContextMenu");
+    branchMenu.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-bmenu-action]");
+      if (!item) return;
+      e.stopPropagation();
+      handleBranchMenuAction(item.getAttribute("data-bmenu-action"));
     });
-    window.addEventListener("resize", () => { closeFileMenu(); closeCommitMenu(); });
-    window.addEventListener("scroll", () => { closeFileMenu(); closeCommitMenu(); }, true);
+
+    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); }
+    document.addEventListener("click", closeAllMenus);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllMenus(); });
+    window.addEventListener("resize", closeAllMenus);
+    window.addEventListener("scroll", closeAllMenus, true);
 
     // Checkbox selection (delegated)
     [byId("stagedList"), byId("unstagedList")].forEach((listEl) => {
@@ -785,6 +808,55 @@
         break;
       case "cherryPickCommit":
         post({ type: "cherryPickCommit", hash: commit.hash });
+        break;
+      default:
+        break;
+    }
+  }
+
+  function openBranchMenu(name, isCurrent, x, y) {
+    closeCommitMenu();
+    closeFileMenu();
+    contextBranch = { name, isCurrent };
+    const menu = byId("branchContextMenu");
+    menu.innerHTML =
+      `<button data-bmenu-action="renameBranch" role="menuitem" type="button">${icon("pencil", "sm")}<span>Rename…</span></button>` +
+      `<span class="gx-menu-sep"></span>` +
+      `<button data-bmenu-action="copyBranchName" role="menuitem" type="button">${icon("copy", "sm")}<span>Copy branch name</span></button>` +
+      (!isCurrent
+        ? `<span class="gx-menu-sep"></span>` +
+          `<button data-bmenu-action="deleteBranch" role="menuitem" type="button" class="gx-menu-danger">${icon("trash", "sm")}<span>Delete…</span></button>`
+        : "");
+    menu.classList.remove("hidden");
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const margin = 6;
+    const left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin));
+    const top = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin));
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
+  function closeBranchMenu() {
+    const menu = document.getElementById("branchContextMenu");
+    if (menu) menu.classList.add("hidden");
+    contextBranch = null;
+  }
+
+  function handleBranchMenuAction(action) {
+    if (!contextBranch) return;
+    const branch = contextBranch;
+    closeBranchMenu();
+    switch (action) {
+      case "renameBranch":
+        post({ type: "renameBranch", name: branch.name });
+        break;
+      case "copyBranchName":
+        post({ type: "copyBranchName", name: branch.name });
+        break;
+      case "deleteBranch":
+        post({ type: "deleteBranch", name: branch.name });
         break;
       default:
         break;
