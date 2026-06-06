@@ -3,7 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError } from "./GitService";
-import { cliStatusToLetter, CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
+import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
 
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
@@ -324,6 +324,22 @@ export class GitCliService implements GitService {
 
   async cherryPickCommit(hash: string): Promise<void> {
     await this.run(["cherry-pick", hash], this.requireRoot());
+  }
+
+  async getCommitStat(hash: string): Promise<CommitStat> {
+    const output = await this.run(
+      ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--stat", "-r", "-M", "--root", hash],
+      this.requireRoot()
+    );
+    const summary = output.trim().split("\n").pop() ?? "";
+    const files = /(\d+) files? changed/.exec(summary);
+    const ins = /(\d+) insertions?\(\+\)/.exec(summary);
+    const del = /(\d+) deletions?\(-\)/.exec(summary);
+    return {
+      files: files ? parseInt(files[1], 10) : 0,
+      insertions: ins ? parseInt(ins[1], 10) : 0,
+      deletions: del ? parseInt(del[1], 10) : 0
+    };
   }
 
   private async readBranch(root: string): Promise<string> {

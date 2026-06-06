@@ -333,6 +333,11 @@ export class VsCodeGitService implements GitService {
     this.syncCliRoot();
     return this.cli.cherryPickCommit(hash);
   }
+
+  getCommitStat(hash: string) {
+    this.syncCliRoot();
+    return this.cli.getCommitStat(hash);
+  }
   // ---- internals ----
 
   /**

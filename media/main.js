@@ -130,6 +130,7 @@
     branchFilter: "",
     expandedCommits: new Set(),
     commitFiles: /** @type {Record<string, any>} */ ({}),
+    commitStats: /** @type {Record<string, any>} */ ({}),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -1089,6 +1090,14 @@
     if (!files.length) {
       return `<ul class="gx-commit-files"><li class="gx-empty">No file changes</li></ul>`;
     }
+    const stat = ui.commitStats[hash];
+    const footer = stat
+      ? `<li class="gx-diff-stat" aria-label="${stat.files} changed files, ${stat.insertions} insertions, ${stat.deletions} deletions">
+          <span class="gx-ds-files">${stat.files} changed ${stat.files === 1 ? "file" : "files"}</span>
+          ${stat.insertions ? `<span class="gx-ds-add">+${stat.insertions}</span>` : ""}
+          ${stat.deletions ? `<span class="gx-ds-del">-${stat.deletions}</span>` : ""}
+        </li>`
+      : "";
     return `<ul class="gx-commit-files">${files
       .map((f) => {
         const label = f.displayPath || f.path;
@@ -1102,7 +1111,7 @@
             ${commitStatusGlyph(f.status)}
           </li>`;
       })
-      .join("")}</ul>`;
+      .join("")}${footer}</ul>`;
   }
 
   function commitStatusGlyph(status) {
@@ -1170,6 +1179,7 @@
         break;
       case "commitFiles":
         ui.commitFiles[message.hash] = Array.isArray(message.files) ? message.files : [];
+        if (message.stat) ui.commitStats[message.hash] = message.stat;
         if (ui.expandedCommits.has(message.hash)) renderHistory(ui.state);
         break;
       default:

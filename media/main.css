@@ -1020,6 +1020,30 @@ textarea {
   width: 13px;
   height: 13px;
 }
+.gx-diff-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 2px;
+  border-top: 1px solid var(--gx-line);
+  margin-top: 3px;
+  list-style: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.gx-ds-files {
+  color: var(--vscode-descriptionForeground);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.gx-ds-add {
+  color: #62d39a;
+  font-weight: 600;
+}
+.gx-ds-del {
+  color: var(--gx-pink-strong);
+  font-weight: 600;
+}
 .gx-commit-title {
   display: flex;
   align-items: baseline;

@@ -1,4 +1,4 @@
-import { CommitInfo, RepoChanges, RepoSummary, SyncInfo } from "./models";
+import { CommitInfo, CommitStat, RepoChanges, RepoSummary, SyncInfo } from "./models";
 
 /**
  * Error raised by Git operations. Carries a user-friendly message that can be
@@ -85,4 +85,7 @@ export interface GitService {
 
   /** Applies the changes from the given commit onto the current branch. */
   cherryPickCommit(hash: string): Promise<void>;
+
+  /** Files-changed / insertion / deletion counts for a single commit. */
+  getCommitStat(hash: string): Promise<CommitStat>;
 }

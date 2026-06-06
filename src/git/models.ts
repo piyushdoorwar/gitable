@@ -31,6 +31,12 @@ export interface RepoSummary {
   branch: string;
 }
 
+export interface CommitStat {
+  files: number;
+  insertions: number;
+  deletions: number;
+}
+
 export interface SyncInfo {
   /** Commits on HEAD not yet on the upstream (to push). */
   ahead: number;

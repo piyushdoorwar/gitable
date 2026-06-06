@@ -714,11 +714,14 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     try {
-      const files = await this.git.getCommitFiles(hash);
-      this.view.webview.postMessage({ type: "commitFiles", hash, files });
+      const [files, stat] = await Promise.all([
+        this.git.getCommitFiles(hash),
+        this.git.getCommitStat(hash)
+      ]);
+      this.view.webview.postMessage({ type: "commitFiles", hash, files, stat });
     } catch (error) {
       this.logger.error("Failed to read commit files", error);
-      this.view.webview.postMessage({ type: "commitFiles", hash, files: [] });
+      this.view.webview.postMessage({ type: "commitFiles", hash, files: [], stat: null });
     }
   }
 
