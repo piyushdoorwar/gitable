@@ -132,6 +132,110 @@ describe("GitCliService integration", () => {
     expect((await git(["stash", "list"], root)).trim()).toBe("");
   });
 
+  it("commits with a summary only", async () => {
+    await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+    await service.stageFiles(["tracked.txt"]);
+
+    await service.commit("fix: update tracked file");
+
+    const history = await service.getHistory(1);
+    expect(history).toHaveLength(1);
+    expect(history[0].subject).toBe("fix: update tracked file");
+    expect(history[0].hash).toMatch(/^[a-f0-9]{7}$/);
+  });
+
+  it("commits with a summary and description", async () => {
+    await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+    await service.stageFiles(["tracked.txt"]);
+
+    await service.commit("feat: add change", "Detailed description of what changed.");
+
+    const history = await service.getHistory(1);
+    expect(history[0].subject).toBe("feat: add change");
+  });
+
+  it("getHistory returns commits in reverse-chronological order", async () => {
+    for (let i = 1; i <= 3; i++) {
+      await writeFile(path.join(root, "tracked.txt"), `revision ${i}\n`);
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", `commit ${i}`], root);
+    }
+
+    const history = await service.getHistory(10);
+    // init + 3 extra; newest first
+    expect(history.length).toBeGreaterThanOrEqual(4);
+    expect(history[0].subject).toBe("commit 3");
+    expect(history[1].subject).toBe("commit 2");
+    expect(history[2].subject).toBe("commit 1");
+  });
+
+  it("getHistory respects the limit", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await writeFile(path.join(root, "tracked.txt"), `rev ${i}\n`);
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", `commit ${i}`], root);
+    }
+
+    const history = await service.getHistory(3);
+    expect(history).toHaveLength(3);
+  });
+
+  it("getHistory returns empty array for a repo with no commits", async () => {
+    // Create a fresh empty repo with no commits.
+    const emptyRoot = await mkdtemp(path.join(os.tmpdir(), "gitable-empty-"));
+    try {
+      await git(["init", "-b", "main"], emptyRoot);
+      const emptyService = new GitCliService(new TestLogger() as unknown as Logger);
+      emptyService.setActiveRoot(emptyRoot);
+      const history = await emptyService.getHistory(10);
+      expect(history).toEqual([]);
+    } finally {
+      await rm(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("getCommitFiles returns files changed in a commit", async () => {
+    await writeFile(path.join(root, "new.txt"), "new file\n");
+    await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+    await git(["add", "."], root);
+    await git(["commit", "-m", "second commit"], root);
+
+    const history = await service.getHistory(1);
+    const files = await service.getCommitFiles(history[0].hash);
+
+    const paths = files.map((f) => f.path).sort();
+    expect(paths).toContain("new.txt");
+    expect(paths).toContain("tracked.txt");
+
+    const newFile = files.find((f) => f.path === "new.txt");
+    const modFile = files.find((f) => f.path === "tracked.txt");
+    expect(newFile?.status).toBe("A");
+    expect(modFile?.status).toBe("M");
+  });
+
+  it("getCommitFiles returns all files for the root (initial) commit", async () => {
+    // The very first commit has no parent; --root handles this.
+    const history = await service.getHistory(10);
+    const rootCommit = history[history.length - 1];
+    const files = await service.getCommitFiles(rootCommit.hash);
+
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe("tracked.txt");
+    expect(files[0].status).toBe("A");
+  });
+
+  it("getCommitFiles reports deleted files", async () => {
+    await git(["rm", "tracked.txt"], root);
+    await git(["commit", "-m", "remove file"], root);
+
+    const history = await service.getHistory(1);
+    const files = await service.getCommitFiles(history[0].hash);
+
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe("tracked.txt");
+    expect(files[0].status).toBe("D");
+  });
+
   it("keeps local changes on the source branch and restores them when returning", async () => {
     await git(["checkout", "-b", "test"], root);
     await writeFile(path.join(root, "target.txt"), "target\n");

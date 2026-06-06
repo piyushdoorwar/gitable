@@ -26,8 +26,8 @@ telemetry, and no database** — everything runs in the VS Code extension host.
 media/                     Webview assets (vanilla JS/CSS) + Activity Bar icon
   icon.svg, main.css, main.js
 src/
-  extension.ts             activate(): wires services, registers the view + 7 commands, Git watchers
-  constants.ts             command ids, secret/state keys, MAX_DIFF_CHARS, fallback models
+  extension.ts             activate(): wires services, registers the view + 11 commands, Git watchers
+  constants.ts             command ids, secret/state keys, MAX_DIFF_CHARS, HISTORY_LIMIT, MODEL_FETCH_LIMIT
   views/
     GitableViewProvider.ts WebviewViewProvider: message protocol + orchestration + state
   git/
@@ -48,6 +48,17 @@ src/
   utils/
     DiffLimiter.ts         ignore noisy files + truncate to MAX_DIFF_CHARS
     Logger.ts              OutputChannel("Gitable")
+tests/
+  git/
+    GitCliService.test.ts  integration tests for all CLI operations (real git repo via mkdtemp)
+    models.test.ts         unit tests for vscodeStatusToLetter + cliStatusToLetter
+  ai/
+    AiProvider.test.ts     unit tests for parseGeneratedMessage + mapStatusToMessage + throwForStatus
+    prompts.test.ts        unit tests for buildCommitPrompt
+  utils/
+    DiffLimiter.test.ts    unit tests for isIgnored + prepare (ignore, truncate, empty)
+  mocks/
+    vscode.ts              minimal vscode API stub (workspace, window) for the test environment
 ```
 
 ## Services & data flow
@@ -67,15 +78,20 @@ src/
 ### Webview message protocol
 
 - **Webview → host:** `ready`, `refresh`, `selectRepo`, `stageFile`, `unstageFile`,
-  `stageFiles`, `unstageFiles`, `stageAll`, `unstageAll`, `commit`,
+  `stageFiles`, `unstageFiles`, `stageAll`, `unstageAll`, `discard`, `commit`,
   `generateCommitMessage`, `saveProvider`, `saveApiKey`, `validateApiKey`,
-  `saveModel`, `fetchModels`.
+  `saveModel`, `fetchModels`, `openDiff`, `toggleCommit`, `openCommitFile`,
+  `push`, `pull`, `createBranch`, `switchBranch`, `checkoutBranchWithChanges`,
+  `checkoutBranchKeepingChanges`, `restoreBranchChanges`.
 - **Host → webview:** `state` (full snapshot), `setCommitFields`,
-  `clearCommitFields`, `switchTab`.
+  `clearCommitFields`, `switchTab`, `commitFiles`.
 
 The `state` payload: `{ repositoryName, branchName, activeRoot, repositories,
-changes:{staged,unstaged}, history, provider, model, models, hasApiKey, isLoading,
-error, notice }`.
+changes:{staged,unstaged}, history, branches, syncInfo, provider, model, models,
+hasApiKey, busyKind, busyText, error, notice }`.
+
+The `commitFiles` message carries `{ type:"commitFiles", hash, files:FileChange[] }` —
+sent lazily on first expand of a commit row in the History tab.
 
 ## Conventions (mirrors the author's other projects)
 
@@ -96,24 +112,41 @@ error, notice }`.
   extension host, so the webview needs no external `connect-src`.
 - Git CLI calls use `execFile` with argument arrays — no shell interpolation.
 
-## Build, run, package
+## Build, run, package, test
 
 ```bash
 npm install
 npm run compile      # esbuild -> dist/extension.js  (npm run watch to rebuild on change)
 npm run typecheck    # tsc --noEmit
+npm test             # vitest run  (unit + integration tests)
 # F5 in VS Code -> Extension Development Host
 vsce package         # produce a .vsix
 ```
 
+Tests live in `tests/` and are run by **Vitest** (`vitest.config.mts`). The `vscode`
+module is aliased to `tests/mocks/vscode.ts` so host-side TypeScript compiles and
+runs outside VS Code. Git integration tests create a real temporary repository via
+`mkdtemp` and clean it up with `rm -rf` in `afterEach`.
+
 ## Notable design decisions
 
-- **Hybrid Git access.** The stable Git API has no reliable "unstage" and no
-  `--stat`/rich `log`, so those go through the CLI while reads/staging/commit/watch
-  use the API. This keeps behavior predictable and cross-platform.
+- **Hybrid Git access.** All local mutations (stage/unstage/commit/discard) go through
+  the CLI because the stable VS Code Git API's command execution is unreliable on some
+  setups. Reads, watches, and push/pull prefer the API (credential/UI integration) with
+  a transparent CLI fallback via `apiOrCli()`.
 - **OpenAI uses `chat/completions` JSON mode** (rather than `/v1/responses`) because
   commit generation needs reliable structured `{summary, description}` output. Auth,
   validation, and model-listing patterns follow the same conventions as the other
   providers.
-- **Live model lists with static fallback** (`FALLBACK_MODELS` in `constants.ts`)
-  so the dropdown is accurate when online and still usable offline.
+- **Live model lists only.** `FALLBACK_MODELS`/`DEFAULT_MODELS` were removed. Models
+  are fetched from the provider on validate and then cached via `preloadModels()` on
+  webview ready, so the dropdown is always fresh and the user never sees stale data.
+- **Expandable commit history.** Clicking a commit in the History tab expands it
+  inline (like VS Code's built-in Git view). Files are lazy-loaded on first expand
+  using `git diff-tree --no-commit-id --name-status -r --root <hash>` (the `--root`
+  flag handles the initial commit). Results are cached in the webview so background
+  refreshes do not collapse expanded rows. Clicking a file opens the parent↔commit
+  diff via `toGitUri` + `vscode.diff`.
+- **API keys in SecretStorage only.** Keys are written with `context.secrets` under
+  `gitable.<provider>.apiKey` and read back at call time — they never touch settings,
+  globalState, or any file.
