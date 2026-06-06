@@ -114,6 +114,14 @@ button[aria-disabled="true"],
   align-items: center;
   gap: 6px;
 }
+.gx-settings-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-settings-btn:hover {
+  color: var(--vscode-foreground);
+}
 
 .gx-repo-name {
   display: inline-flex;
@@ -438,9 +446,6 @@ button[aria-disabled="true"],
 .gx-model-block .gx-field {
   margin-bottom: 8px;
 }
-.gx-model-block .gx-actions {
-  margin-top: 0;
-}
 
 /* Sections ----------------------------------------------------------- */
 .gx-section-head {
@@ -608,13 +613,13 @@ button[aria-disabled="true"],
 .gx-check:checked::after {
   content: "";
   position: absolute;
-  left: 3px;
-  top: 4px;
+  left: 50%;
+  top: 50%;
   width: 8px;
   height: 4px;
   border: solid var(--gx-pink-ink);
   border-width: 0 0 2px 2px;
-  transform: rotate(-45deg);
+  transform: translate(-50%, -60%) rotate(-45deg);
 }
 /* File-type icon (left), coloured by extension */
 .gx-ftype {
@@ -802,6 +807,20 @@ button[aria-disabled="true"],
   letter-spacing: 0.06em;
   color: var(--vscode-descriptionForeground);
   margin-bottom: 5px;
+}
+.gx-label.gx-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gx-refresh-icon-btn {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+  padding: 0 2px;
+}
+.gx-refresh-icon-btn:hover {
+  opacity: 1;
+  color: var(--vscode-foreground);
 }
 input[type="text"],
 input[type="password"],

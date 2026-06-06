@@ -188,6 +188,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "validateApiKey":
         await this.runValidate(message.provider);
         break;
+      case "saveAndValidate":
+        if (message.apiKey) {
+          await this.saveApiKey(message.provider, message.apiKey);
+        }
+        await this.runValidate(message.provider);
+        break;
       case "saveModel":
         await this.saveModel(message.model);
         break;

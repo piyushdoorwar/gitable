@@ -358,6 +358,7 @@
       <div class="gx-header">
         <div class="gx-repo-row">
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
+          <button class="gx-iconbtn gx-settings-btn" data-action="openSettings" title="Settings" aria-label="Settings" type="button">${icon("settings", "sm")}</button>
         </div>
         <div class="gx-branch-row">
           <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
@@ -450,18 +451,16 @@
           <input id="apiKeyInput" type="password" placeholder="Paste your API key" autocomplete="off" spellcheck="false" />
         </div>
         <div class="gx-actions">
-          <button class="gx-btn gx-btn-primary" data-action="saveApiKey" title="Save API key securely in VS Code" aria-label="Save API key securely in VS Code" type="button">${icon("lock")}<span>Save key</span></button>
-          <button class="gx-btn gx-btn-ghost" data-action="validateApiKey" title="Validate saved API key and load models" aria-label="Validate saved API key and load models" type="button">${icon("check")}<span>Validate</span></button>
+          <button id="saveValidateBtn" class="gx-btn gx-btn-primary" data-action="saveAndValidate" title="Save API key and validate" aria-label="Save API key and validate" type="button" disabled>${icon("lock")}<span>Save &amp; Validate</span></button>
         </div>
-        <div id="modelHint" class="gx-hint">Save or validate your API key to load the available models.</div>
+        <div id="modelHint" class="gx-hint">Save your API key to load the available models.</div>
         <div id="modelSection" class="hidden gx-model-block">
           <div class="gx-field">
-            <label class="gx-label">Model</label>
+            <label class="gx-label gx-label-row">
+              <span>Model</span>
+              <button class="gx-iconbtn gx-refresh-icon-btn" data-action="refreshModels" title="Refresh available models" aria-label="Refresh available models" type="button">${icon("refresh", "sm")}</button>
+            </label>
             <div id="modelSlot"></div>
-          </div>
-          <div class="gx-actions">
-            <button class="gx-btn gx-btn-soft" data-action="refreshModels" title="Refresh models from selected provider" aria-label="Refresh models from selected provider" type="button">${icon("refresh", "sm")}<span>Refresh</span></button>
-            <button class="gx-btn gx-btn-primary" data-action="saveModel" title="Save selected AI model" aria-label="Save selected AI model" type="button">${icon("check")}<span>Save model</span></button>
           </div>
         </div>
         <div id="settingsStatus" class="gx-status-line"></div>
@@ -494,11 +493,17 @@
 
     // Dropdowns
     ui.dd.provider = createDropdown((provider) => post({ type: "saveProvider", provider }));
-    ui.dd.model = createDropdown(() => {
-      /* value tracked in dropdown; persisted via Save model */
+    ui.dd.model = createDropdown((model) => {
+      if (model) post({ type: "saveModel", model });
     });
     byId("providerSlot").append(ui.dd.provider.root);
     byId("modelSlot").append(ui.dd.model.root);
+
+    // Enable/disable Save & Validate based on key input content
+    byId("apiKeyInput").addEventListener("input", () => {
+      const hasText = /** @type {HTMLInputElement} */ (byId("apiKeyInput")).value.trim().length > 0;
+      setDisabled(byId("saveValidateBtn"), !hasText && !ui.state.hasApiKey);
+    });
 
     // Branches tab: filter (client-side) + create-on-Enter
     byId("branchFilter").addEventListener("input", (e) => {
@@ -655,22 +660,15 @@
         post({ type: "commit", summary, description });
         break;
       }
-      case "saveApiKey": {
+      case "saveAndValidate": {
         const apiKey = /** @type {HTMLInputElement} */ (byId("apiKeyInput")).value.trim();
-        if (apiKey) post({ type: "saveApiKey", provider: ui.dd.provider.getValue(), apiKey });
+        const provider = ui.dd.provider.getValue();
+        post({ type: "saveAndValidate", provider, apiKey: apiKey || undefined });
         break;
       }
-      case "validateApiKey":
-        post({ type: "validateApiKey", provider: ui.dd.provider.getValue() });
-        break;
       case "refreshModels":
         post({ type: "fetchModels", provider: ui.dd.provider.getValue() });
         break;
-      case "saveModel": {
-        const model = ui.dd.model.getValue();
-        if (model) post({ type: "saveModel", model });
-        break;
-      }
       case "push":
         post({ type: "push" });
         break;
@@ -679,6 +677,9 @@
         break;
       case "openBranches":
         switchTab("branches");
+        break;
+      case "openSettings":
+        switchTab("settings");
         break;
       case "createBranchNamed": {
         const input = /** @type {HTMLInputElement} */ (byId("newBranchInput"));
@@ -1366,6 +1367,8 @@
     keyInput.placeholder = s.hasApiKey
       ? "•••••••••••• stored — paste to replace"
       : "Paste your API key";
+    const hasInputText = keyInput.value.trim().length > 0;
+    setDisabled(byId("saveValidateBtn"), !hasInputText && !s.hasApiKey);
 
     const icons = s.providerIcons || {};
     const providerItems = PROVIDERS.map((p) => ({ value: p.value, label: p.label, icon: icons[p.value] }));

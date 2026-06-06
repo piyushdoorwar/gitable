@@ -123,11 +123,6 @@
           "command": "gitable.refresh",
           "when": "view == gitable.panel",
           "group": "navigation@1"
-        },
-        {
-          "command": "gitable.openSettings",
-          "when": "view == gitable.panel",
-          "group": "navigation@2"
         }
       ]
     }
