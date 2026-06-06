@@ -69,7 +69,7 @@ export class GeminiProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage> {
+  async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
     const url = `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
     const response = await fetch(url, {
       method: "POST",
@@ -85,11 +85,11 @@ export class GeminiProvider implements AiProvider {
     const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
     const text = parts.map((p) => (typeof p?.text === "string" ? p.text : "")).join("").trim();
     if (!text) throw new AiProviderError("Gemini returned an empty response.");
-    return parseGeneratedMessage(text);
+    return text;
   }
 
   async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
     const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
-    return this.generate(system, user, input.model, apiKey);
+    return parseGeneratedMessage(await this.generate(system, user, input.model, apiKey));
   }
 }

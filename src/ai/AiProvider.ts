@@ -31,8 +31,47 @@ export interface AiProvider {
     apiKey: string
   ): Promise<GeneratedCommitMessage>;
 
-  /** Calls the provider with custom system/user prompts and returns a parsed result. */
-  generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage>;
+  /** Calls the provider with custom system/user prompts and returns the raw text response. */
+  generate(system: string, user: string, model: string, apiKey: string): Promise<string>;
+}
+
+export interface SecurityFinding {
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  category: string;
+  title: string;
+  detail: string;
+}
+
+export interface SecurityReview {
+  findings: SecurityFinding[];
+  safe: boolean;
+}
+
+export function parseSecurityReview(text: string): SecurityReview {
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(cleaned.slice(start, end + 1)) as any;
+      if (Array.isArray(parsed?.findings)) {
+        const SEVERITIES = new Set(["critical", "high", "medium", "low", "info"]);
+        const findings: SecurityFinding[] = parsed.findings.map((f: any) => ({
+          severity: SEVERITIES.has(String(f?.severity)) ? (f.severity as SecurityFinding["severity"]) : "info",
+          category: String(f?.category ?? "Security"),
+          title: String(f?.title ?? "Issue"),
+          detail: String(f?.detail ?? "")
+        }));
+        return { findings, safe: findings.length === 0 || !!parsed.safe };
+      }
+    } catch {
+      // Fall through to plain-text fallback.
+    }
+  }
+  return {
+    findings: [{ severity: "info", category: "Analysis", title: "Security review", detail: text.trim() }],
+    safe: false
+  };
 }
 
 /** Carries a user-friendly message plus the HTTP status, when available. */

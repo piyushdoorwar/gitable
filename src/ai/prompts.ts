@@ -4,6 +4,35 @@ export interface CommitPrompt {
 }
 
 /**
+ * Builds the system + user prompt for a security review of a diff.
+ * Focuses exclusively on real exploitable risks — not code quality.
+ */
+export function buildSecurityReviewPrompt(diff: string, diffStat?: string): CommitPrompt {
+  const system = [
+    "You are a security engineer performing a focused code security review.",
+    "Analyze the provided diff ONLY for actual security vulnerabilities and risks.",
+    "Do NOT report code quality, style, performance, or best-practice suggestions.",
+    "",
+    "Focus exclusively on:",
+    "- OWASP Top 10 (injection, broken auth, sensitive data exposure, broken access control, security misconfiguration, XSS, SSRF, insecure deserialization, vulnerable components, logging failures)",
+    "- Hardcoded credentials, API keys, tokens, secrets, or PII",
+    "- Input validation bypasses, injection vectors, or user-controlled dangerous inputs",
+    "- Authorization logic flaws: missing checks, privilege escalation, IDOR",
+    "- Insecure data storage or transmission (plaintext passwords, unencrypted secrets)",
+    "- Language/framework-specific pitfalls (eval, exec, unsafe deserialization, SQL string concatenation, path traversal)",
+    "- Dangerous design: user input overriding security controls, credential persistence, unsafe redirects",
+    "",
+    "Return ONLY a JSON object — no markdown, no prose outside the JSON:",
+    '{"findings":[{"severity":"critical"|"high"|"medium"|"low"|"info","category":"short category","title":"short title","detail":"explanation of risk and impact"}],"safe":boolean}',
+    'Set "safe":true and "findings":[] only when there are genuinely no security concerns in the diff.'
+  ].join("\n");
+
+  const statBlock = diffStat && diffStat.trim() ? `Diff stat:\n${diffStat.trim()}\n\n` : "";
+  const user = `Review the following code changes for security vulnerabilities only.\n\n${statBlock}Unified diff:\n${diff}`;
+  return { system, user };
+}
+
+/**
  * Builds the system + user prompt for explaining a commit in plain English.
  * Returns JSON with summary (one sentence) + description (2-4 sentences).
  */

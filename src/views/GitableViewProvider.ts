@@ -1,7 +1,8 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { AiProviderFactory } from "../ai/AiProviderFactory";
-import { buildCommitSummaryPrompt } from "../ai/prompts";
+import { buildCommitSummaryPrompt, buildSecurityReviewPrompt } from "../ai/prompts";
+import { parseGeneratedMessage, parseSecurityReview } from "../ai/AiProvider";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
@@ -260,6 +261,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       case "summarizeCommit":
         await this.handleSummarizeCommit(String(message.hash ?? ""), String(message.subject ?? ""));
+        break;
+      case "securityReview":
+        await this.handleSecurityReview(!!message.staged);
         break;
       case "copySummaryText": {
         const text = String(message.text ?? "");
@@ -547,11 +551,41 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const { diff } = DiffLimiter.prepare(rawDiff);
       const { system, user } = buildCommitSummaryPrompt(subject, diff);
       const provider = AiProviderFactory.createProvider(providerId);
-      const result = await provider.generate(system, user, model, apiKey);
+      const text = await provider.generate(system, user, model, apiKey);
+      const result = parseGeneratedMessage(text);
       post({ type: "commitSummary", hash, summary: result.summary, description: result.description });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to generate summary.";
       this.view?.webview.postMessage({ type: "commitSummary", hash, error: msg });
+    }
+  }
+
+  private async handleSecurityReview(staged: boolean): Promise<void> {
+    if (!this.view) return;
+    const post = (payload: object) => this.view!.webview.postMessage(payload);
+    try {
+      const providerId = this.settings.getProvider() as ProviderId;
+      const apiKey = await this.secrets.getKey(providerId);
+      if (!apiKey) {
+        post({ type: "securityReview", error: "No API key saved — go to Settings to add one." });
+        return;
+      }
+      const model = this.settings.getModel(providerId);
+      if (!model) {
+        post({ type: "securityReview", error: "No model selected — go to Settings to pick one." });
+        return;
+      }
+      const diff = staged ? await this.git.getStagedDiff() : await this.git.getUnstagedDiff();
+      const diffStat = staged ? await this.git.getStagedDiffStat() : undefined;
+      const { diff: limitedDiff } = DiffLimiter.prepare(diff);
+      const { system, user } = buildSecurityReviewPrompt(limitedDiff, diffStat);
+      const provider = AiProviderFactory.createProvider(providerId);
+      const text = await provider.generate(system, user, model, apiKey);
+      const review = parseSecurityReview(text);
+      post({ type: "securityReview", findings: review.findings, safe: review.safe });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to run security review.";
+      this.view?.webview.postMessage({ type: "securityReview", error: msg });
     }
   }
 

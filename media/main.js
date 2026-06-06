@@ -54,7 +54,9 @@
     cherryPick:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="2.5"/><line x1="3" y1="12" x2="6.5" y2="12"/><line x1="11.5" y1="12" x2="16" y2="12"/><polyline points="13 7 18 12 13 17"/></svg>',
     pencil:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>',
+    shieldAi:
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5.5V11c0 5.25 3.6 9.74 8 11.5 4.4-1.76 8-6.25 8-11.5V5.5L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8l.75 2.1 2.1.75-2.1.75L12 13.7l-.75-2.1-2.1-.75 2.1-.75z" fill="currentColor" stroke="none"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -134,6 +136,7 @@
     commitFiles: /** @type {Record<string, any>} */ ({}),
     commitStats: /** @type {Record<string, any>} */ ({}),
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
+    activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -369,6 +372,7 @@
         <button class="gx-tab" data-tab="changes" title="Show working tree changes" aria-label="Show working tree changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
         <button class="gx-tab" data-tab="history" title="Show commit history" aria-label="Show commit history" type="button">${icon("history", "sm")}<span>History</span></button>
         <button id="summaryTab" class="gx-tab gx-tab-summary hidden" data-tab="summary" title="AI commit summary" aria-label="AI commit summary" type="button">${icon("sparkle", "sm")}<span>AI Summary</span><span class="gx-tab-close-btn" data-action="closeSummary" role="button" aria-label="Close summary" title="Close summary">✕</span></button>
+        <button id="securityTab" class="gx-tab gx-tab-summary hidden" data-tab="security" title="Security review" aria-label="Security review" type="button">${icon("shieldAi", "sm")}<span>Security</span><span class="gx-tab-close-btn" data-action="closeSecurityReview" role="button" aria-label="Close security review" title="Close security review">✕</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -380,6 +384,8 @@
             <span id="stagedCount" class="gx-count">0</span>
             <span class="spacer"></span>
             <span class="gx-section-actions">
+              <button id="stagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="1" title="Security review of staged changes" aria-label="Security review of staged changes" type="button">${ICONS.shieldAi}</button>
+              <span class="gx-mini-sep"></span>
               <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
               <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
             </span>
@@ -391,6 +397,8 @@
             <span id="unstagedCount" class="gx-count">0</span>
             <span class="spacer"></span>
             <span class="gx-section-actions">
+              <button id="unstagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="0" title="Security review of unstaged changes" aria-label="Security review of unstaged changes" type="button">${ICONS.shieldAi}</button>
+              <span class="gx-mini-sep"></span>
               <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
               <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
               <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
@@ -427,6 +435,10 @@
 
       <div id="panel-summary" class="gx-panel hidden">
         <div id="summaryContent"></div>
+      </div>
+
+      <div id="panel-security" class="gx-panel hidden">
+        <div id="securityContent"></div>
       </div>
 
       <div id="panel-branches" class="gx-panel hidden">
@@ -598,7 +610,7 @@
     if (branchButton) {
       branchButton.classList.toggle("active", tab === "branches");
     }
-    ["changes", "history", "branches", "settings", "summary"].forEach((name) => {
+    ["changes", "history", "branches", "settings", "summary", "security"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
   }
@@ -731,6 +743,30 @@
         byId("summaryTab").classList.add("hidden");
         switchTab("history");
         break;
+      case "securityReview": {
+        const staged = elm.getAttribute("data-staged") === "1";
+        ui.activeSecurityReview = { staged, loading: true };
+        const secTab = byId("securityTab");
+        if (secTab) secTab.classList.remove("hidden");
+        switchTab("security");
+        renderSecurityPanel();
+        post({ type: "securityReview", staged });
+        break;
+      }
+      case "closeSecurityReview":
+        ui.activeSecurityReview = null;
+        byId("securityTab").classList.add("hidden");
+        switchTab("changes");
+        break;
+      case "copySecurityReview": {
+        const sr = ui.activeSecurityReview;
+        if (!sr || !sr.findings) break;
+        const lines = sr.safe
+          ? ["No security issues found."]
+          : sr.findings.map((f) => `[${f.severity.toUpperCase()}] ${f.category} — ${f.title}\n${f.detail}`);
+        post({ type: "copySummaryText", text: lines.join("\n\n") });
+        break;
+      }
       case "copySummaryText": {
         const parts = [ui.activeSummary?.summary, ui.activeSummary?.description].filter(Boolean);
         post({ type: "copySummaryText", text: parts.join("\n\n") });
@@ -967,14 +1003,19 @@
     renderHistory(s);
     renderSettings(s);
     renderSummaryPanel();
+    renderSecurityPanel();
     const summaryTab = byId("summaryTab");
     if (summaryTab) summaryTab.classList.toggle("hidden", !ui.activeSummary);
+    const securityTab = byId("securityTab");
+    if (securityTab) securityTab.classList.toggle("hidden", !ui.activeSecurityReview);
   }
 
   function updateChangeActionButtons(s) {
     const busy = !!s.isLoading;
     const stagedFiles = s.changes.staged || [];
     const unstagedFiles = s.changes.unstaged || [];
+    setDisabled(byId("stagedSecurityBtn"), busy || stagedFiles.length === 0);
+    setDisabled(byId("unstagedSecurityBtn"), busy || unstagedFiles.length === 0);
     const selectedStaged = selectedPaths(stagedFiles).length;
     const selectedUnstaged = selectedPaths(unstagedFiles).length;
     const unstageSelected = byId("unstageSelectedBtn");
@@ -1227,6 +1268,61 @@
       </div>`;
   }
 
+  function renderSecurityPanel() {
+    const container = byId("securityContent");
+    if (!container) return;
+    const sr = ui.activeSecurityReview;
+    if (!sr) { container.innerHTML = ""; return; }
+
+    const scope = sr.staged ? "Staged Changes" : "Working Tree Changes";
+
+    if (sr.loading) {
+      container.innerHTML = `
+        <div class="gx-ai-panel">
+          <div class="gx-ai-panel-meta"><span class="gx-sec-scope">${escapeHtml(scope)}</span></div>
+          <div class="gx-ai-panel-loading">${icon("shieldAi", "sm")}<span>Scanning for security risks…</span></div>
+        </div>`;
+      return;
+    }
+    if (sr.error) {
+      container.innerHTML = `
+        <div class="gx-ai-panel">
+          <div class="gx-ai-panel-meta"><span class="gx-sec-scope">${escapeHtml(scope)}</span></div>
+          <div class="gx-ai-panel-error">${escapeHtml(sr.error)}</div>
+          <div class="gx-ai-panel-actions">
+            <button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("changes", "sm")}<span>Back to Changes</span></button>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const findings = sr.findings || [];
+    const bodyHtml = sr.safe || !findings.length
+      ? `<div class="gx-sec-safe">${icon("check", "sm")}<span>No security issues found in ${escapeHtml(scope.toLowerCase())}.</span></div>`
+      : findings.map((f) => `
+          <div class="gx-finding gx-sev-${escapeHtml(f.severity)}">
+            <div class="gx-finding-header">
+              <span class="gx-severity-badge gx-sev-badge-${escapeHtml(f.severity)}">${escapeHtml(f.severity.toUpperCase())}</span>
+              <span class="gx-finding-cat">${escapeHtml(f.category)}</span>
+            </div>
+            <div class="gx-finding-title">${escapeHtml(f.title)}</div>
+            <div class="gx-finding-detail">${escapeHtml(f.detail)}</div>
+          </div>`).join("");
+
+    container.innerHTML = `
+      <div class="gx-ai-panel">
+        <div class="gx-ai-panel-meta">
+          <span class="gx-sec-scope">${escapeHtml(scope)}</span>
+          ${findings.length ? `<span class="gx-sec-count">${findings.length} issue${findings.length === 1 ? "" : "s"}</span>` : ""}
+        </div>
+        <div class="gx-ai-panel-body gx-sec-body">${bodyHtml}</div>
+        <div class="gx-ai-panel-actions">
+          <button class="gx-btn gx-btn-primary" data-action="copySecurityReview" type="button">${icon("copy", "sm")}<span>Copy</span></button>
+          <button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("changes", "sm")}<span>Back to Changes</span></button>
+        </div>
+      </div>`;
+  }
+
   function renderCommitTags(tags) {
     const names = Array.isArray(tags) ? tags.filter(Boolean) : [];
     if (!names.length) return "";
@@ -1343,6 +1439,16 @@
             ui.activeSummary = { ...ui.activeSummary, loading: false, summary: message.summary, description: message.description };
           }
           renderSummaryPanel();
+        }
+        break;
+      case "securityReview":
+        if (ui.activeSecurityReview) {
+          if (message.error) {
+            ui.activeSecurityReview = { ...ui.activeSecurityReview, loading: false, error: message.error };
+          } else {
+            ui.activeSecurityReview = { ...ui.activeSecurityReview, loading: false, findings: message.findings, safe: !!message.safe };
+          }
+          renderSecurityPanel();
         }
         break;
       default:

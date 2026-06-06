@@ -6,6 +6,7 @@ import {
   parseGeneratedMessage,
   throwForStatus
 } from "./AiProvider";
+
 import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
 
@@ -66,7 +67,7 @@ export class OpenAiProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage> {
+  async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -81,11 +82,11 @@ export class OpenAiProvider implements AiProvider {
     const data: any = await response.json();
     const content: string = data?.choices?.[0]?.message?.content ?? "";
     if (!content) throw new AiProviderError("OpenAI returned an empty response.");
-    return parseGeneratedMessage(content);
+    return content;
   }
 
   async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
     const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
-    return this.generate(system, user, input.model, apiKey);
+    return parseGeneratedMessage(await this.generate(system, user, input.model, apiKey));
   }
 }
