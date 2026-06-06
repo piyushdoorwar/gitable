@@ -326,6 +326,13 @@ export class GitCliService implements GitService {
     await this.run(["cherry-pick", hash], this.requireRoot());
   }
 
+  async getCommitDiff(hash: string): Promise<string> {
+    return this.run(
+      ["-c", "core.quotepath=false", "diff-tree", "-p", "--no-commit-id", "-r", "-M", "--root", hash],
+      this.requireRoot()
+    );
+  }
+
   async renameBranch(oldName: string, newName: string): Promise<void> {
     await this.run(["branch", "-m", oldName, newName], this.requireRoot());
   }

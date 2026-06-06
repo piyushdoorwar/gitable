@@ -69,40 +69,27 @@ export class GeminiProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generateCommitMessage(
-    input: GenerateCommitMessageInput,
-    apiKey: string
-  ): Promise<GeneratedCommitMessage> {
-    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
-    const url = `${BASE_URL}/models/${encodeURIComponent(input.model)}:generateContent`;
+  async generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage> {
+    const url = `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
-        }
+        generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
       })
     });
-
-    if (!response.ok) {
-      await throwForStatus(response);
-    }
+    if (!response.ok) await throwForStatus(response);
     const data: any = await response.json();
     const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
-    const text = parts
-      .map((p) => (typeof p?.text === "string" ? p.text : ""))
-      .join("")
-      .trim();
-    if (!text) {
-      throw new AiProviderError("Gemini returned an empty response.");
-    }
+    const text = parts.map((p) => (typeof p?.text === "string" ? p.text : "")).join("").trim();
+    if (!text) throw new AiProviderError("Gemini returned an empty response.");
     return parseGeneratedMessage(text);
+  }
+
+  async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
+    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
+    return this.generate(system, user, input.model, apiKey);
   }
 }

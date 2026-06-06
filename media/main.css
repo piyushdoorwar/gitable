@@ -320,6 +320,30 @@ button[aria-disabled="true"],
   background: var(--gx-pink);
 }
 
+/* Summary tab close button */
+.gx-tab-summary {
+  flex: 0 1 auto;
+  padding-right: 6px;
+  gap: 4px;
+}
+.gx-tab-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  margin-left: 2px;
+}
+.gx-tab-close-btn:hover {
+  background: var(--gx-pink-soft);
+  color: var(--vscode-foreground);
+}
+
 .gx-panel {
   flex: 1 1 auto;
   min-height: 0;
@@ -1021,6 +1045,103 @@ textarea {
   width: 13px;
   height: 13px;
 }
+/* AI summarise button (inside commit head) */
+.gx-commit-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.gx-ai-sum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--gx-pink-strong);
+  opacity: 0;
+  transition: opacity 0.12s;
+  cursor: pointer;
+}
+.gx-commit-head:hover .gx-ai-sum {
+  opacity: 1;
+}
+.gx-ai-sum:hover {
+  background: var(--gx-pink-soft);
+  opacity: 1;
+}
+.gx-ai-sum svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* AI Summary panel */
+.gx-ai-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  height: 100%;
+  box-sizing: border-box;
+}
+.gx-ai-panel-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.gx-ai-subject {
+  font-size: 12.5px;
+  color: var(--vscode-foreground);
+  font-weight: 500;
+}
+.gx-ai-panel-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12.5px;
+}
+.gx-ai-panel-error {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(249, 139, 158, 0.1);
+  color: var(--gx-pink-strong);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.gx-ai-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gx-ai-panel-summary {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--vscode-foreground);
+}
+.gx-ai-panel-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-ai-panel-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .gx-diff-stat {
   display: flex;
   align-items: center;

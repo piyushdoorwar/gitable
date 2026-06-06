@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { AiProviderFactory } from "../ai/AiProviderFactory";
+import { buildCommitSummaryPrompt } from "../ai/prompts";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
@@ -257,6 +258,16 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           await this.createBranchFromInput();
         }
         break;
+      case "summarizeCommit":
+        await this.handleSummarizeCommit(String(message.hash ?? ""), String(message.subject ?? ""));
+        break;
+      case "copySummaryText": {
+        const text = String(message.text ?? "");
+        await vscode.env.clipboard.writeText(text);
+        this.pendingNotice = "Summary copied to clipboard.";
+        await this.postState();
+        break;
+      }
       case "renameBranch":
         await this.renameBranch(String(message.name ?? ""));
         break;
@@ -515,6 +526,33 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       () => this.git.createBranch(branch),
       `Created and switched to ${branch}.`
     );
+  }
+
+  private async handleSummarizeCommit(hash: string, subject: string): Promise<void> {
+    if (!hash || !this.view) return;
+    const post = (payload: object) => this.view!.webview.postMessage(payload);
+    try {
+      const providerId = this.settings.getProvider() as ProviderId;
+      const apiKey = await this.secrets.getKey(providerId);
+      if (!apiKey) {
+        post({ type: "commitSummary", hash, error: "No API key saved — go to Settings to add one." });
+        return;
+      }
+      const model = this.settings.getModel(providerId);
+      if (!model) {
+        post({ type: "commitSummary", hash, error: "No model selected — go to Settings to pick one." });
+        return;
+      }
+      const rawDiff = await this.git.getCommitDiff(hash);
+      const { diff } = DiffLimiter.prepare(rawDiff);
+      const { system, user } = buildCommitSummaryPrompt(subject, diff);
+      const provider = AiProviderFactory.createProvider(providerId);
+      const result = await provider.generate(system, user, model, apiKey);
+      post({ type: "commitSummary", hash, summary: result.summary, description: result.description });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to generate summary.";
+      this.view?.webview.postMessage({ type: "commitSummary", hash, error: msg });
+    }
   }
 
   private async renameBranch(oldName: string): Promise<void> {

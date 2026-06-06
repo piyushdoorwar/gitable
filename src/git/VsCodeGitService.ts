@@ -339,6 +339,11 @@ export class VsCodeGitService implements GitService {
     return this.cli.getCommitStat(hash);
   }
 
+  getCommitDiff(hash: string): Promise<string> {
+    this.syncCliRoot();
+    return this.cli.getCommitDiff(hash);
+  }
+
   renameBranch(oldName: string, newName: string): Promise<void> {
     this.syncCliRoot();
     return this.cli.renameBranch(oldName, newName);

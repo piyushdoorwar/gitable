@@ -66,36 +66,26 @@ export class OpenAiProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generateCommitMessage(
-    input: GenerateCommitMessageInput,
-    apiKey: string
-  ): Promise<GeneratedCommitMessage> {
-    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
+  async generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage> {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: input.model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user }
-        ],
+        model,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
         response_format: { type: "json_object" },
         temperature: 0.2
       })
     });
-
-    if (!response.ok) {
-      await throwForStatus(response);
-    }
+    if (!response.ok) await throwForStatus(response);
     const data: any = await response.json();
     const content: string = data?.choices?.[0]?.message?.content ?? "";
-    if (!content) {
-      throw new AiProviderError("OpenAI returned an empty response.");
-    }
+    if (!content) throw new AiProviderError("OpenAI returned an empty response.");
     return parseGeneratedMessage(content);
+  }
+
+  async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
+    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
+    return this.generate(system, user, input.model, apiKey);
   }
 }

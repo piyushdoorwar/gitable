@@ -133,6 +133,7 @@
     expandedCommits: new Set(),
     commitFiles: /** @type {Record<string, any>} */ ({}),
     commitStats: /** @type {Record<string, any>} */ ({}),
+    activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -367,6 +368,7 @@
       <div class="gx-tabs">
         <button class="gx-tab" data-tab="changes" title="Show working tree changes" aria-label="Show working tree changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
         <button class="gx-tab" data-tab="history" title="Show commit history" aria-label="Show commit history" type="button">${icon("history", "sm")}<span>History</span></button>
+        <button id="summaryTab" class="gx-tab gx-tab-summary hidden" data-tab="summary" title="AI commit summary" aria-label="AI commit summary" type="button">${icon("sparkle", "sm")}<span>AI Summary</span><span class="gx-tab-close-btn" data-action="closeSummary" role="button" aria-label="Close summary" title="Close summary">✕</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -421,6 +423,10 @@
 
       <div id="panel-history" class="gx-panel hidden">
         <ul id="commitList" class="gx-commits"></ul>
+      </div>
+
+      <div id="panel-summary" class="gx-panel hidden">
+        <div id="summaryContent"></div>
       </div>
 
       <div id="panel-branches" class="gx-panel hidden">
@@ -496,7 +502,10 @@
 
     // Tabs
     app.querySelectorAll(".gx-tab").forEach((tab) => {
-      tab.addEventListener("click", () => switchTab(tab.getAttribute("data-tab")));
+      tab.addEventListener("click", (e) => {
+        if (e.target.closest("[data-action]")) return; // close-btn handles itself
+        switchTab(tab.getAttribute("data-tab"));
+      });
     });
 
     // Delegated button actions
@@ -589,7 +598,7 @@
     if (branchButton) {
       branchButton.classList.toggle("active", tab === "branches");
     }
-    ["changes", "history", "branches", "settings"].forEach((name) => {
+    ["changes", "history", "branches", "settings", "summary"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
   }
@@ -705,6 +714,28 @@
           status: elm.getAttribute("data-status")
         });
         break;
+      case "summarizeCommit": {
+        const hash = elm.getAttribute("data-hash");
+        const subject = elm.getAttribute("data-subject") || "";
+        if (!hash) break;
+        ui.activeSummary = { hash, subject, loading: true };
+        const tab = byId("summaryTab");
+        if (tab) tab.classList.remove("hidden");
+        switchTab("summary");
+        renderSummaryPanel();
+        post({ type: "summarizeCommit", hash, subject });
+        break;
+      }
+      case "closeSummary":
+        ui.activeSummary = null;
+        byId("summaryTab").classList.add("hidden");
+        switchTab("history");
+        break;
+      case "copySummaryText": {
+        const parts = [ui.activeSummary?.summary, ui.activeSummary?.description].filter(Boolean);
+        post({ type: "copySummaryText", text: parts.join("\n\n") });
+        break;
+      }
       default:
         break;
     }
@@ -935,6 +966,9 @@
 
     renderHistory(s);
     renderSettings(s);
+    renderSummaryPanel();
+    const summaryTab = byId("summaryTab");
+    if (summaryTab) summaryTab.classList.toggle("hidden", !ui.activeSummary);
   }
 
   function updateChangeActionButtons(s) {
@@ -1126,7 +1160,10 @@
         return `
         <li class="gx-commit${expanded ? " expanded" : ""}">
           <div class="gx-commit-head" data-action="toggleCommit" data-hash="${escapeHtml(c.hash)}" title="Show changed files" aria-label="Show changed files in ${escapeHtml(c.hash)}">
-            <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
+            <span class="gx-commit-left">
+              <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
+              <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>
+            </span>
             <span class="rail gx-ic">${ICONS.commit}</span>
             <span class="body">
               <div class="gx-commit-title">
@@ -1144,6 +1181,50 @@
         </li>`;
       })
       .join("");
+  }
+
+  function renderSummaryPanel() {
+    const el = byId("summaryContent");
+    if (!el) return;
+    const s = ui.activeSummary;
+    if (!s) { el.innerHTML = ""; return; }
+
+    const hashEl = `<span class="gx-hash">${escapeHtml(s.hash)}</span>`;
+    const subjectEl = s.subject ? `<span class="gx-ai-subject">${escapeHtml(s.subject)}</span>` : "";
+
+    if (s.loading) {
+      el.innerHTML = `
+        <div class="gx-ai-panel">
+          <div class="gx-ai-panel-meta">${hashEl}${subjectEl}</div>
+          <div class="gx-ai-panel-loading">
+            <span class="gx-spin"></span><span>Generating summary…</span>
+          </div>
+        </div>`;
+      return;
+    }
+    if (s.error) {
+      el.innerHTML = `
+        <div class="gx-ai-panel">
+          <div class="gx-ai-panel-meta">${hashEl}${subjectEl}</div>
+          <div class="gx-ai-panel-error">${escapeHtml(s.error)}</div>
+          <div class="gx-ai-panel-actions">
+            <button class="gx-btn gx-btn-ghost" data-action="closeSummary" type="button">${icon("history", "sm")}<span>Back to History</span></button>
+          </div>
+        </div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="gx-ai-panel">
+        <div class="gx-ai-panel-meta">${hashEl}${subjectEl}</div>
+        <div class="gx-ai-panel-body">
+          <p class="gx-ai-panel-summary">${escapeHtml(s.summary || "")}</p>
+          ${s.description ? `<p class="gx-ai-panel-desc">${escapeHtml(s.description)}</p>` : ""}
+        </div>
+        <div class="gx-ai-panel-actions">
+          <button class="gx-btn gx-btn-primary" data-action="copySummaryText" type="button">${icon("copy", "sm")}<span>Copy</span></button>
+          <button class="gx-btn gx-btn-ghost" data-action="closeSummary" type="button">${icon("history", "sm")}<span>Back to History</span></button>
+        </div>
+      </div>`;
   }
 
   function renderCommitTags(tags) {
@@ -1253,6 +1334,16 @@
         ui.commitFiles[message.hash] = Array.isArray(message.files) ? message.files : [];
         if (message.stat) ui.commitStats[message.hash] = message.stat;
         if (ui.expandedCommits.has(message.hash)) renderHistory(ui.state);
+        break;
+      case "commitSummary":
+        if (ui.activeSummary && ui.activeSummary.hash === message.hash) {
+          if (message.error) {
+            ui.activeSummary = { ...ui.activeSummary, loading: false, error: message.error };
+          } else {
+            ui.activeSummary = { ...ui.activeSummary, loading: false, summary: message.summary, description: message.description };
+          }
+          renderSummaryPanel();
+        }
         break;
       default:
         break;

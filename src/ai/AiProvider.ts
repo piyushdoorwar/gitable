@@ -30,6 +30,9 @@ export interface AiProvider {
     input: GenerateCommitMessageInput,
     apiKey: string
   ): Promise<GeneratedCommitMessage>;
+
+  /** Calls the provider with custom system/user prompts and returns a parsed result. */
+  generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage>;
 }
 
 /** Carries a user-friendly message plus the HTTP status, when available. */

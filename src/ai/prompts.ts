@@ -4,6 +4,25 @@ export interface CommitPrompt {
 }
 
 /**
+ * Builds the system + user prompt for explaining a commit in plain English.
+ * Returns JSON with summary (one sentence) + description (2-4 sentences).
+ */
+export function buildCommitSummaryPrompt(subject: string, diff: string): CommitPrompt {
+  const system = [
+    "You are a helpful code reviewer. Given a git commit diff, explain in plain English what was changed and why.",
+    "Be concrete about what the code actually does — not just which files changed.",
+    "Return ONLY a JSON object with no markdown fences or commentary.",
+    'The JSON shape is: {"summary": string, "description": string}.',
+    '"summary" is a single sentence (max 120 chars) capturing the main change.',
+    '"description" is 2-4 sentences explaining what was done and the reasoning behind it.'
+  ].join("\n");
+
+  const commitLine = subject ? `Commit: ${subject}\n\n` : "";
+  const user = `${commitLine}Diff:\n${diff}`;
+  return { system, user };
+}
+
+/**
  * Builds the system + user prompt pair for commit-message generation.
  * Encodes Gitable's rules: concise, Conventional Commits, imperative mood,
  * summary under ~72 chars, optional description, and JSON-only output.

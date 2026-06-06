@@ -57,35 +57,22 @@ export class ClaudeProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generateCommitMessage(
-    input: GenerateCommitMessageInput,
-    apiKey: string
-  ): Promise<GeneratedCommitMessage> {
-    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
+  async generate(system: string, user: string, model: string, apiKey: string): Promise<GeneratedCommitMessage> {
     const response = await fetch(`${BASE_URL}/messages`, {
       method: "POST",
       headers: this.headers(apiKey),
-      body: JSON.stringify({
-        model: input.model,
-        system,
-        max_tokens: 1024,
-        temperature: 0.2,
-        messages: [{ role: "user", content: user }]
-      })
+      body: JSON.stringify({ model, system, max_tokens: 1024, temperature: 0.2, messages: [{ role: "user", content: user }] })
     });
-
-    if (!response.ok) {
-      await throwForStatus(response);
-    }
+    if (!response.ok) await throwForStatus(response);
     const data: any = await response.json();
     const blocks: any[] = Array.isArray(data?.content) ? data.content : [];
-    const text = blocks
-      .map((b) => (b?.type === "text" && typeof b?.text === "string" ? b.text : ""))
-      .join("")
-      .trim();
-    if (!text) {
-      throw new AiProviderError("Claude returned an empty response.");
-    }
+    const text = blocks.map((b) => (b?.type === "text" && typeof b?.text === "string" ? b.text : "")).join("").trim();
+    if (!text) throw new AiProviderError("Claude returned an empty response.");
     return parseGeneratedMessage(text);
+  }
+
+  async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
+    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
+    return this.generate(system, user, input.model, apiKey);
   }
 }
