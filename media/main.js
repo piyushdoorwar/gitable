@@ -371,8 +371,6 @@
       <div class="gx-tabs">
         <button class="gx-tab" data-tab="changes" title="Show working tree changes" aria-label="Show working tree changes" type="button">${icon("changes", "sm")}<span>Changes</span></button>
         <button class="gx-tab" data-tab="history" title="Show commit history" aria-label="Show commit history" type="button">${icon("history", "sm")}<span>History</span></button>
-        <button id="summaryTab" class="gx-tab gx-tab-summary hidden" data-tab="summary" title="AI commit summary" aria-label="AI commit summary" type="button">${icon("sparkle", "sm")}<span>AI Summary</span><span class="gx-tab-close-btn" data-action="closeSummary" role="button" aria-label="Close summary" title="Close summary">✕</span></button>
-        <button id="securityTab" class="gx-tab gx-tab-summary hidden" data-tab="security" title="Security review" aria-label="Security review" type="button">${icon("shieldAi", "sm")}<span>Security</span><span class="gx-tab-close-btn" data-action="closeSecurityReview" role="button" aria-label="Close security review" title="Close security review">✕</span></button>
       </div>
 
       <div id="panel-changes" class="gx-panel">
@@ -433,14 +431,6 @@
         <ul id="commitList" class="gx-commits"></ul>
       </div>
 
-      <div id="panel-summary" class="gx-panel hidden">
-        <div id="summaryContent"></div>
-      </div>
-
-      <div id="panel-security" class="gx-panel hidden">
-        <div id="securityContent"></div>
-      </div>
-
       <div id="panel-branches" class="gx-panel hidden">
         <div class="gx-newbranch">
           <input id="newBranchInput" type="text" placeholder="New branch name" autocomplete="off" spellcheck="false" />
@@ -480,6 +470,13 @@
           <span>Only the selected Git diff is sent to your configured AI provider. API keys are stored
           using VS Code SecretStorage. Gitable does not send data to any server owned by this extension.</span>
         </div>
+      </div>
+
+      <div id="panel-summary" class="gx-ai-overlay hidden">
+        <div id="summaryContent"></div>
+      </div>
+      <div id="panel-security" class="gx-ai-overlay hidden">
+        <div id="securityContent"></div>
       </div>
 
       <div id="fileContextMenu" class="gx-context-menu hidden" role="menu">
@@ -610,7 +607,7 @@
     if (branchButton) {
       branchButton.classList.toggle("active", tab === "branches");
     }
-    ["changes", "history", "branches", "settings", "summary", "security"].forEach((name) => {
+    ["changes", "history", "branches", "settings"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
   }
@@ -731,32 +728,26 @@
         const subject = elm.getAttribute("data-subject") || "";
         if (!hash) break;
         ui.activeSummary = { hash, subject, loading: true };
-        const tab = byId("summaryTab");
-        if (tab) tab.classList.remove("hidden");
-        switchTab("summary");
+        byId("panel-summary").classList.remove("hidden");
         renderSummaryPanel();
         post({ type: "summarizeCommit", hash, subject });
         break;
       }
       case "closeSummary":
         ui.activeSummary = null;
-        byId("summaryTab").classList.add("hidden");
-        switchTab("history");
+        byId("panel-summary").classList.add("hidden");
         break;
       case "securityReview": {
         const staged = elm.getAttribute("data-staged") === "1";
         ui.activeSecurityReview = { staged, loading: true };
-        const secTab = byId("securityTab");
-        if (secTab) secTab.classList.remove("hidden");
-        switchTab("security");
+        byId("panel-security").classList.remove("hidden");
         renderSecurityPanel();
         post({ type: "securityReview", staged });
         break;
       }
       case "closeSecurityReview":
         ui.activeSecurityReview = null;
-        byId("securityTab").classList.add("hidden");
-        switchTab("changes");
+        byId("panel-security").classList.add("hidden");
         break;
       case "copySecurityReview": {
         const sr = ui.activeSecurityReview;
@@ -1004,10 +995,8 @@
     renderSettings(s);
     renderSummaryPanel();
     renderSecurityPanel();
-    const summaryTab = byId("summaryTab");
-    if (summaryTab) summaryTab.classList.toggle("hidden", !ui.activeSummary);
-    const securityTab = byId("securityTab");
-    if (securityTab) securityTab.classList.toggle("hidden", !ui.activeSecurityReview);
+    byId("panel-summary").classList.toggle("hidden", !ui.activeSummary);
+    byId("panel-security").classList.toggle("hidden", !ui.activeSecurityReview);
   }
 
   function updateChangeActionButtons(s) {
