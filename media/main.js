@@ -21,6 +21,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h7"/><path d="M4 12h7"/><path d="M4 17h7"/><path d="M17 6v12"/><path d="M11 12h12"/></svg>',
     unstageAll:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h7"/><path d="M4 12h7"/><path d="M4 17h7"/><path d="M12 12h10"/></svg>',
+    trash:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
     lock:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     check:
@@ -144,6 +146,7 @@
   const openDropdowns = [];
   let tooltipNode = null;
   let tooltipTarget = null;
+  let contextFile = null;
 
   function post(message) {
     vscode.postMessage(message);
@@ -370,6 +373,7 @@
           <span id="unstagedCount" class="gx-count">0</span>
           <span class="spacer"></span>
           <span class="gx-section-actions">
+            <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
             <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
             <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
           </span>
@@ -442,6 +446,14 @@
           using VS Code SecretStorage. Gitable does not send data to any server owned by this extension.</span>
         </div>
       </div>
+
+      <div id="fileContextMenu" class="gx-context-menu hidden" role="menu">
+        <button data-menu-action="discardFile" role="menuitem" type="button">${icon("trash", "sm")}<span>Discard file</span></button>
+        <span class="gx-menu-sep"></span>
+        <button data-menu-action="copyFilePath" role="menuitem" type="button">${icon("file", "sm")}<span>Copy file path</span></button>
+        <button data-menu-action="copyRelativePath" role="menuitem" type="button">${icon("file", "sm")}<span>Copy relative path</span></button>
+        <button data-menu-action="revealFile" role="menuitem" type="button">${icon("repo", "sm")}<span>Show in file manager</span></button>
+      </div>
     `;
     initTooltips();
 
@@ -476,6 +488,29 @@
       }
       if (target) handleAction(target.getAttribute("data-action"), target);
     });
+    app.addEventListener("contextmenu", (e) => {
+      const row = e.target.closest(".gx-file");
+      if (!row) {
+        closeFileMenu();
+        return;
+      }
+      e.preventDefault();
+      openFileMenu(row, e.clientX, e.clientY);
+    });
+
+    const fileMenu = byId("fileContextMenu");
+    fileMenu.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-menu-action]");
+      if (!item) return;
+      e.stopPropagation();
+      handleMenuAction(item.getAttribute("data-menu-action"));
+    });
+    document.addEventListener("click", closeFileMenu);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeFileMenu();
+    });
+    window.addEventListener("resize", closeFileMenu);
+    window.addEventListener("scroll", closeFileMenu, true);
 
     // Checkbox selection (delegated)
     [byId("stagedList"), byId("unstagedList")].forEach((listEl) => {
@@ -517,6 +552,11 @@
       case "stageSelected": {
         const paths = selectedPaths(s.changes.unstaged);
         if (paths.length) post({ type: "stageFiles", filePaths: paths });
+        break;
+      }
+      case "discardSelected": {
+        const paths = selectedPaths(s.changes.unstaged);
+        if (paths.length) post({ type: "discardFiles", filePaths: paths, staged: false });
         break;
       }
       case "unstageSelected": {
@@ -587,6 +627,52 @@
           staged: elm.getAttribute("data-staged") === "1",
           status: elm.getAttribute("data-status")
         });
+        break;
+      default:
+        break;
+    }
+  }
+
+  function openFileMenu(row, x, y) {
+    contextFile = {
+      path: row.getAttribute("data-path") || "",
+      staged: row.getAttribute("data-staged") === "1",
+      status: row.getAttribute("data-status") || ""
+    };
+    const menu = byId("fileContextMenu");
+    menu.classList.remove("hidden");
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const margin = 6;
+    const left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin));
+    const top = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin));
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
+  function closeFileMenu() {
+    const menu = document.getElementById("fileContextMenu");
+    if (menu) menu.classList.add("hidden");
+    contextFile = null;
+  }
+
+  function handleMenuAction(action) {
+    if (!contextFile || !contextFile.path) return;
+    const file = contextFile;
+    closeFileMenu();
+    switch (action) {
+      case "discardFile":
+        post({ type: "discardFiles", filePaths: [file.path], staged: file.staged });
+        break;
+      case "copyFilePath":
+        post({ type: "copyFilePath", filePath: file.path });
+        break;
+      case "copyRelativePath":
+        post({ type: "copyRelativePath", filePath: file.path });
+        break;
+      case "revealFile":
+        post({ type: "revealFile", filePath: file.path });
         break;
       default:
         break;
@@ -677,6 +763,7 @@
     const unstageAll = byId("unstageAllBtn");
     const stageSelected = byId("stageSelectedBtn");
     const stageAll = byId("stageAllBtn");
+    const discardSelected = byId("discardSelectedBtn");
     setHint(
       unstageSelected,
       selectedStaged
@@ -697,10 +784,18 @@
       stageAll,
       unstagedFiles.length ? `Stage all ${plural(unstagedFiles.length, "file")}` : "No changed files to stage"
     );
+    setHint(
+      discardSelected,
+      selectedUnstaged
+        ? `Discard ${plural(selectedUnstaged, "selected file")}`
+        : "Select changed files to discard"
+    );
     setDisabled(unstageSelected, busy || selectedStaged === 0);
     setDisabled(unstageAll, busy || stagedFiles.length === 0);
     setDisabled(stageSelected, busy || selectedUnstaged === 0);
     setDisabled(stageAll, busy || unstagedFiles.length === 0);
+    discardSelected.classList.toggle("hidden", selectedUnstaged === 0);
+    setDisabled(discardSelected, busy || selectedUnstaged === 0);
   }
 
   function renderBranches(s) {
@@ -809,7 +904,7 @@
         const title = action === "stageOne" ? `Stage ${f.displayPath || f.path}` : `Unstage ${f.displayPath || f.path}`;
         const selectTitle = `Select ${f.displayPath || f.path}`;
         return `
-          <li class="gx-file">
+          <li class="gx-file" data-path="${escapeHtml(f.path)}" data-staged="${staged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
             <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" title="${escapeHtml(
           selectTitle
         )}" aria-label="${escapeHtml(selectTitle)}" ${checked} />

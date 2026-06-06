@@ -178,6 +178,11 @@ export class VsCodeGitService implements GitService {
     return this.cli.unstageAll();
   }
 
+  discardFiles(paths: string[], staged = false): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.discardFiles(paths, staged);
+  }
+
   commit(summary: string, description?: string): Promise<void> {
     this.syncCliRoot();
     return this.cli.commit(summary, description);

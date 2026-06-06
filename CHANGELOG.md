@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- File rows now have a right-click menu for discarding a file, copying absolute/relative paths, and revealing the file in the OS file manager.
+- The Changes section shows a discard-selected action when one or more changed files are selected.
+
 ## [0.0.13] - 2026-06-06
 
 ### Fixed

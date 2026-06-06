@@ -45,6 +45,7 @@ export interface GitService {
   unstageFiles(paths: string[]): Promise<void>;
   stageAll(): Promise<void>;
   unstageAll(): Promise<void>;
+  discardFiles(paths: string[], staged?: boolean): Promise<void>;
 
   /** Creates a commit from a summary and optional description. */
   commit(summary: string, description?: string): Promise<void>;

@@ -137,13 +137,15 @@ button[aria-disabled="true"],
 
 /* Header branch button (opens the branch panel) */
 .gx-branch-btn {
-  flex: 1;
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: 72px;
+  max-width: min(180px, 58%);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 9px;
-  font-size: 12.5px;
+  gap: 6px;
+  height: 26px;
+  padding: 4px 8px;
+  font-size: 12px;
   color: var(--vscode-foreground);
   background: var(--vscode-input-background);
   border: 1px solid var(--gx-line);
@@ -435,6 +437,47 @@ button[aria-disabled="true"],
   background: var(--gx-pink-soft);
   border-color: var(--gx-pink-line);
 }
+.gx-mini-action.gx-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--vscode-errorForeground, var(--gx-pink-strong));
+}
+
+.gx-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 190px;
+  padding: 4px;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  background: var(--vscode-menu-background, var(--vscode-input-background));
+  border: 1px solid var(--vscode-menu-border, var(--gx-pink-line));
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+}
+.gx-context-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  font-size: 12.5px;
+}
+.gx-context-menu button:hover {
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+  background: var(--vscode-menu-selectionBackground, var(--gx-pink-soft));
+}
+.gx-context-menu button:first-child:hover {
+  color: var(--vscode-errorForeground, var(--gx-pink-strong));
+}
+.gx-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px;
+  background: var(--vscode-menu-separatorBackground, var(--gx-line));
+}
 
 /* File list ---------------------------------------------------------- */
 .gx-files {
@@ -458,15 +501,23 @@ button[aria-disabled="true"],
 }
 .gx-check {
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
   margin: 0;
   border: 1.5px solid var(--gx-pink-line);
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   position: relative;
   cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.gx-check:hover {
+  border-color: var(--gx-pink);
+}
+.gx-check:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--gx-pink-line);
 }
 .gx-check:checked {
   background: var(--gx-pink);
@@ -475,13 +526,13 @@ button[aria-disabled="true"],
 .gx-check:checked::after {
   content: "";
   position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 4px;
-  height: 8px;
+  left: 3px;
+  top: 4px;
+  width: 8px;
+  height: 4px;
   border: solid var(--gx-pink-ink);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
 }
 /* File-type icon (left), coloured by extension */
 .gx-ftype {

@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { AiProviderFactory } from "../ai/AiProviderFactory";
 import { SecretService } from "../config/SecretService";
@@ -195,6 +196,18 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "openFile":
         await this.openFileDiff(message.filePath, !!message.staged, String(message.status ?? ""));
         break;
+      case "discardFiles":
+        await this.discardFiles(message.filePaths ?? [], !!message.staged);
+        break;
+      case "copyFilePath":
+        await this.copyFilePath(message.filePath, false);
+        break;
+      case "copyRelativePath":
+        await this.copyFilePath(message.filePath, true);
+        break;
+      case "revealFile":
+        await this.revealFile(message.filePath);
+        break;
       case "createBranch":
         if (message.name) {
           await this.createBranchNamed(message.name);
@@ -233,6 +246,67 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.fail(error);
     }
     await this.refresh();
+  }
+
+  private async discardFiles(filePaths: unknown, staged: boolean): Promise<void> {
+    const paths = Array.isArray(filePaths)
+      ? filePaths.map((item) => String(item).trim()).filter(Boolean)
+      : [];
+    if (!paths.length) {
+      return;
+    }
+    const label = paths.length === 1 ? paths[0] : `${paths.length} files`;
+    const picked = await vscode.window.showWarningMessage(
+      `Discard changes to ${label}?`,
+      {
+        modal: true,
+        detail: "This permanently removes the selected local Git changes and cannot be undone."
+      },
+      "Discard"
+    );
+    if (picked !== "Discard") {
+      await this.refresh();
+      return;
+    }
+    await this.runBusyGit(
+      "git",
+      `Discarding ${paths.length === 1 ? "file" : "files"}…`,
+      () => this.git.discardFiles(paths, staged),
+      `Discarded changes to ${label}.`
+    );
+  }
+
+  private async copyFilePath(filePath: string, relative: boolean): Promise<void> {
+    const text = relative ? filePath : this.absolutePath(filePath);
+    if (!text) {
+      return;
+    }
+    await vscode.env.clipboard.writeText(text);
+    this.pendingNotice = relative ? "Relative path copied." : "File path copied.";
+    await this.postState();
+  }
+
+  private async revealFile(filePath: string): Promise<void> {
+    const fullPath = this.absolutePath(filePath);
+    if (!fullPath) {
+      return;
+    }
+    let uri = vscode.Uri.file(fullPath);
+    try {
+      await vscode.workspace.fs.stat(uri);
+    } catch {
+      uri = vscode.Uri.file(path.dirname(fullPath));
+    }
+    await vscode.commands.executeCommand("revealFileInOS", uri);
+  }
+
+  private absolutePath(filePath: string): string | undefined {
+    const root = this.git.getActiveRoot();
+    const relativePath = String(filePath ?? "").trim();
+    if (!root || !relativePath) {
+      return undefined;
+    }
+    return path.join(root, relativePath);
   }
 
   /** Runs a slower git op (network/branch) with a busy indicator + notice. */

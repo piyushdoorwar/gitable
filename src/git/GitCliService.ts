@@ -131,6 +131,29 @@ export class GitCliService implements GitService {
     await this.run(["reset"], this.requireRoot());
   }
 
+  async discardFiles(paths: string[], staged = false): Promise<void> {
+    const unique = Array.from(new Set(paths.map((p) => String(p).trim()).filter(Boolean)));
+    if (!unique.length) {
+      return;
+    }
+    const root = this.requireRoot();
+    if (staged) {
+      await this.run(["restore", "--staged", "--worktree", "--", ...unique], root);
+      return;
+    }
+
+    const changes = await this.getChanges();
+    const statusByPath = new Map(changes.unstaged.map((change) => [change.path, change.status]));
+    const untracked = unique.filter((filePath) => statusByPath.get(filePath) === "U");
+    const tracked = unique.filter((filePath) => statusByPath.get(filePath) !== "U");
+    if (tracked.length) {
+      await this.run(["restore", "--worktree", "--", ...tracked], root);
+    }
+    if (untracked.length) {
+      await this.run(["clean", "-fd", "--", ...untracked], root);
+    }
+  }
+
   async commit(summary: string, description?: string): Promise<void> {
     const args = ["commit", "-m", summary];
     if (description && description.trim()) {
