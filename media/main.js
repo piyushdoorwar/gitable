@@ -120,6 +120,8 @@
     activeTab: "changes",
     selected: new Set(),
     branchFilter: "",
+    expandedCommits: new Set(),
+    commitFiles: /** @type {Record<string, any>} */ ({}),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -630,6 +632,29 @@
           status: elm.getAttribute("data-status")
         });
         break;
+      case "toggleCommit": {
+        const hash = elm.getAttribute("data-hash");
+        if (!hash) break;
+        if (ui.expandedCommits.has(hash)) {
+          ui.expandedCommits.delete(hash);
+        } else {
+          ui.expandedCommits.add(hash);
+          if (ui.commitFiles[hash] === undefined) {
+            ui.commitFiles[hash] = "loading";
+            post({ type: "commitFiles", hash });
+          }
+        }
+        renderHistory(ui.state);
+        break;
+      }
+      case "openCommitFile":
+        post({
+          type: "openCommitFile",
+          hash: elm.getAttribute("data-hash"),
+          filePath: elm.getAttribute("data-path"),
+          status: elm.getAttribute("data-status")
+        });
+        break;
       default:
         break;
     }
@@ -935,21 +960,57 @@
       return;
     }
     list.innerHTML = commits
-      .map(
-        (c) => `
-        <li class="gx-commit">
-          <span class="rail gx-ic">${ICONS.commit}</span>
-          <span class="body">
-            <div class="gx-commit-subject">${escapeHtml(c.subject)}</div>
-            <div class="gx-commit-meta">
-              <span class="gx-hash">${escapeHtml(c.hash)}</span>
-              <span>${escapeHtml(c.author)}</span>
-              <span>${escapeHtml(c.relativeDate)}</span>
-            </div>
-          </span>
-        </li>`
-      )
+      .map((c) => {
+        const expanded = ui.expandedCommits.has(c.hash);
+        return `
+        <li class="gx-commit${expanded ? " expanded" : ""}">
+          <div class="gx-commit-head" data-action="toggleCommit" data-hash="${escapeHtml(c.hash)}" title="Show changed files" aria-label="Show changed files in ${escapeHtml(c.hash)}">
+            <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
+            <span class="rail gx-ic">${ICONS.commit}</span>
+            <span class="body">
+              <div class="gx-commit-subject">${escapeHtml(c.subject)}</div>
+              <div class="gx-commit-meta">
+                <span class="gx-hash">${escapeHtml(c.hash)}</span>
+                <span>${escapeHtml(c.author)}</span>
+                <span>${escapeHtml(c.relativeDate)}</span>
+              </div>
+            </span>
+          </div>
+          ${expanded ? renderCommitFiles(c.hash) : ""}
+        </li>`;
+      })
       .join("");
+  }
+
+  function renderCommitFiles(hash) {
+    const files = ui.commitFiles[hash];
+    if (files === "loading" || files === undefined) {
+      return `<ul class="gx-commit-files"><li class="gx-empty">Loading changes…</li></ul>`;
+    }
+    if (!files.length) {
+      return `<ul class="gx-commit-files"><li class="gx-empty">No file changes</li></ul>`;
+    }
+    return `<ul class="gx-commit-files">${files
+      .map((f) => {
+        const label = f.displayPath || f.path;
+        return `<li class="gx-cfile" data-action="openCommitFile" data-hash="${escapeHtml(hash)}" data-path="${escapeHtml(
+          f.path
+        )}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(
+          label
+        )}" aria-label="Open changes — ${escapeHtml(label)}">
+            ${fileIcon(f.path)}
+            <span class="gx-path">${escapeHtml(label)}</span>
+            ${commitStatusGlyph(f.status)}
+          </li>`;
+      })
+      .join("")}</ul>`;
+  }
+
+  function commitStatusGlyph(status) {
+    if (status === "A" || status === "U") return `<span class="gx-cstat gx-stat-A">${ICONS.plus}</span>`;
+    if (status === "D") return `<span class="gx-cstat gx-stat-D">${ICONS.minus}</span>`;
+    if (status === "R" || status === "C") return `<span class="gx-cstat gx-stat-R">${ICONS.dot}</span>`;
+    return `<span class="gx-cstat gx-stat-M">${ICONS.dot}</span>`;
   }
 
   function renderSettings(s) {
@@ -1007,6 +1068,10 @@
         break;
       case "switchTab":
         switchTab(message.tab);
+        break;
+      case "commitFiles":
+        ui.commitFiles[message.hash] = Array.isArray(message.files) ? message.files : [];
+        if (ui.expandedCommits.has(message.hash)) renderHistory(ui.state);
         break;
       default:
         break;

@@ -193,6 +193,35 @@ export class GitCliService implements GitService {
     }
   }
 
+  /** Files changed by a single commit (vs its parent; root commit shows all). */
+  async getCommitFiles(hash: string): Promise<FileChange[]> {
+    const root = this.requireRoot();
+    const output = await this.run(
+      ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--name-status", "-r", "--root", hash],
+      root
+    );
+    const files: FileChange[] = [];
+    for (const line of output.split("\n")) {
+      if (!line.trim()) {
+        continue;
+      }
+      const parts = line.split("\t");
+      const letter = parts[0].trim().charAt(0).toUpperCase();
+      // Renames/copies report "R100\told\tnew" — use the new path.
+      const filePath = (letter === "R" || letter === "C") && parts[2] ? parts[2] : parts[1];
+      if (!filePath) {
+        continue;
+      }
+      files.push({
+        path: filePath,
+        displayPath: filePath,
+        status: cliStatusToLetter(letter),
+        staged: false
+      });
+    }
+    return files;
+  }
+
   async getBranches(): Promise<string[]> {
     const output = await this.run(
       ["for-each-ref", "--format=%(refname:short)", "refs/heads"],

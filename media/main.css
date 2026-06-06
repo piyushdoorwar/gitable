@@ -955,20 +955,70 @@ textarea {
   gap: 6px;
 }
 .gx-commit {
-  display: flex;
-  gap: 9px;
-  padding: 9px 10px;
   background: var(--gx-navy-card);
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
+  overflow: hidden;
+}
+.gx-commit-head {
+  display: flex;
+  gap: 8px;
+  padding: 9px 10px;
+  cursor: pointer;
+  align-items: flex-start;
+}
+.gx-commit-head:hover {
+  background: var(--gx-pink-soft);
+}
+.gx-commit-caret {
+  color: var(--vscode-descriptionForeground);
+  transform: rotate(-90deg);
+  transition: transform 0.12s;
+  margin-top: 1px;
+}
+.gx-commit.expanded .gx-commit-caret {
+  transform: rotate(0deg);
+  color: var(--gx-pink);
 }
 .gx-commit .rail {
   color: var(--gx-pink);
-  padding-top: 1px;
+  margin-top: 1px;
 }
 .gx-commit .body {
   min-width: 0;
   flex: 1;
+}
+.gx-commit-files {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 8px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-top: 1px solid var(--gx-line);
+}
+.gx-cfile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.gx-cfile:hover {
+  background: var(--gx-navy-card);
+}
+.gx-cstat {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+.gx-cstat svg {
+  width: 13px;
+  height: 13px;
 }
 .gx-commit-subject {
   font-size: 12.5px;

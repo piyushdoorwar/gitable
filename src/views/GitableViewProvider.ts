@@ -196,6 +196,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "openFile":
         await this.openFileDiff(message.filePath, !!message.staged, String(message.status ?? ""));
         break;
+      case "commitFiles":
+        await this.sendCommitFiles(message.hash);
+        break;
+      case "openCommitFile":
+        await this.openCommitFile(message.hash, message.filePath, String(message.status ?? ""));
+        break;
       case "discardFiles":
         await this.discardFiles(message.filePaths ?? [], !!message.staged);
         break;
@@ -644,6 +650,30 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private async openFileDiff(filePath: string, staged: boolean, status: string): Promise<void> {
     try {
       await this.git.openDiff(filePath, staged, status);
+    } catch (error) {
+      this.fail(error);
+      await this.postState();
+    }
+  }
+
+  /** Sends the files changed by a commit back to the webview (for expansion). */
+  private async sendCommitFiles(hash: string): Promise<void> {
+    if (!hash || !this.view) {
+      return;
+    }
+    try {
+      const files = await this.git.getCommitFiles(hash);
+      this.view.webview.postMessage({ type: "commitFiles", hash, files });
+    } catch (error) {
+      this.logger.error("Failed to read commit files", error);
+      this.view.webview.postMessage({ type: "commitFiles", hash, files: [] });
+    }
+  }
+
+  /** Opens a single file's diff for a specific commit. */
+  private async openCommitFile(hash: string, filePath: string, status: string): Promise<void> {
+    try {
+      await this.git.openCommitDiff(hash, filePath, status);
     } catch (error) {
       this.fail(error);
       await this.postState();

@@ -227,6 +227,36 @@ export class VsCodeGitService implements GitService {
     }
   }
 
+  /** Files changed in a specific commit. */
+  getCommitFiles(hash: string): Promise<FileChange[]> {
+    this.syncCliRoot();
+    return this.cli.getCommitFiles(hash);
+  }
+
+  /** Opens a commit's file change in the diff editor (parent ↔ this commit). */
+  async openCommitDiff(hash: string, filePath: string, _status: string): Promise<void> {
+    const repo = this.getActiveRepository();
+    const root = repo ? repo.rootUri.fsPath : this.getActiveRoot();
+    if (!root) {
+      return;
+    }
+    const fileUri = vscode.Uri.file(path.join(root, filePath));
+    const name = path.basename(filePath);
+    const short = hash.slice(0, 7);
+    const api = this.api;
+    if (!api || typeof api.toGitUri !== "function") {
+      await vscode.commands.executeCommand("vscode.open", fileUri);
+      return;
+    }
+    const toGit = (ref: string) => api.toGitUri!(fileUri, ref);
+    await vscode.commands.executeCommand(
+      "vscode.diff",
+      toGit(`${hash}~1`),
+      toGit(hash),
+      `${name} (${short})`
+    );
+  }
+
   async getBranches(): Promise<string[]> {
     this.syncCliRoot();
     try {
