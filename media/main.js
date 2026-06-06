@@ -56,7 +56,9 @@
     pencil:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>',
     shieldAi:
-      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5.5V11c0 5.25 3.6 9.74 8 11.5 4.4-1.76 8-6.25 8-11.5V5.5L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8l.75 2.1 2.1.75-2.1.75L12 13.7l-.75-2.1-2.1-.75 2.1-.75z" fill="currentColor" stroke="none"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5.5V11c0 5.25 3.6 9.74 8 11.5 4.4-1.76 8-6.25 8-11.5V5.5L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8l.75 2.1 2.1.75-2.1.75L12 13.7l-.75-2.1-2.1-.75 2.1-.75z" fill="currentColor" stroke="none"/></svg>',
+    reports:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -358,7 +360,10 @@
       <div class="gx-header">
         <div class="gx-repo-row">
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
-          <button class="gx-iconbtn gx-settings-btn" data-action="openSettings" title="Settings" aria-label="Settings" type="button">${icon("settings", "sm")}</button>
+          <span class="gx-header-actions">
+            <button class="gx-iconbtn gx-hdr-btn" data-action="openReports" title="Usage reports" aria-label="Usage reports" type="button">${icon("reports", "sm")}</button>
+            <button class="gx-iconbtn gx-hdr-btn" data-action="openSettings" title="Settings" aria-label="Settings" type="button">${icon("settings", "sm")}</button>
+          </span>
         </div>
         <div class="gx-branch-row">
           <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
@@ -469,6 +474,10 @@
           <span>Only the selected Git diff is sent to your configured AI provider. API keys are stored
           using VS Code SecretStorage. Gitable does not send data to any server owned by this extension.</span>
         </div>
+      </div>
+
+      <div id="panel-reports" class="gx-panel hidden">
+        <div id="reportsContent"></div>
       </div>
 
       <div id="panel-summary" class="gx-ai-overlay hidden">
@@ -612,7 +621,7 @@
     if (branchButton) {
       branchButton.classList.toggle("active", tab === "branches");
     }
-    ["changes", "history", "branches", "settings"].forEach((name) => {
+    ["changes", "history", "branches", "settings", "reports"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
   }
@@ -680,6 +689,11 @@
         break;
       case "openSettings":
         switchTab("settings");
+        break;
+      case "openReports":
+        switchTab("reports");
+        post({ type: "getReports" });
+        renderReports(null);
         break;
       case "createBranchNamed": {
         const input = /** @type {HTMLInputElement} */ (byId("newBranchInput"));
@@ -1397,6 +1411,127 @@
       `<span>model: <span class="gx-strong">${escapeHtml(s.model || "—")}</span></span>`;
   }
 
+  // ---------- Reports ----------
+
+  const TYPE_LABELS = { commitMessage: "Commit msg", commitSummary: "AI Summary", security: "Security" };
+  const TYPE_COLORS = { commitMessage: "var(--gx-pink)", commitSummary: "#7aa2ff", security: "#e7bd57" };
+  const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e" };
+
+  /**
+   * @param {Array<{ts:number,provider:string,model:string,type:string}>|null} entries — null = loading
+   */
+  function renderReports(entries) {
+    const el = byId("reportsContent");
+    if (!el) return;
+
+    if (entries === null) {
+      el.innerHTML = `<div class="gx-rep-loading"><span class="gx-spin"></span><span>Loading…</span></div>`;
+      return;
+    }
+
+    if (!entries.length) {
+      el.innerHTML = `
+        <div class="gx-rep-empty">
+          ${icon("reports", "sm")}
+          <p>No AI calls recorded yet.</p>
+          <p class="gx-rep-hint">Usage is tracked each time you generate a commit message, run an AI summary, or run a security review.</p>
+        </div>`;
+      return;
+    }
+
+    const total = entries.length;
+
+    // ── By type ──
+    const typeCounts = /** @type {Record<string,number>} */ ({});
+    entries.forEach((e) => { typeCounts[e.type] = (typeCounts[e.type] || 0) + 1; });
+
+    // ── By provider ──
+    const provCounts = /** @type {Record<string,number>} */ ({});
+    entries.forEach((e) => { const p = e.provider || "other"; provCounts[p] = (provCounts[p] || 0) + 1; });
+
+    // ── By model (top 5) ──
+    const modelCounts = /** @type {Record<string,number>} */ ({});
+    entries.forEach((e) => { if (e.model) modelCounts[e.model] = (modelCounts[e.model] || 0) + 1; });
+    const topModels = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    // ── Daily sparkline (last 30 days) ──
+    const days = [];
+    const now = Date.now();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now - i * 86400000);
+      days.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, key: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, count: 0 });
+    }
+    entries.forEach((e) => {
+      const d = new Date(e.ts);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const slot = days.find((day) => day.key === key);
+      if (slot) slot.count++;
+    });
+    const maxDay = Math.max(...days.map((d) => d.count), 1);
+
+    function barRow(label, count, color) {
+      const pct = Math.round((count / total) * 100);
+      const width = Math.max(2, pct);
+      return `
+        <div class="gx-rep-bar-row">
+          <span class="gx-rep-bar-label">${escapeHtml(label)}</span>
+          <span class="gx-rep-bar-track">
+            <span class="gx-rep-bar-fill" style="width:${width}%;background:${color}"></span>
+          </span>
+          <span class="gx-rep-bar-count">${count}</span>
+        </div>`;
+    }
+
+    const typeRows = Object.entries(TYPE_LABELS).filter(([k]) => typeCounts[k]).map(([k, label]) =>
+      barRow(label, typeCounts[k] || 0, TYPE_COLORS[k] || "var(--gx-pink)")
+    ).join("");
+
+    const provRows = Object.entries(provCounts).sort((a, b) => b[1] - a[1]).map(([p, c]) =>
+      barRow(p.charAt(0).toUpperCase() + p.slice(1), c, PROVIDER_COLORS[p] || "#9a8f83")
+    ).join("");
+
+    const modelRows = topModels.map(([m, c]) => `
+      <div class="gx-rep-model-row">
+        <span class="gx-rep-model-name" title="${escapeHtml(m)}">${escapeHtml(m)}</span>
+        <span class="gx-rep-model-count">${c}</span>
+      </div>`).join("");
+
+    const sparkBars = days.map((d) => {
+      const h = Math.max(2, Math.round((d.count / maxDay) * 36));
+      return `<span class="gx-spark-bar" style="height:${h}px" title="${escapeHtml(d.label)}: ${d.count}"></span>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="gx-rep-header">
+        <span class="gx-rep-title">Last 30 days</span>
+        <button class="gx-iconbtn gx-rep-refresh" data-action="openReports" title="Refresh" aria-label="Refresh" type="button">${icon("refresh", "sm")}</button>
+      </div>
+
+      <div class="gx-rep-total">
+        <span class="gx-rep-total-num">${total}</span>
+        <span class="gx-rep-total-label">AI call${total === 1 ? "" : "s"}</span>
+      </div>
+
+      <div class="gx-rep-spark">${sparkBars}</div>
+
+      <div class="gx-rep-section">
+        <div class="gx-rep-section-title">BY TYPE</div>
+        ${typeRows}
+      </div>
+
+      <div class="gx-rep-section">
+        <div class="gx-rep-section-title">BY PROVIDER</div>
+        ${provRows}
+      </div>
+
+      ${topModels.length ? `
+      <div class="gx-rep-section">
+        <div class="gx-rep-section-title">TOP MODELS</div>
+        ${modelRows}
+      </div>` : ""}
+    `;
+  }
+
   // ---------- Messages from the extension host ----------
   window.addEventListener("message", (event) => {
     const message = event.data;
@@ -1444,6 +1579,9 @@
           }
           renderSecurityPanel();
         }
+        break;
+      case "reports":
+        renderReports(Array.isArray(message.entries) ? message.entries : []);
         break;
       default:
         break;

@@ -5,6 +5,7 @@ import { buildCommitSummaryPrompt, buildSecurityReviewPrompt } from "../ai/promp
 import { parseGeneratedMessage, parseSecurityReview } from "../ai/AiProvider";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
+import { UsageStore } from "../analytics/UsageStore";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
 import { RepoChanges } from "../git/models";
@@ -34,6 +35,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     private readonly git: VsCodeGitService,
     private readonly secrets: SecretService,
     private readonly settings: SettingsService,
+    private readonly usage: UsageStore,
     private readonly logger: Logger
   ) {}
 
@@ -270,6 +272,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       case "securityReview":
         await this.handleSecurityReview(!!message.staged);
+        break;
+      case "getReports":
+        this.view?.webview.postMessage({ type: "reports", entries: this.usage.getLast30Days() });
         break;
       case "copySummaryText": {
         const text = String(message.text ?? "");
@@ -559,6 +564,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const provider = AiProviderFactory.create(providerId);
       const text = await provider.generate(system, user, model, apiKey);
       const result = parseGeneratedMessage(text);
+      this.usage.record({ provider: providerId, model, type: "commitSummary" });
       post({ type: "commitSummary", hash, summary: result.summary, description: result.description });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to generate summary.";
@@ -588,6 +594,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const provider = AiProviderFactory.create(providerId);
       const text = await provider.generate(system, user, model, apiKey);
       const review = parseSecurityReview(text);
+      this.usage.record({ provider: providerId, model, type: "security" });
       post({ type: "securityReview", findings: review.findings, safe: review.safe });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to run security review.";
@@ -678,6 +685,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         { diff: prepared.diff, diffStat, provider, model },
         apiKey
       );
+      this.usage.record({ provider, model, type: "commitMessage" });
       this.view?.webview.postMessage({
         type: "setCommitFields",
         summary: result.summary,

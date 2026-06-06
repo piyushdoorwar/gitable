@@ -5,6 +5,7 @@ import { VsCodeGitService } from "./git/VsCodeGitService";
 import { SecretService } from "./config/SecretService";
 import { SettingsService } from "./config/SettingsService";
 import { GitableViewProvider } from "./views/GitableViewProvider";
+import { UsageStore } from "./analytics/UsageStore";
 import { Logger } from "./utils/Logger";
 
 let logger: Logger | undefined;
@@ -15,12 +16,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const secrets = new SecretService(context.secrets);
   const settings = new SettingsService(context.globalState);
+  const usage = new UsageStore(context.globalState);
 
   const cli = new GitCliService(logger);
   const git = new VsCodeGitService(cli, logger);
   await git.initialize();
 
-  const provider = new GitableViewProvider(context.extensionUri, git, secrets, settings, logger);
+  const provider = new GitableViewProvider(context.extensionUri, git, secrets, settings, usage, logger);
 
   context.subscriptions.push(
     logger,

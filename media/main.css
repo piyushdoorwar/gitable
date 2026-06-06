@@ -114,12 +114,19 @@ button[aria-disabled="true"],
   align-items: center;
   gap: 6px;
 }
-.gx-settings-btn {
+.gx-header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
-  color: var(--vscode-descriptionForeground);
 }
-.gx-settings-btn:hover {
+.gx-hdr-btn {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.75;
+}
+.gx-hdr-btn:hover {
+  opacity: 1;
   color: var(--vscode-foreground);
 }
 
@@ -1390,6 +1397,168 @@ textarea {
 .gx-privacy .gx-ic {
   color: var(--gx-pink);
   margin-top: 1px;
+}
+
+/* Reports panel ------------------------------------------------------- */
+.gx-rep-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.gx-rep-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 8px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-rep-empty .gx-ic {
+  opacity: 0.4;
+  width: 32px;
+  height: 32px;
+}
+.gx-rep-empty p {
+  margin: 0;
+  font-size: 12px;
+}
+.gx-rep-hint {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.gx-rep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.gx-rep-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-rep-refresh {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.6;
+}
+.gx-rep-refresh:hover {
+  opacity: 1;
+}
+.gx-rep-total {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.gx-rep-total-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gx-pink);
+  line-height: 1;
+}
+.gx-rep-total-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+/* Sparkline */
+.gx-rep-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 40px;
+  margin-bottom: 16px;
+  padding: 2px 0;
+}
+.gx-spark-bar {
+  flex: 1;
+  min-width: 2px;
+  background: var(--gx-pink-soft);
+  border-radius: 2px 2px 0 0;
+  transition: background 0.12s;
+}
+.gx-spark-bar:hover {
+  background: var(--gx-pink);
+}
+/* Sections */
+.gx-rep-section {
+  margin-bottom: 16px;
+}
+.gx-rep-section-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.6;
+  margin-bottom: 7px;
+}
+.gx-rep-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.gx-rep-bar-label {
+  font-size: 11.5px;
+  color: var(--vscode-foreground);
+  width: 78px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gx-rep-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--gx-surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gx-rep-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+.gx-rep-bar-count {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  width: 22px;
+  text-align: right;
+  flex-shrink: 0;
+}
+/* Model list */
+.gx-rep-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--gx-line);
+  font-size: 11px;
+}
+.gx-rep-model-row:last-child {
+  border-bottom: none;
+}
+.gx-rep-model-name {
+  color: var(--vscode-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 10.5px;
+}
+.gx-rep-model-count {
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
 }
 
 ::-webkit-scrollbar {
