@@ -41,9 +41,34 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+button[aria-disabled="true"],
+.gx-disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.gx-tooltip {
+  position: fixed;
+  z-index: 999;
+  max-width: min(280px, calc(100vw - 12px));
+  padding: 5px 8px;
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-input-background));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--gx-pink-line));
+  border-radius: 4px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34);
+  font-size: 11.5px;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.08s ease, transform 0.08s ease;
+  white-space: normal;
+}
+.gx-tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* Icons -------------------------------------------------------------- */
@@ -405,7 +430,7 @@ button:disabled {
   width: 14px;
   height: 14px;
 }
-.gx-mini-action:hover:not(:disabled) {
+.gx-mini-action:hover:not(:disabled):not([aria-disabled="true"]) {
   color: var(--gx-pink);
   background: var(--gx-pink-soft);
   border-color: var(--gx-pink-line);
@@ -697,7 +722,8 @@ textarea {
   width: 16px;
   height: 16px;
 }
-.gx-input-action:disabled {
+.gx-input-action:disabled,
+.gx-input-action[aria-disabled="true"] {
   color: var(--vscode-descriptionForeground);
 }
 .gx-vsep {

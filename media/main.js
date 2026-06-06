@@ -142,6 +142,8 @@
   };
 
   const openDropdowns = [];
+  let tooltipNode = null;
+  let tooltipTarget = null;
 
   function post(message) {
     vscode.postMessage(message);
@@ -164,6 +166,86 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+  function setDisabled(elm, disabled) {
+    if (!elm) return;
+    elm.toggleAttribute("aria-disabled", !!disabled);
+    elm.classList.toggle("gx-disabled", !!disabled);
+    elm.removeAttribute("disabled");
+  }
+  function tooltipText(elm) {
+    return elm.getAttribute("data-tooltip") || elm.getAttribute("aria-label") || elm.getAttribute("title") || "";
+  }
+  function tooltipCandidate(node) {
+    return node && node.closest ? node.closest("[data-tooltip], [aria-label], [title]") : null;
+  }
+  function initTooltips() {
+    if (tooltipNode) return;
+    tooltipNode = el("div", "gx-tooltip");
+    tooltipNode.setAttribute("role", "tooltip");
+    tooltipNode.hidden = true;
+    document.body.append(tooltipNode);
+
+    const show = (target) => {
+      const text = tooltipText(target);
+      if (!text) return;
+      tooltipTarget = target;
+      tooltipNode.textContent = text;
+      tooltipNode.hidden = false;
+      tooltipNode.classList.add("show");
+      positionTooltip();
+    };
+    const hide = () => {
+      tooltipTarget = null;
+      tooltipNode.classList.remove("show");
+      tooltipNode.hidden = true;
+    };
+
+    document.addEventListener(
+      "pointerover",
+      (e) => {
+        const target = tooltipCandidate(e.target);
+        if (!target || target === tooltipTarget) return;
+        show(target);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerout",
+      (e) => {
+        if (!tooltipTarget) return;
+        const next = e.relatedTarget;
+        if (next && tooltipTarget.contains(next)) return;
+        hide();
+      },
+      true
+    );
+    document.addEventListener("focusin", (e) => {
+      const target = tooltipCandidate(e.target);
+      if (target) show(target);
+    });
+    document.addEventListener("focusout", hide);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hide();
+    });
+    window.addEventListener("resize", hide);
+    window.addEventListener("scroll", hide, true);
+  }
+  function positionTooltip() {
+    if (!tooltipNode || !tooltipTarget || tooltipNode.hidden) return;
+    const rect = tooltipTarget.getBoundingClientRect();
+    const gap = 8;
+    const margin = 6;
+    const width = tooltipNode.offsetWidth;
+    const height = tooltipNode.offsetHeight;
+    let left = rect.left + rect.width / 2 - width / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+    let top = rect.top - height - gap;
+    if (top < margin) {
+      top = rect.bottom + gap;
+    }
+    tooltipNode.style.left = `${Math.round(left)}px`;
+    tooltipNode.style.top = `${Math.round(top)}px`;
   }
 
   // ---------- Custom dropdown ----------
@@ -206,6 +288,7 @@
       iconSlot.innerHTML = current ? optIcon(current) : "";
       button.title = current ? `Selected: ${current.label}` : placeholder;
       button.setAttribute("aria-label", button.title);
+      button.dataset.tooltip = button.title;
     }
     function paintList() {
       list.innerHTML = "";
@@ -360,6 +443,7 @@
         </div>
       </div>
     `;
+    initTooltips();
 
     // Dropdowns
     ui.dd.provider = createDropdown((provider) => post({ type: "saveProvider", provider }));
@@ -386,6 +470,10 @@
     // Delegated button actions
     app.addEventListener("click", (e) => {
       const target = e.target.closest("[data-action]");
+      if (target && target.getAttribute("aria-disabled") === "true") {
+        e.preventDefault();
+        return;
+      }
       if (target) handleAction(target.getAttribute("data-action"), target);
     });
 
@@ -512,6 +600,7 @@
     if (!elm) return;
     elm.title = text;
     elm.setAttribute("aria-label", text);
+    elm.dataset.tooltip = text;
   }
   function plural(count, singular, pluralForm) {
     return `${count} ${count === 1 ? singular : pluralForm || singular + "s"}`;
@@ -558,7 +647,7 @@
         : `<span class="gx-ic">${ICONS.sparkle}</span>`);
     setHint(genBtn, generateHint);
     // Generate reads the staged diff and Commit commits the index — both need staged changes.
-    genBtn.toggleAttribute("disabled", busy || !hasStaged);
+    setDisabled(genBtn, busy || !hasStaged);
     const commitBtn = byId("commitBtn");
     commitBtn.innerHTML = `${icon("commit")}<span>Commit${
       s.branchName ? " to " + escapeHtml(s.branchName) : ""
@@ -569,9 +658,9 @@
         ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
         : "Stage files before committing"
     );
-    commitBtn.toggleAttribute("disabled", busy || !hasStaged);
-    byId("pushBtn").toggleAttribute("disabled", busy || !s.branchName);
-    byId("pullBtn").toggleAttribute("disabled", busy || !s.branchName);
+    setDisabled(commitBtn, busy || !hasStaged);
+    setDisabled(byId("pushBtn"), busy || !s.branchName);
+    setDisabled(byId("pullBtn"), busy || !s.branchName);
     updateChangeActionButtons(s);
 
     renderHistory(s);
@@ -608,10 +697,10 @@
       stageAll,
       unstagedFiles.length ? `Stage all ${plural(unstagedFiles.length, "file")}` : "No changed files to stage"
     );
-    unstageSelected.toggleAttribute("disabled", busy || selectedStaged === 0);
-    unstageAll.toggleAttribute("disabled", busy || stagedFiles.length === 0);
-    stageSelected.toggleAttribute("disabled", busy || selectedUnstaged === 0);
-    stageAll.toggleAttribute("disabled", busy || unstagedFiles.length === 0);
+    setDisabled(unstageSelected, busy || selectedStaged === 0);
+    setDisabled(unstageAll, busy || stagedFiles.length === 0);
+    setDisabled(stageSelected, busy || selectedUnstaged === 0);
+    setDisabled(stageAll, busy || unstagedFiles.length === 0);
   }
 
   function renderBranches(s) {
