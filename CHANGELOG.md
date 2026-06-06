@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-06-06
+
+### Added
+
+- Marketplace/Extensions **icon** (`media/icon.png`) — a navy app-icon tile with the coral Gitable mark, so the logo shows in the Extensions view.
+
+## [0.0.7] - 2026-06-06
+
+### Changed
+
+- Refined the logo/icon: the chat bubble is now an outlined navy border (no fill) and enlarged for clearance around the leaves.
+
+## [0.0.6] - 2026-06-06
+
+### Added
+
+- **Click a changed file** to open its diff in VS Code's native diff editor — index↔working-tree for unstaged, HEAD↔index for staged (untracked files just open).
+- Models now **auto-load on startup** from the saved key, so you don't re-validate after a restart.
+
+### Changed
+
+- **Refresh** and **Settings (gear)** moved to the view's title bar; removed from the in-panel header. The gear still opens the Settings (AI models) tab.
+- The API-key field shows a "stored — paste to replace" placeholder when a key is already saved (keys live in VS Code SecretStorage — persistent and never written to the repo).
+
 ## [0.0.5] - 2026-06-06
 
 ### Added
@@ -77,7 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git integration preferring the built-in VS Code Git API with a cross-platform `execFile`-based CLI fallback.
 - Commands: `gitable.refresh`, `gitable.generateCommitMessage`, `gitable.commit`, `gitable.stageAll`, `gitable.unstageAll`, `gitable.openSettings`, `gitable.validateApiKey`.
 
-[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/piyushdoorwar/gitable/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/piyushdoorwar/gitable/compare/v0.0.7...v0.0.8
+[0.0.7]: https://github.com/piyushdoorwar/gitable/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/piyushdoorwar/gitable/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/piyushdoorwar/gitable/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/piyushdoorwar/gitable/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/piyushdoorwar/gitable/compare/v0.0.2...v0.0.3

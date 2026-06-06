@@ -247,9 +247,6 @@
       <div class="gx-header">
         <div class="gx-repo-row">
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
-          <span style="flex:1"></span>
-          <button id="refreshBtn" class="gx-iconbtn" title="Refresh" type="button">${ICONS.refresh}</button>
-          <button id="settingsBtn" class="gx-iconbtn" title="Settings" type="button">${ICONS.settings}</button>
         </div>
         <div class="gx-branch-row">
           <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" type="button">
@@ -376,8 +373,6 @@
     app.querySelectorAll(".gx-tab").forEach((tab) => {
       tab.addEventListener("click", () => switchTab(tab.getAttribute("data-tab")));
     });
-    byId("refreshBtn").addEventListener("click", () => post({ type: "refresh" }));
-    byId("settingsBtn").addEventListener("click", () => switchTab("settings"));
 
     // Delegated button actions
     app.addEventListener("click", (e) => {
@@ -406,8 +401,6 @@
     ["changes", "history", "branches", "settings"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
-    const sb = byId("settingsBtn");
-    if (sb) sb.classList.toggle("active", tab === "settings");
   }
 
   function handleAction(action, elm) {
@@ -484,6 +477,14 @@
       }
       case "switchBranchTo":
         post({ type: "switchBranch", name: elm.getAttribute("data-name") });
+        break;
+      case "openFile":
+        post({
+          type: "openFile",
+          filePath: elm.getAttribute("data-path"),
+          staged: elm.getAttribute("data-staged") === "1",
+          status: elm.getAttribute("data-status")
+        });
         break;
       default:
         break;
@@ -616,6 +617,7 @@
     if (!files || !files.length) {
       return `<li class="gx-empty">No files</li>`;
     }
+    const staged = action === "unstageOne";
     return files
       .map((f) => {
         const checked = ui.selected.has(f.path) ? "checked" : "";
@@ -624,7 +626,11 @@
           <li class="gx-file">
             <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" ${checked} />
             ${fileIcon(f.path)}
-            <span class="gx-path" title="${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
+            <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${
+          staged ? 1 : 0
+        }" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(
+          f.displayPath || f.path
+        )}</span>
             <span class="gx-right">
               <button class="gx-row-action" data-action="${action}" data-path="${escapeHtml(
           f.path
@@ -662,6 +668,11 @@
   }
 
   function renderSettings(s) {
+    const keyInput = /** @type {HTMLInputElement} */ (byId("apiKeyInput"));
+    keyInput.placeholder = s.hasApiKey
+      ? "•••••••••••• stored — paste to replace"
+      : "Paste your API key";
+
     const icons = s.providerIcons || {};
     const providerItems = PROVIDERS.map((p) => ({ value: p.value, label: p.label, icon: icons[p.value] }));
     ui.dd.provider.update(providerItems, s.provider);

@@ -40,6 +40,7 @@ interface GitApi {
   repositories: GitApiRepository[];
   onDidOpenRepository: vscode.Event<GitApiRepository>;
   onDidCloseRepository: vscode.Event<GitApiRepository>;
+  toGitUri?(uri: vscode.Uri, ref: string): vscode.Uri;
 }
 interface GitExtensionExports {
   enabled: boolean;
@@ -184,6 +185,41 @@ export class VsCodeGitService implements GitService {
 
   getHistory(limit: number): Promise<CommitInfo[]> {
     return this.cli.getHistory(limit);
+  }
+
+  /**
+   * Opens the file's changes in VS Code's native diff editor (like the built-in
+   * Git view): index↔working-tree for unstaged, HEAD↔index for staged.
+   */
+  async openDiff(filePath: string, staged: boolean, status: string): Promise<void> {
+    const repo = this.getActiveRepository();
+    const root = repo ? repo.rootUri.fsPath : this.getActiveRoot();
+    if (!root) {
+      return;
+    }
+    const fileUri = vscode.Uri.file(path.join(root, filePath));
+    const name = path.basename(filePath);
+    const api = this.api;
+    const toGit =
+      api && typeof api.toGitUri === "function"
+        ? (ref: string) => api.toGitUri!(fileUri, ref)
+        : undefined;
+
+    // Untracked, or no git URI helper available -> just open the file.
+    if (status === "U" || !toGit) {
+      await vscode.commands.executeCommand("vscode.open", fileUri);
+      return;
+    }
+    // Deleted -> show the previous version read-only.
+    if (status === "D") {
+      await vscode.commands.executeCommand("vscode.open", toGit(staged ? "HEAD" : "~"));
+      return;
+    }
+    if (staged) {
+      await vscode.commands.executeCommand("vscode.diff", toGit("HEAD"), toGit("~"), `${name} (Staged)`);
+    } else {
+      await vscode.commands.executeCommand("vscode.diff", toGit("~"), fileUri, `${name} (Working Tree)`);
+    }
   }
 
   async getBranches(): Promise<string[]> {

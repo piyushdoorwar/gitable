@@ -22,6 +22,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private pendingError = "";
   private pendingNotice = "";
   private pendingTab: TabName | undefined;
+  private modelsPreloaded = false;
   private readonly modelsCache: Partial<Record<ProviderId, string[]>> = {};
 
   constructor(
@@ -133,6 +134,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           this.pendingTab = undefined;
         }
         await this.refresh();
+        void this.preloadModels();
         break;
       case "refresh":
         await this.refresh();
@@ -188,6 +190,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       case "switchBranch":
         await this.switchBranch(message.name);
+        break;
+      case "openFile":
+        await this.openFileDiff(message.filePath, !!message.staged, String(message.status ?? ""));
         break;
       case "createBranch":
         if (message.name) {
@@ -467,7 +472,39 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** Best-effort model fetch; failures fall back silently to the static list. */
+  /**
+   * On first load, if the (persisted, SecretStorage) key exists for the current
+   * provider, fetch its models so the dropdown is ready without re-entering the
+   * key after a restart.
+   */
+  private async preloadModels(): Promise<void> {
+    if (this.modelsPreloaded) {
+      return;
+    }
+    this.modelsPreloaded = true;
+    const provider = this.settings.getProvider();
+    if (this.modelsCache[provider]) {
+      return;
+    }
+    const apiKey = await this.secrets.getApiKey(provider);
+    if (!apiKey) {
+      return;
+    }
+    await this.cacheModels(provider, apiKey);
+    await this.postState();
+  }
+
+  /** Opens a changed file in VS Code's native diff editor. */
+  private async openFileDiff(filePath: string, staged: boolean, status: string): Promise<void> {
+    try {
+      await this.git.openDiff(filePath, staged, status);
+    } catch (error) {
+      this.fail(error);
+      await this.postState();
+    }
+  }
+
+  /** Best-effort model fetch; failures fall back silently. */
   private async cacheModels(provider: ProviderId, apiKey: string): Promise<void> {
     try {
       const models = await AiProviderFactory.create(provider).listModels(apiKey);
