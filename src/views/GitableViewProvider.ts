@@ -537,7 +537,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
       const providerId = this.settings.getProvider() as ProviderId;
-      const apiKey = await this.secrets.getKey(providerId);
+      const apiKey = await this.secrets.getApiKey(providerId);
       if (!apiKey) {
         post({ type: "commitSummary", hash, error: "No API key saved — go to Settings to add one." });
         return;
@@ -550,7 +550,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const rawDiff = await this.git.getCommitDiff(hash);
       const { diff } = DiffLimiter.prepare(rawDiff);
       const { system, user } = buildCommitSummaryPrompt(subject, diff);
-      const provider = AiProviderFactory.createProvider(providerId);
+      const provider = AiProviderFactory.create(providerId);
       const text = await provider.generate(system, user, model, apiKey);
       const result = parseGeneratedMessage(text);
       post({ type: "commitSummary", hash, summary: result.summary, description: result.description });
@@ -565,7 +565,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
       const providerId = this.settings.getProvider() as ProviderId;
-      const apiKey = await this.secrets.getKey(providerId);
+      const apiKey = await this.secrets.getApiKey(providerId);
       if (!apiKey) {
         post({ type: "securityReview", error: "No API key saved — go to Settings to add one." });
         return;
@@ -579,7 +579,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const diffStat = staged ? await this.git.getStagedDiffStat() : undefined;
       const { diff: limitedDiff } = DiffLimiter.prepare(diff);
       const { system, user } = buildSecurityReviewPrompt(limitedDiff, diffStat);
-      const provider = AiProviderFactory.createProvider(providerId);
+      const provider = AiProviderFactory.create(providerId);
       const text = await provider.generate(system, user, model, apiKey);
       const review = parseSecurityReview(text);
       post({ type: "securityReview", findings: review.findings, safe: review.safe });
