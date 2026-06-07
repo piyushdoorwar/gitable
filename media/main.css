@@ -218,6 +218,79 @@ button[aria-disabled="true"],
   letter-spacing: 0.02em;
 }
 
+/* Stash section ------------------------------------------------------------ */
+.gx-stash-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+  transition: border-color 0.12s, background 0.12s;
+}
+.gx-stash-save-btn:hover:not(:disabled) {
+  border-color: var(--gx-pink-line);
+  background: var(--gx-pink-soft);
+}
+.gx-stash-save-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.gx-stash-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gx-stash-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--gx-navy-card);
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+}
+.gx-stash-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.gx-stash-msg {
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gx-stash-meta {
+  font-size: 10.5px;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-stash-pop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: auto;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gx-pink);
+}
+.gx-stash-pop-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* Branches tab */
 .gx-newbranch {
   display: flex;

@@ -8,7 +8,7 @@ import { SettingsService } from "../config/SettingsService";
 import { UsageStore } from "../analytics/UsageStore";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
-import { RepoChanges } from "../git/models";
+import { RepoChanges, StashEntry } from "../git/models";
 import { DiffLimiter } from "../utils/DiffLimiter";
 import { Logger } from "../utils/Logger";
 
@@ -300,6 +300,24 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "mergeBranch":
         await this.mergeBranch(String(message.name ?? ""));
         break;
+      case "stashStaged":
+        await this.runBusyGit("git", "Stashing staged changes…", () => this.git.stashStaged(), "Changes stashed.");
+        break;
+      case "stashPop": {
+        const ref = String(message.ref ?? "");
+        await this.runBusyGit("git", "Restoring stash…", () => this.git.stashPop(ref), "Stash applied and removed.");
+        break;
+      }
+      case "stashApply": {
+        const ref = String(message.ref ?? "");
+        await this.runBusyGit("git", "Applying stash…", () => this.git.stashApply(ref), "Stash applied.");
+        break;
+      }
+      case "stashDrop": {
+        const ref = String(message.ref ?? "");
+        await this.runBusyGit("git", "Dropping stash…", () => this.git.stashDrop(ref), "Stash dropped.");
+        break;
+      }
       case "copyBranchName": {
         const name = String(message.name ?? "");
         await vscode.env.clipboard.writeText(name);
@@ -987,6 +1005,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let changes: RepoChanges = { staged: [], unstaged: [] };
     let history: unknown[] = [];
     let branches: string[] = [];
+    let stashes: StashEntry[] = [];
     let ahead = 0;
     let behind = 0;
     let hasUpstream = false;
@@ -1001,6 +1020,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         changes = await this.git.getChanges();
         history = await this.git.getHistory(HISTORY_LIMIT);
         branches = await this.git.getBranches();
+        stashes = await this.git.stashList();
         const sync = await this.git.getSyncInfo();
         ahead = sync.ahead;
         behind = sync.behind;
@@ -1022,6 +1042,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       activeRoot: this.git.getActiveRoot(),
       repositories,
       changes,
+      stashes,
       history,
       provider,
       model,

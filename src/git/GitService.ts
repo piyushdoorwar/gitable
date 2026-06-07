@@ -1,4 +1,4 @@
-import { CommitInfo, CommitStat, RepoChanges, RepoSummary, SyncInfo } from "./models";
+import { CommitInfo, CommitStat, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
 /**
  * Error raised by Git operations. Carries a user-friendly message that can be
@@ -103,4 +103,19 @@ export interface GitService {
 
   /** Full unified diff of a single commit (vs its parent). */
   getCommitDiff(hash: string): Promise<string>;
+
+  /** Stashes only the currently staged files (git stash push --staged). */
+  stashStaged(): Promise<void>;
+
+  /** Returns all stash entries, newest first. Empty array when there are none. */
+  stashList(): Promise<StashEntry[]>;
+
+  /** Applies the stash and removes it from the stash list (pop). */
+  stashPop(ref: string): Promise<void>;
+
+  /** Applies the stash without removing it. */
+  stashApply(ref: string): Promise<void>;
+
+  /** Removes the stash without applying it. */
+  stashDrop(ref: string): Promise<void>;
 }

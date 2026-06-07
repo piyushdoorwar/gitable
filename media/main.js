@@ -11,6 +11,10 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="14"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M18 9.4c0 4-3.5 5.6-6 5.6"/></svg>',
     merge:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><line x1="6" y1="8.4" x2="6" y2="15.6"/><path d="M18 8.4c0 5.6-4.5 9.6-12 9.6"/></svg>',
+    stash:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m-3.5-3.5L12 13l3.5-3.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></svg>',
+    stashPop:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="5" rx="1.5"/><path d="M12 21V11m-3.5 3.5L12 11l3.5 3.5"/></svg>',
     sparkle:
       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2l1.9 5.4 5.4 1.9-5.4 1.9L12 16.8l-1.9-5.4L4.7 9.5l5.4-1.9z"/><path d="M18.7 13.6l.85 2.45 2.45.85-2.45.85-.85 2.45-.85-2.45-2.45-.85 2.45-.85z"/></svg>',
     commit:
@@ -414,6 +418,16 @@
             </span>
           </div>
           <ul id="unstagedList" class="gx-files"></ul>
+
+          <div class="gx-section-head">
+            <span class="gx-section-title">Stashes</span>
+            <span id="stashCount" class="gx-count hidden">0</span>
+            <span class="spacer"></span>
+            <button id="stashBtn" class="gx-stash-save-btn" data-action="stashStaged" type="button" title="Stash staged changes (git stash push --staged)" disabled>
+              ${icon("stash", "sm")}<span>Stash staged</span>
+            </button>
+          </div>
+          <ul id="stashList" class="gx-stash-list"></ul>
         </div>
 
         <div class="gx-card">
@@ -502,6 +516,7 @@
 
       <div id="commitContextMenu" class="gx-context-menu hidden" role="menu"></div>
       <div id="branchContextMenu" class="gx-context-menu hidden" role="menu"></div>
+      <div id="stashContextMenu" class="gx-context-menu hidden" role="menu"></div>
     `;
     initTooltips();
 
@@ -597,7 +612,15 @@
       handleBranchMenuAction(item.getAttribute("data-bmenu-action"));
     });
 
-    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); }
+    const stashMenu = byId("stashContextMenu");
+    stashMenu.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-smenu-action]");
+      if (!item) return;
+      e.stopPropagation();
+      handleStashMenuAction(item.getAttribute("data-smenu-action"));
+    });
+
+    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); closeStashMenu(); }
     document.addEventListener("click", closeAllMenus);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllMenus(); });
     window.addEventListener("resize", closeAllMenus);
@@ -695,6 +718,17 @@
         } else {
           post({ type: "fetchOrigin" });
         }
+        break;
+      }
+      case "stashStaged":
+        post({ type: "stashStaged" });
+        break;
+      case "stashPop":
+        post({ type: "stashPop", ref: elm.getAttribute("data-ref") });
+        break;
+      case "openStashMenu": {
+        const rect = elm.getBoundingClientRect();
+        openStashMenu(elm.getAttribute("data-ref"), rect.left, rect.bottom + 4);
         break;
       }
       case "openBranches":
@@ -954,6 +988,55 @@
     }
   }
 
+  // ---- Stash context menu ----
+  let contextStash = null;
+
+  function openStashMenu(ref, x, y) {
+    closeCommitMenu(); closeFileMenu(); closeBranchMenu();
+    contextStash = { ref };
+    const menu = byId("stashContextMenu");
+    menu.innerHTML =
+      `<button data-smenu-action="stashApply" role="menuitem" type="button">${icon("stashPop", "sm")}<span>Apply (keep stash)</span></button>` +
+      `<span class="gx-menu-sep"></span>` +
+      `<button data-smenu-action="stashDrop" role="menuitem" type="button" class="gx-menu-danger">${icon("trash", "sm")}<span>Drop stash</span></button>`;
+    menu.classList.remove("hidden");
+    menu.style.left = "0px"; menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const margin = 6;
+    const left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin));
+    const top  = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin));
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top  = `${Math.round(top)}px`;
+  }
+
+  function closeStashMenu() {
+    const menu = document.getElementById("stashContextMenu");
+    if (menu) menu.classList.add("hidden");
+    contextStash = null;
+  }
+
+  function handleStashMenuAction(action) {
+    if (!contextStash) return;
+    const { ref } = contextStash;
+    closeStashMenu();
+    if (action === "stashApply") post({ type: "stashApply", ref });
+    else if (action === "stashDrop") post({ type: "stashDrop", ref });
+  }
+
+  function renderStashList(stashes) {
+    if (!stashes || stashes.length === 0) return "";
+    return stashes.map((s) =>
+      `<li class="gx-stash-item">
+        <span class="gx-stash-body">
+          <span class="gx-stash-msg" title="${escapeHtml(s.message)}">${escapeHtml(s.message)}</span>
+          <span class="gx-stash-meta">${escapeHtml(s.date)}</span>
+        </span>
+        <button class="gx-mini-action gx-stash-pop-btn" data-action="stashPop" data-ref="${escapeHtml(s.ref)}" title="Pop: apply and remove this stash" type="button">${icon("stashPop", "sm")}<span>Pop</span></button>
+        <button class="gx-mini-action" data-action="openStashMenu" data-ref="${escapeHtml(s.ref)}" title="More options" type="button">···</button>
+      </li>`
+    ).join("");
+  }
+
   function selectedPaths(files) {
     return files.filter((f) => ui.selected.has(f.path)).map((f) => f.path);
   }
@@ -991,6 +1074,17 @@
     byId("unstagedList").innerHTML = renderFileList(s.changes.unstaged);
     byId("stagedCount").textContent = String((s.changes.staged || []).length);
     byId("unstagedCount").textContent = String((s.changes.unstaged || []).length);
+
+    // Stash section
+    const stashes = s.stashes || [];
+    byId("stashList").innerHTML = renderStashList(stashes);
+    const stashCountEl = byId("stashCount");
+    if (stashes.length > 0) {
+      stashCountEl.textContent = String(stashes.length);
+      stashCountEl.classList.remove("hidden");
+    } else {
+      stashCountEl.classList.add("hidden");
+    }
 
     const busy = !!s.isLoading;
     const stagedFiles = s.changes.staged || [];
@@ -1036,6 +1130,7 @@
     const unstagedFiles = s.changes.unstaged || [];
     setDisabled(byId("stagedSecurityBtn"), busy || stagedFiles.length === 0);
     setDisabled(byId("unstagedSecurityBtn"), busy || unstagedFiles.length === 0);
+    setDisabled(byId("stashBtn"), busy || !hasStaged);
     const selectedStaged = selectedPaths(stagedFiles).length;
     const selectedUnstaged = selectedPaths(unstagedFiles).length;
     const unstageSelected = byId("unstageSelectedBtn");

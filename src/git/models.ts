@@ -45,6 +45,13 @@ export interface SyncInfo {
   hasUpstream: boolean;
 }
 
+export interface StashEntry {
+  index: number;
+  ref: string;      // "stash@{0}"
+  message: string;  // "WIP on main: fix auth"
+  date: string;     // "2 hours ago"
+}
+
 /**
  * Maps the numeric status from the VS Code Git API (`Status` enum) to a letter.
  * The enum values are stable and documented in the git extension's API typings:

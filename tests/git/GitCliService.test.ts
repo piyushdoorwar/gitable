@@ -542,6 +542,81 @@ describe("GitCliService integration", () => {
     });
   });
 
+  describe("stash", () => {
+    it("stashList returns empty array when there are no stashes", async () => {
+      const stashes = await service.stashList();
+      expect(stashes).toEqual([]);
+    });
+
+    it("stashStaged stashes only staged files, leaving unstaged untouched", async () => {
+      await writeFile(path.join(root, "staged.txt"), "staged\n");
+      await writeFile(path.join(root, "unstaged.txt"), "unstaged\n");
+      await git(["add", "staged.txt"], root);
+
+      await service.stashStaged();
+
+      const changes = await service.getChanges();
+      // staged.txt should be gone from staged (stashed)
+      expect(changes.staged.map((f) => f.path)).not.toContain("staged.txt");
+      // unstaged.txt should still be in unstaged
+      expect(changes.unstaged.map((f) => f.path)).toContain("unstaged.txt");
+    });
+
+    it("stashList returns one entry after stashing", async () => {
+      await writeFile(path.join(root, "a.txt"), "hello\n");
+      await git(["add", "a.txt"], root);
+      await service.stashStaged();
+
+      const stashes = await service.stashList();
+      expect(stashes).toHaveLength(1);
+      expect(stashes[0].index).toBe(0);
+      expect(stashes[0].ref).toBe("stash@{0}");
+      expect(stashes[0].message).toMatch(/WIP on|On /);
+      expect(stashes[0].date).toBeTruthy();
+    });
+
+    it("stashPop restores staged changes and removes the stash entry", async () => {
+      await writeFile(path.join(root, "b.txt"), "content\n");
+      await git(["add", "b.txt"], root);
+      await service.stashStaged();
+
+      await service.stashPop("stash@{0}");
+
+      const stashes = await service.stashList();
+      expect(stashes).toHaveLength(0);
+      const changes = await service.getChanges();
+      // file restored to unstaged (pop stages → working tree after pop)
+      const allPaths = [...changes.staged, ...changes.unstaged].map((f) => f.path);
+      expect(allPaths).toContain("b.txt");
+    });
+
+    it("stashApply restores changes and keeps the stash entry", async () => {
+      await writeFile(path.join(root, "c.txt"), "apply-me\n");
+      await git(["add", "c.txt"], root);
+      await service.stashStaged();
+
+      await service.stashApply("stash@{0}");
+
+      const stashes = await service.stashList();
+      expect(stashes).toHaveLength(1);
+    });
+
+    it("stashDrop removes the stash entry without applying", async () => {
+      await writeFile(path.join(root, "d.txt"), "drop-me\n");
+      await git(["add", "d.txt"], root);
+      await service.stashStaged();
+      expect(await service.stashList()).toHaveLength(1);
+
+      await service.stashDrop("stash@{0}");
+
+      expect(await service.stashList()).toHaveLength(0);
+      // working tree unchanged — d.txt not restored
+      const changes = await service.getChanges();
+      const allPaths = [...changes.staged, ...changes.unstaged].map((f) => f.path);
+      expect(allPaths).not.toContain("d.txt");
+    });
+  });
+
   describe("mergeBranch", () => {
     it("merges a feature branch into the current branch", async () => {
       // Create a feature branch with one commit

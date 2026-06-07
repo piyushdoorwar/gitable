@@ -3,7 +3,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError } from "./GitService";
-import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
+import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
@@ -347,6 +347,41 @@ export class GitCliService implements GitService {
 
   async mergeBranch(name: string): Promise<void> {
     await this.run(["merge", name], this.requireRoot());
+  }
+
+  async stashStaged(): Promise<void> {
+    await this.run(["stash", "push", "--staged"], this.requireRoot());
+  }
+
+  async stashList(): Promise<StashEntry[]> {
+    const root = this.requireRoot();
+    let output: string;
+    try {
+      output = await this.run(["stash", "list", "--format=%gd\t%gs\t%cr"], root);
+    } catch {
+      return [];
+    }
+    if (!output.trim()) return [];
+    return output
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const [ref = "", message = "", date = ""] = line.split("\t");
+        const match = /stash@\{(\d+)\}/.exec(ref);
+        return { index: match ? parseInt(match[1], 10) : 0, ref, message, date };
+      });
+  }
+
+  async stashPop(ref: string): Promise<void> {
+    await this.run(["stash", "pop", ref], this.requireRoot());
+  }
+
+  async stashApply(ref: string): Promise<void> {
+    await this.run(["stash", "apply", ref], this.requireRoot());
+  }
+
+  async stashDrop(ref: string): Promise<void> {
+    await this.run(["stash", "drop", ref], this.requireRoot());
   }
 
   async getCommitStat(hash: string): Promise<CommitStat> {

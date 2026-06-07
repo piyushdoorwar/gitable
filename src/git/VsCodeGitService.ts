@@ -363,6 +363,31 @@ export class VsCodeGitService implements GitService {
     return this.cli.mergeBranch(name);
   }
 
+  stashStaged(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.stashStaged();
+  }
+
+  stashList() {
+    this.syncCliRoot();
+    return this.cli.stashList();
+  }
+
+  stashPop(ref: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.stashPop(ref);
+  }
+
+  stashApply(ref: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.stashApply(ref);
+  }
+
+  stashDrop(ref: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.stashDrop(ref);
+  }
+
   // ---- internals ----
 
   /**
