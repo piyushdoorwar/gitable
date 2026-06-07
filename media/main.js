@@ -409,6 +409,7 @@
           <div class="gx-section-head">
             <span class="gx-section-title">Staged</span>
             <span id="stagedCount" class="gx-count">0</span>
+            <span id="stagedBusy" class="gx-section-busy hidden"><span class="gx-spin"></span><span id="stagedBusyText"></span></span>
             <span class="spacer"></span>
             <span class="gx-section-actions">
               <button id="stagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="1" title="Security review of staged changes" aria-label="Security review of staged changes" type="button">${ICONS.shieldAi}</button>
@@ -424,6 +425,7 @@
           <div class="gx-section-head">
             <span class="gx-section-title">Changes</span>
             <span id="unstagedCount" class="gx-count">0</span>
+            <span id="unstagedBusy" class="gx-section-busy hidden"><span class="gx-spin"></span><span id="unstagedBusyText"></span></span>
             <span class="spacer"></span>
             <span class="gx-section-actions">
               <button id="unstagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="0" title="Security review of unstaged changes" aria-label="Security review of unstaged changes" type="button">${ICONS.shieldAi}</button>
@@ -701,10 +703,10 @@
     const s = ui.state;
     switch (action) {
       case "stageAll":
-        post({ type: "stageAll" });
+        post({ type: "stageAll", count: (s.changes.unstaged || []).length });
         break;
       case "unstageAll":
-        post({ type: "unstageAll" });
+        post({ type: "unstageAll", count: (s.changes.staged || []).length });
         break;
       case "stageSelected": {
         const paths = selectedPaths(s.changes.unstaged, false);
@@ -1198,6 +1200,7 @@
     byId("unstagedList").innerHTML = renderFileList(unstagedFiles, false);
     byId("stagedCount").textContent = String(stagedFiles.length);
     byId("unstagedCount").textContent = String(unstagedFiles.length);
+    renderStageBusy(s);
 
     // Conflicts section
     const conflicts = (s.changes && s.changes.conflicts) || [];
@@ -1313,6 +1316,22 @@
     setDisabled(stageAll, busy || unstagedFiles.length === 0);
     discardSelected.classList.toggle("hidden", selectedUnstaged === 0);
     setDisabled(discardSelected, busy || selectedUnstaged === 0);
+  }
+
+  function renderStageBusy(s) {
+    const isStage = s.busyKind === "stage";
+    const isUnstage = s.busyKind === "unstage";
+    setSectionBusy("unstaged", isStage, s.busyText || "Staging files...");
+    setSectionBusy("staged", isUnstage, s.busyText || "Unstaging files...");
+    byId("unstagedList").classList.toggle("gx-list-busy", isStage);
+    byId("stagedList").classList.toggle("gx-list-busy", isUnstage);
+  }
+
+  function setSectionBusy(section, active, text) {
+    const node = byId(`${section}Busy`);
+    const label = byId(`${section}BusyText`);
+    if (label) label.textContent = active ? text : "";
+    node.classList.toggle("hidden", !active);
   }
 
   function renderBranches(s) {

@@ -157,14 +157,14 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "stageFile": {
         const fp = String(message.filePath ?? "");
         if (fp) {
-          await this.runGit(() => this.git.stageFiles([fp]));
+          await this.runGit(() => this.git.stageFiles([fp]), "stage", "Staging file...");
         }
         break;
       }
       case "unstageFile": {
         const fp = String(message.filePath ?? "");
         if (fp) {
-          await this.runGit(() => this.git.unstageFiles([fp]));
+          await this.runGit(() => this.git.unstageFiles([fp]), "unstage", "Unstaging file...");
         }
         break;
       }
@@ -183,10 +183,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         );
         break;
       case "stageAll":
-        await this.runGit(() => this.git.stageAll(), "stage", "Staging all files…");
+        await this.runGit(() => this.git.stageAll(), "stage", this.countFilesText(message.count, "Staging"));
         break;
       case "unstageAll":
-        await this.runGit(() => this.git.unstageAll(), "unstage", "Unstaging all files…");
+        await this.runGit(() => this.git.unstageAll(), "unstage", this.countFilesText(message.count, "Unstaging"));
         break;
       case "commit":
         await this.runCommit(message.summary, message.description);
@@ -462,11 +462,15 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   private countFilesText(paths: unknown, verb: string): string {
-    const count = Array.isArray(paths) ? paths.length : 0;
+    const count = Array.isArray(paths)
+      ? paths.length
+      : typeof paths === "number" && Number.isFinite(paths)
+        ? paths
+        : 0;
     if (count <= 1) {
-      return `${verb} file…`;
+      return `${verb} file...`;
     }
-    return `${verb} ${count} files…`;
+    return `${verb} ${count} files...`;
   }
 
   private async runCommit(summary: string, description?: string): Promise<void> {
