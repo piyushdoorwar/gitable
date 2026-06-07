@@ -91,7 +91,8 @@ tests/
   `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`, `mergeBranch`,
   `openMergeEditor`, `markResolved`,
   `stashStaged`, `stashPop`, `stashApply`, `stashDrop`,
-  `createTag` `{hash}`, `deleteTag` `{name}`, `pushTags`
+  `createTag` `{hash}`, `deleteTag` `{name}`, `pushTags`,
+  `addToGitignore` `{filePath}`, `undoLastCommit`
 - AI: `generateCommitMessage`, `summarizeCommit`, `securityReview`,
   `saveAndValidate`, `saveProvider`, `saveModel`, `fetchModels`, `copySummaryText`
 - Analytics: `getReports`
@@ -110,7 +111,7 @@ repositoryName, branchName, activeRoot, repositories,
 changes:{staged, unstaged, conflicts}, stashes,
 history, branches,
 ahead, behind, hasUpstream, syncAction, lastFetchedAt,
-pendingTagCount, hasConflicts,
+pendingTagCount, canUndoCommit, lastCommitSummary, hasConflicts,
 provider, model, models, hasApiKey,
 busyKind, busyText, isLoading, error, notice
 ```
@@ -240,6 +241,8 @@ workspace, never committed to the repo.
 - **Merge branch.** Right-click a branch in the Branches tab → "Merge into current".
   Conflict detection surfaces the error as a panel notice pointing users to the
   conflict resolution flow.
+- **Add to .gitignore.** Right-clicking an untracked file (status `U`) in the Changes list shows "Add to .gitignore" in the context menu. The host appends the relative path to `<repo-root>/.gitignore` (creating it if absent, skipping if the path is already listed). The entry only appears for untracked files; `openFileMenu` toggles it based on `data-status === "U"`.
+- **Undo last commit.** After a commit, `GitableViewProvider` stores the commit summary in `lastCommitSummary` and sets `canUndoCommit: true` in state. The Changes tab shows an undo bar below the Commit button. Clicking "Undo" posts `undoLastCommit` → `git reset --soft HEAD~1`, moving staged changes back to the index. The bar disappears after undo or after a successful push. Auto-stage tracking is reset on undo so the re-staged files remain checked.
 - **Tag management.** Tags are created via right-click on a commit row → "Create tag…"
   (VS Code input box for the name, validated inline). Existing tag badges in the History
   tab are interactive (`gx-tag-btn`): clicking opens a mini `tagContextMenu` with

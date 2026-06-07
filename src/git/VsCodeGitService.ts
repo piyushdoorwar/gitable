@@ -435,6 +435,16 @@ export class VsCodeGitService implements GitService {
     return this.cli.pushAllTags();
   }
 
+  addToGitignore(filePath: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.addToGitignore(filePath);
+  }
+
+  undoLastCommit(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.undoLastCommit();
+  }
+
   // ---- internals ----
 
   /**

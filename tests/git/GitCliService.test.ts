@@ -735,4 +735,66 @@ describe("GitCliService integration", () => {
       await expect(service.deleteTag("does-not-exist")).rejects.toThrow();
     });
   });
+
+  describe("addToGitignore", () => {
+    it("creates .gitignore and adds the file path when none exists", async () => {
+      await service.addToGitignore("debug.log");
+      const content = await readFile(path.join(root, ".gitignore"), "utf8");
+      expect(content).toContain("debug.log");
+    });
+
+    it("appends to an existing .gitignore without overwriting", async () => {
+      await writeFile(path.join(root, ".gitignore"), "node_modules\n");
+      await service.addToGitignore("dist/");
+      const content = await readFile(path.join(root, ".gitignore"), "utf8");
+      expect(content).toContain("node_modules");
+      expect(content).toContain("dist/");
+    });
+
+    it("does not duplicate an entry that is already in .gitignore", async () => {
+      await writeFile(path.join(root, ".gitignore"), "debug.log\n");
+      await service.addToGitignore("debug.log");
+      const content = await readFile(path.join(root, ".gitignore"), "utf8");
+      expect(content.split("debug.log").length - 1).toBe(1);
+    });
+
+    it("adds a newline separator when existing file has no trailing newline", async () => {
+      await writeFile(path.join(root, ".gitignore"), "node_modules");
+      await service.addToGitignore("dist/");
+      const content = await readFile(path.join(root, ".gitignore"), "utf8");
+      expect(content).toBe("node_modules\ndist/\n");
+    });
+  });
+
+  describe("undoLastCommit", () => {
+    it("soft-resets HEAD~1 so the committed files return to staged", async () => {
+      await writeFile(path.join(root, "new.txt"), "hello\n");
+      await git(["add", "new.txt"], root);
+      await git(["commit", "-m", "wip: temp commit"], root);
+
+      const historyBefore = await service.getHistory(5);
+      expect(historyBefore[0].subject).toBe("wip: temp commit");
+
+      await service.undoLastCommit();
+
+      const historyAfter = await service.getHistory(5);
+      expect(historyAfter[0].subject).toBe("init");
+
+      const changes = await service.getChanges();
+      expect(changes.staged.map((f) => f.path)).toContain("new.txt");
+    });
+
+    it("throws when trying to undo past the root commit", async () => {
+      // Add a second commit so we can undo it first, then hit the root
+      await writeFile(path.join(root, "extra.txt"), "data\n");
+      await git(["add", "extra.txt"], root);
+      await git(["commit", "-m", "second"], root);
+
+      // Undo the second commit — should succeed
+      await service.undoLastCommit();
+
+      // Now HEAD is at the root "init" commit — undoing it should throw
+      await expect(service.undoLastCommit()).rejects.toThrow();
+    });
+  });
 });

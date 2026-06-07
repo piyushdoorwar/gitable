@@ -27,6 +27,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private syncAction = "";
   private lastFetchedAt = 0;
   private pendingTagPushes = new Set<string>();
+  /** Summary of the last commit made via Gitable; cleared on push or undo. */
+  private lastCommitSummary = "";
   /** Paths the user explicitly unchecked this session — not auto-staged. */
   private explicitlyUnstaged = new Set<string>();
   /** Paths that were already unstaged on first load — not auto-staged on next poll. */
@@ -227,6 +229,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
             await this.git.pushAllTags();
             this.pendingTagPushes.clear();
           }
+          this.lastCommitSummary = "";
         });
         break;
       case "pull":
@@ -426,6 +429,24 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           this.pendingNotice = "Tags pushed to origin.";
         });
         break;
+      case "addToGitignore": {
+        const fp = String(message.filePath ?? "").trim();
+        if (!fp) break;
+        await this.runGit(async () => {
+          await this.git.addToGitignore(fp);
+          this.pendingNotice = `Added "${fp}" to .gitignore.`;
+        });
+        break;
+      }
+      case "undoLastCommit":
+        await this.runBusyGit("git", "Undoing last commit…", async () => {
+          await this.git.undoLastCommit();
+          this.lastCommitSummary = "";
+          this.explicitlyUnstaged.clear();
+          this.initialUnstagedPaths.clear();
+          this.initialStateLoaded = false;
+        }, "Last commit moved back to staged.");
+        break;
       default:
         break;
     }
@@ -497,6 +518,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       await this.git.commit(summary.trim(), description?.trim());
+      this.lastCommitSummary = summary.trim();
       this.pendingNotice = "Commit created.";
       vscode.window.showInformationMessage("Gitable: commit created.");
       this.view?.webview.postMessage({ type: "clearCommitFields" });
@@ -1192,6 +1214,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       syncAction: this.syncAction,
       lastFetchedAt: this.lastFetchedAt,
       pendingTagCount: this.pendingTagPushes.size,
+      canUndoCommit: !!this.lastCommitSummary,
+      lastCommitSummary: this.lastCommitSummary,
       busyKind: this.busyKind,
       busyText: this.busyText,
       isLoading: !!this.busyKind,

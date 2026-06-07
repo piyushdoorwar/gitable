@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { readFile, writeFile } from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
@@ -415,6 +416,28 @@ export class GitCliService implements GitService {
 
   async pushAllTags(): Promise<void> {
     await this.run(["push", "origin", "--tags"], this.requireRoot());
+  }
+
+  async addToGitignore(filePath: string): Promise<void> {
+    const root = this.requireRoot();
+    const gitignorePath = path.join(root, ".gitignore");
+    let existing = "";
+    try {
+      existing = await readFile(gitignorePath, "utf8");
+    } catch { /* file doesn't exist yet */ }
+    const lines = existing.split("\n");
+    if (lines.some((l) => l.trim() === filePath || l.trim() === `/${filePath}`)) {
+      return;
+    }
+    const appended =
+      existing.length && !existing.endsWith("\n")
+        ? `${existing}\n${filePath}\n`
+        : `${existing}${filePath}\n`;
+    await writeFile(gitignorePath, appended, "utf8");
+  }
+
+  async undoLastCommit(): Promise<void> {
+    await this.run(["reset", "--soft", "HEAD~1"], this.requireRoot());
   }
 
   async getCommitStat(hash: string): Promise<CommitStat> {

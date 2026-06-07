@@ -443,6 +443,10 @@
               ${icon("commit")}<span>Commit</span>
             </button>
           </div>
+          <div id="undoBar" class="gx-undo-bar hidden">
+            <span id="undoMsg" class="gx-undo-msg"></span>
+            <button class="gx-undo-btn" data-action="undoLastCommit" title="Undo last commit (git reset --soft HEAD~1)" aria-label="Undo last commit" type="button">Undo</button>
+          </div>
         </div>
       </div>
 
@@ -501,6 +505,8 @@
       </div>
 
       <div id="fileContextMenu" class="gx-context-menu hidden" role="menu">
+        <button id="addToGitignoreItem" data-menu-action="addToGitignore" role="menuitem" type="button">${icon("file", "sm")}<span>Add to .gitignore</span></button>
+        <span id="addToGitignoreSep" class="gx-menu-sep"></span>
         <button data-menu-action="discardFile" role="menuitem" type="button">${icon("trash", "sm")}<span>Discard file</span></button>
         <span class="gx-menu-sep"></span>
         <button data-menu-action="copyFilePath" role="menuitem" type="button">${icon("file", "sm")}<span>Copy file path</span></button>
@@ -673,6 +679,9 @@
       case "unstageAll":
         post({ type: "unstageAll" });
         break;
+      case "undoLastCommit":
+        post({ type: "undoLastCommit" });
+        break;
       case "discardOne":
         post({ type: "discardFiles", filePaths: [elm.getAttribute("data-path")], staged: elm.getAttribute("data-staged") === "1" });
         break;
@@ -836,6 +845,9 @@
       staged: row.getAttribute("data-staged") === "1",
       status: row.getAttribute("data-status") || ""
     };
+    const isUntracked = contextFile.status === "U";
+    byId("addToGitignoreItem").classList.toggle("hidden", !isUntracked);
+    byId("addToGitignoreSep").classList.toggle("hidden", !isUntracked);
     const menu = byId("fileContextMenu");
     menu.classList.remove("hidden");
     menu.style.left = "0px";
@@ -859,6 +871,9 @@
     const file = contextFile;
     closeFileMenu();
     switch (action) {
+      case "addToGitignore":
+        post({ type: "addToGitignore", filePath: file.path });
+        break;
       case "discardFile":
         post({ type: "discardFiles", filePaths: [file.path], staged: file.staged });
         break;
@@ -1188,6 +1203,12 @@
           : "Stage files before committing"
     );
     setDisabled(commitBtn, busy || !hasStaged || hasConflicts);
+    const undoBar = byId("undoBar");
+    undoBar.classList.toggle("hidden", !s.canUndoCommit);
+    if (s.canUndoCommit && s.lastCommitSummary) {
+      const short = s.lastCommitSummary.length > 42 ? s.lastCommitSummary.slice(0, 42) + "…" : s.lastCommitSummary;
+      byId("undoMsg").textContent = `Last commit: "${short}"`;
+    }
     updateChangeActionButtons(s);
 
     renderHistory(s);

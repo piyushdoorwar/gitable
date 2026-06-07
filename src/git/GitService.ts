@@ -136,4 +136,10 @@ export interface GitService {
 
   /** Pushes all local tags to origin. */
   pushAllTags(): Promise<void>;
+
+  /** Appends filePath to the repo-root .gitignore (creates the file if absent). */
+  addToGitignore(filePath: string): Promise<void>;
+
+  /** Soft-resets HEAD~1, putting the last commit's changes back into the index. */
+  undoLastCommit(): Promise<void>;
 }

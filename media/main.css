@@ -570,6 +570,43 @@ button[aria-disabled="true"],
   to { transform: rotate(360deg); }
 }
 
+/* Undo commit bar ---------------------------------------------------- */
+.gx-undo-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-top: 6px;
+  border-radius: var(--gx-radius-sm);
+  background: rgba(249, 139, 158, 0.08);
+  border: 1px solid var(--gx-pink-line);
+}
+.gx-undo-msg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.gx-undo-btn {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  border-radius: var(--gx-radius-sm);
+  border: 1px solid var(--gx-pink-line);
+  background: transparent;
+  color: var(--gx-pink);
+  cursor: pointer;
+  line-height: 1.6;
+}
+.gx-undo-btn:hover {
+  background: var(--gx-pink-soft);
+  border-color: var(--gx-pink-strong);
+}
+
 /* Settings model block — tighter, consistent spacing */
 .gx-model-block {
   margin-top: 12px;
