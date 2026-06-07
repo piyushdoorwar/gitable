@@ -14,6 +14,7 @@ import { Logger } from "../utils/Logger";
 
 type TabName = "changes" | "history" | "settings";
 type BranchSwitchChoice = "bring" | "keep";
+const MIN_STAGE_BUSY_VISIBLE_MS = 2000;
 
 /**
  * Backs the Gitable sidebar webview. Owns the bidirectional message protocol,
@@ -456,6 +457,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   // ---- Git operations ----
 
   private async runGit(action: () => Promise<void>, kind = "", text = ""): Promise<void> {
+    const startedAt = Date.now();
     if (kind || text) {
       this.setBusy(kind, text);
       await this.postState(true);
@@ -467,6 +469,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     } finally {
       if (kind || text) {
         await this.postState(true);
+        await this.waitForMinimumElapsed(startedAt, MIN_STAGE_BUSY_VISIBLE_MS);
         this.clearBusy();
         await this.postState();
         return;
@@ -485,6 +488,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return `${verb} file...`;
     }
     return `${verb} ${count} files...`;
+  }
+
+  private async waitForMinimumElapsed(startedAt: number, minimumMs: number): Promise<void> {
+    const remaining = minimumMs - (Date.now() - startedAt);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
   }
 
   private async runCommit(summary: string, description?: string): Promise<void> {
