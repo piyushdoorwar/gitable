@@ -473,12 +473,14 @@
       </div>
 
       <div id="panel-branches" class="gx-panel hidden">
+        <div class="gx-branch-scroll">
+          <input id="branchFilter" type="text" class="gx-branch-filter" placeholder="Filter branches" autocomplete="off" spellcheck="false" />
+          <ul id="branchList" class="gx-branch-list"></ul>
+        </div>
         <div class="gx-newbranch">
           <input id="newBranchInput" type="text" placeholder="New branch name" autocomplete="off" spellcheck="false" />
           <button class="gx-btn gx-btn-primary" data-action="createBranchNamed" title="Create and switch to new branch" aria-label="Create and switch to new branch" type="button">${icon("plus", "sm")}<span>Create</span></button>
         </div>
-        <input id="branchFilter" type="text" class="gx-branch-filter" placeholder="Filter branches" autocomplete="off" spellcheck="false" />
-        <ul id="branchList" class="gx-branch-list"></ul>
       </div>
 
       <div id="panel-settings" class="gx-panel hidden">

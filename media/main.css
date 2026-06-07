@@ -342,10 +342,25 @@ button[aria-disabled="true"],
 }
 
 /* Branches tab */
+#panel-branches {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gx-branch-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
 .gx-newbranch {
   display: flex;
   gap: 7px;
-  margin-bottom: 10px;
+  flex: 0 0 auto;
+  margin: 10px -12px -12px;
+  padding: 10px 12px 12px;
+  background: var(--vscode-sideBar-background);
+  border-top: 1px solid var(--gx-line);
 }
 .gx-newbranch input {
   flex: 1;
