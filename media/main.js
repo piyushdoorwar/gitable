@@ -1829,6 +1829,11 @@
         ui.state = Object.assign(ui.state, message.data);
         pruneSelection();
         render();
+        if (typeof message.renderId === "number") {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => post({ type: "stateRendered", renderId: message.renderId }));
+          });
+        }
         break;
       case "setCommitFields":
         if (typeof message.summary === "string")

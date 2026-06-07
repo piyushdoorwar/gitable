@@ -33,6 +33,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private pendingNotice = "";
   private pendingTab: TabName | undefined;
   private modelsPreloaded = false;
+  private stateRenderSeq = 0;
+  private readonly pendingStateRenders = new Map<number, () => void>();
   private readonly modelsCache: Partial<Record<ProviderId, string[]>> = {};
 
   constructor(
@@ -147,6 +149,15 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.refresh();
         void this.preloadModels();
         break;
+      case "stateRendered": {
+        const renderId = Number(message.renderId);
+        const resolve = this.pendingStateRenders.get(renderId);
+        if (resolve) {
+          this.pendingStateRenders.delete(renderId);
+          resolve();
+        }
+        break;
+      }
       case "refresh":
         await this.refresh();
         break;
@@ -447,7 +458,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private async runGit(action: () => Promise<void>, kind = "", text = ""): Promise<void> {
     if (kind || text) {
       this.setBusy(kind, text);
-      await this.postState();
+      await this.postState(true);
     }
     try {
       await action();
@@ -455,7 +466,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.fail(error);
     } finally {
       if (kind || text) {
-        await this.refresh();
+        await this.postState(true);
         this.clearBusy();
         await this.postState();
         return;
@@ -1107,17 +1118,30 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     vscode.window.showErrorMessage(`Gitable: ${message}`);
   }
 
-  private async postState(): Promise<void> {
+  private async postState(waitForRender = false): Promise<void> {
     if (!this.view) {
       return;
     }
     const data = await this.buildState();
-    this.view.webview.postMessage({ type: "state", data });
+    const renderId = waitForRender ? ++this.stateRenderSeq : undefined;
+    const rendered = renderId ? this.waitForStateRender(renderId) : undefined;
+    const delivered = await this.view.webview.postMessage({ type: "state", data, renderId });
     const changes = data.changes as { staged: unknown[]; unstaged: unknown[] } | undefined;
     const count = (changes?.staged?.length ?? 0) + (changes?.unstaged?.length ?? 0);
     this.view.badge = count > 0 ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` } : undefined;
     this.pendingError = "";
     this.pendingNotice = "";
+    if (rendered && delivered) {
+      await rendered;
+    }
+  }
+
+  private async waitForStateRender(renderId: number): Promise<void> {
+    await Promise.race([
+      new Promise<void>((resolve) => this.pendingStateRenders.set(renderId, resolve)),
+      new Promise<void>((resolve) => setTimeout(resolve, 750))
+    ]);
+    this.pendingStateRenders.delete(renderId);
   }
 
   private async buildState(): Promise<Record<string, unknown>> {
