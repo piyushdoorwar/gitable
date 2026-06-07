@@ -1521,12 +1521,12 @@
             <span class="body">
               <div class="gx-commit-title">
                 <span class="gx-commit-subject">${escapeHtml(c.subject)}</span>
-                ${renderCommitTags(c.tags)}
               </div>
               <div class="gx-commit-meta">
                 <span class="gx-hash">${escapeHtml(c.hash.slice(0, 7))}</span>
                 <span>${escapeHtml(c.author)}</span>
                 <span>${escapeHtml(c.relativeDate)}</span>
+                ${renderCommitTags(c.tags)}
               </div>
             </span>
             <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>

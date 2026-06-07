@@ -1269,7 +1269,7 @@ textarea {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 .gx-commit {
   background: var(--gx-navy-card);
@@ -1278,11 +1278,12 @@ textarea {
   overflow: hidden;
 }
 .gx-commit-head {
-  display: flex;
-  gap: 8px;
-  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 20px;
+  gap: 7px;
+  padding: 8px 9px;
   cursor: pointer;
-  align-items: flex-start;
+  align-items: start;
 }
 .gx-commit-head:hover {
   background: var(--gx-pink-soft);
@@ -1291,9 +1292,10 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-self: stretch;
-  flex: 0 0 auto;
+  gap: 13px;
+  min-height: 44px;
 }
 .gx-commit-col-bottom {
   display: flex;
@@ -1315,7 +1317,9 @@ textarea {
 }
 .gx-commit .body {
   min-width: 0;
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 .gx-commit-files {
   list-style: none;
@@ -1432,8 +1436,8 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  align-self: flex-start;
+  justify-self: end;
+  align-self: start;
   width: 18px;
   height: 18px;
   padding: 0;
@@ -1441,8 +1445,8 @@ textarea {
   border: 0;
   border-radius: 3px;
   color: var(--gx-pink-strong);
-  opacity: 0;
-  transition: opacity 0.12s;
+  opacity: 0.72;
+  transition: opacity 0.12s, background 0.12s;
   cursor: pointer;
 }
 .gx-commit-head:hover .gx-ai-sum {
@@ -1544,29 +1548,31 @@ textarea {
   font-weight: 600;
 }
 .gx-commit-title {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 5px 7px;
-  margin-bottom: 3px;
+  min-width: 0;
 }
 .gx-commit-subject {
-  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--vscode-foreground);
   word-break: break-word;
 }
 .gx-commit-tags {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
 }
 .gx-tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  max-width: 120px;
-  min-height: 18px;
+  max-width: 104px;
+  min-height: 17px;
   padding: 1px 6px 1px 5px;
   border-radius: 999px;
   color: var(--vscode-badge-foreground, var(--gx-pink-ink));
@@ -1596,10 +1602,12 @@ textarea {
 }
 .gx-commit-meta {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px 9px;
   font-size: 10.5px;
   color: var(--vscode-descriptionForeground);
+  min-width: 0;
 }
 .gx-hash {
   font-family: var(--vscode-editor-font-family, monospace);
