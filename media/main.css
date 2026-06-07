@@ -1779,11 +1779,7 @@ textarea {
   justify-content: space-between;
   gap: 6px;
   padding: 3px 0;
-  border-bottom: 1px solid var(--gx-line);
   font-size: 11px;
-}
-.gx-rep-model-row:last-child {
-  border-bottom: none;
 }
 .gx-rep-model-name {
   color: var(--vscode-foreground);
