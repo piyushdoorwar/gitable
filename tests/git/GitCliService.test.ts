@@ -585,9 +585,8 @@ describe("GitCliService integration", () => {
       const stashes = await service.stashList();
       expect(stashes).toHaveLength(0);
       const changes = await service.getChanges();
-      // file restored to unstaged (pop stages → working tree after pop)
-      const allPaths = [...changes.staged, ...changes.unstaged].map((f) => f.path);
-      expect(allPaths).toContain("b.txt");
+      expect(changes.staged.map((f) => f.path)).toContain("b.txt");
+      expect(changes.unstaged.map((f) => f.path)).not.toContain("b.txt");
     });
 
     it("stashApply restores changes and keeps the stash entry", async () => {
@@ -599,6 +598,9 @@ describe("GitCliService integration", () => {
 
       const stashes = await service.stashList();
       expect(stashes).toHaveLength(1);
+      const changes = await service.getChanges();
+      expect(changes.staged.map((f) => f.path)).toContain("c.txt");
+      expect(changes.unstaged.map((f) => f.path)).not.toContain("c.txt");
     });
 
     it("stashDrop removes the stash entry without applying", async () => {

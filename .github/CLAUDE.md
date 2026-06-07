@@ -222,8 +222,9 @@ workspace, never committed to the repo.
   globalState, or files.
 - **Unified Changes list.** Staged and unstaged files appear in a single "Changes"
   list — no separate sections. A checked checkbox means the file is staged; unchecked
-  means unstaged. Toggling a checkbox posts `stageFile` or `unstageFile` directly,
-  with no client-side selection state. "Check all" / "Uncheck all" header buttons map
+  means unstaged. Toggling a checkbox posts `stageFile` or `unstageFile` directly
+  and keeps a short-lived optimistic client-side state until the host state confirms
+  the Git operation. "Check all" / "Uncheck all" header buttons map
   to `stageAll` / `unstageAll`. The visual distinction is purely the checkbox: checked
   (filled pink) = staged, unchecked = unstaged.
 - **Activity bar badge.** The Gitable icon shows the count of changed files
@@ -236,8 +237,9 @@ workspace, never committed to the repo.
   and "Mark as resolved" (stages the file via `stageFiles`). The Commit and AI
   generate buttons are disabled until all conflicts are cleared.
 - **Stash (staged-only).** `git stash push --staged` stashes only currently staged
-  files, leaving unstaged changes intact. The Stash section in the Changes tab lists
-  all stash entries with Pop / Apply / Drop actions.
+  files, leaving unstaged changes intact. Pop / Apply restores the stash with
+  `--index` so previously staged files return checked. The Stash section in the
+  Changes tab lists all stash entries with Pop / Apply / Drop actions.
 - **Merge branch.** Right-click a branch in the Branches tab → "Merge into current".
   Conflict detection surfaces the error as a panel notice pointing users to the
   conflict resolution flow.

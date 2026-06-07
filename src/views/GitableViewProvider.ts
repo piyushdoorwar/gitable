@@ -29,11 +29,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private pendingTagPushes = new Set<string>();
   /** Summary of the last commit made via Gitable; cleared on push or undo. */
   private lastCommitSummary = "";
-  /** Paths the user explicitly unchecked this session — not auto-staged. */
+  /** Paths the user explicitly unchecked this session; all other changed paths are auto-staged. */
   private explicitlyUnstaged = new Set<string>();
-  /** Paths that were already unstaged on first load — not auto-staged on next poll. */
-  private initialUnstagedPaths = new Set<string>();
-  private initialStateLoaded = false;
   private pendingError = "";
   private pendingNotice = "";
   private pendingTab: TabName | undefined;
@@ -176,6 +173,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "stageFiles":
+        this.forEachPath(message.filePaths, (fp) => this.explicitlyUnstaged.delete(fp));
         await this.runGit(
           () => this.git.stageFiles(message.filePaths ?? []),
           "stage",
@@ -183,6 +181,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         );
         break;
       case "unstageFiles":
+        this.forEachPath(message.filePaths, (fp) => this.explicitlyUnstaged.add(fp));
         await this.runGit(
           () => this.git.unstageFiles(message.filePaths ?? []),
           "unstage",
@@ -190,11 +189,15 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         );
         break;
       case "stageAll":
+        this.explicitlyUnstaged.clear();
         await this.runGit(() => this.git.stageAll(), "stage", "Staging all files…");
         break;
-      case "unstageAll":
+      case "unstageAll": {
+        const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [], conflicts: [] }));
+        [...changes.staged, ...changes.unstaged].forEach((f) => this.explicitlyUnstaged.add(f.path));
         await this.runGit(() => this.git.unstageAll(), "unstage", "Unstaging all files…");
         break;
+      }
       case "commit":
         await this.runCommit(message.summary, message.description);
         break;
@@ -330,11 +333,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       case "stashPop": {
         const ref = String(message.ref ?? "");
+        this.explicitlyUnstaged.clear();
         await this.runBusyGit("git", "Restoring stash…", () => this.git.stashPop(ref), "Stash applied and removed.");
         break;
       }
       case "stashApply": {
         const ref = String(message.ref ?? "");
+        this.explicitlyUnstaged.clear();
         await this.runBusyGit("git", "Applying stash…", () => this.git.stashApply(ref), "Stash applied.");
         break;
       }
@@ -443,8 +448,6 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           await this.git.undoLastCommit();
           this.lastCommitSummary = "";
           this.explicitlyUnstaged.clear();
-          this.initialUnstagedPaths.clear();
-          this.initialStateLoaded = false;
         }, "Last commit moved back to staged.");
         break;
       default:
@@ -455,18 +458,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   // ---- Git operations ----
 
   /**
-   * On first load, records unstaged paths so they aren't auto-staged (respect existing git state).
-   * On subsequent polls, stages any new unstaged files the user hasn't explicitly unchecked,
+   * Stages every changed path unless the user explicitly unchecked it in this session,
    * matching the GitHub Desktop behaviour where new edits appear checked by default.
    */
   private async autoStageNewFiles(changes: RepoChanges): Promise<RepoChanges> {
-    if (!this.initialStateLoaded) {
-      this.initialStateLoaded = true;
-      changes.unstaged.forEach((f) => this.initialUnstagedPaths.add(f.path));
-      return changes;
-    }
     const toStage = changes.unstaged
-      .filter((f) => !this.initialUnstagedPaths.has(f.path) && !this.explicitlyUnstaged.has(f.path))
+      .filter((f) => !this.explicitlyUnstaged.has(f.path))
       .map((f) => f.path);
     if (toStage.length > 0) {
       try {
@@ -477,6 +474,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       }
     }
     return changes;
+  }
+
+  private forEachPath(paths: unknown, visit: (path: string) => void): void {
+    if (!Array.isArray(paths)) {
+      return;
+    }
+    paths.map((item) => String(item).trim()).filter(Boolean).forEach(visit);
   }
 
   private async runGit(action: () => Promise<void>, kind = "", text = ""): Promise<void> {
@@ -524,7 +528,6 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.view?.webview.postMessage({ type: "clearCommitFields" });
       // After commit: reset auto-stage tracking so new edits appear checked
       this.explicitlyUnstaged.clear();
-      this.initialUnstagedPaths.clear();
     } catch (error) {
       this.fail(error);
     }

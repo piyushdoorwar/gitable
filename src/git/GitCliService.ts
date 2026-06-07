@@ -387,11 +387,11 @@ export class GitCliService implements GitService {
   }
 
   async stashPop(ref: string): Promise<void> {
-    await this.run(["stash", "pop", ref], this.requireRoot());
+    await this.run(["stash", "pop", "--index", ref], this.requireRoot());
   }
 
   async stashApply(ref: string): Promise<void> {
-    await this.run(["stash", "apply", ref], this.requireRoot());
+    await this.run(["stash", "apply", "--index", ref], this.requireRoot());
   }
 
   async stashDrop(ref: string): Promise<void> {

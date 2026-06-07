@@ -146,6 +146,7 @@
     commitStats: /** @type {Record<string, any>} */ ({}),
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
+    pendingStage: new Map(),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -647,6 +648,9 @@
       const box = e.target;
       if (!box.classList.contains("gx-check")) return;
       const path = box.getAttribute("data-path");
+      if (!path) return;
+      ui.pendingStage.set(path, { staged: box.checked, ts: Date.now() });
+      render();
       if (box.checked) {
         post({ type: "stageFile", filePath: path });
       } else {
@@ -1120,6 +1124,8 @@
   // ---------- Render ----------
   function render() {
     const s = ui.state;
+    settlePendingStage(s);
+    const visibleChanges = optimisticChanges(s.changes || { staged: [], unstaged: [], conflicts: [] });
 
     // Header
     byId("repoName").textContent = s.repositoryName || "—";
@@ -1134,8 +1140,8 @@
     renderNotice(s);
 
     // Unified changes list (checked = staged, unchecked = unstaged)
-    byId("changesList").innerHTML = renderCombinedList(s.changes.staged || [], s.changes.unstaged || []);
-    const totalChanges = (s.changes.staged || []).length + (s.changes.unstaged || []).length;
+    byId("changesList").innerHTML = renderCombinedList(visibleChanges.staged || [], visibleChanges.unstaged || []);
+    const totalChanges = (visibleChanges.staged || []).length + (visibleChanges.unstaged || []).length;
     const changesCountEl = byId("changesCount");
     if (totalChanges > 0) {
       changesCountEl.textContent = String(totalChanges);
@@ -1173,8 +1179,8 @@
     }
 
     const busy = !!s.isLoading;
-    const stagedFiles = s.changes.staged || [];
-    const unstagedFiles = s.changes.unstaged || [];
+    const stagedFiles = visibleChanges.staged || [];
+    const unstagedFiles = visibleChanges.unstaged || [];
     const hasStaged = stagedFiles.length > 0;
     const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
     const genBtn = byId("generateBtn");
@@ -1209,7 +1215,7 @@
       const short = s.lastCommitSummary.length > 42 ? s.lastCommitSummary.slice(0, 42) + "…" : s.lastCommitSummary;
       byId("undoMsg").textContent = `Last commit: "${short}"`;
     }
-    updateChangeActionButtons(s);
+    updateChangeActionButtons(s, visibleChanges);
 
     renderHistory(s);
     renderSettings(s);
@@ -1219,12 +1225,55 @@
     byId("panel-security").classList.toggle("hidden", !ui.activeSecurityReview);
   }
 
-  function updateChangeActionButtons(s) {
+  function updateChangeActionButtons(s, changes) {
     const busy = !!s.isLoading;
-    const stagedFiles = s.changes.staged || [];
+    const stagedFiles = (changes || s.changes).staged || [];
     const hasConflictsNow = ((s.changes && s.changes.conflicts) || []).length > 0;
     setDisabled(byId("stagedSecurityBtn"), busy || stagedFiles.length === 0);
     setDisabled(byId("stashBtn"), busy || stagedFiles.length === 0 || hasConflictsNow);
+  }
+
+  function settlePendingStage(s) {
+    if (!ui.pendingStage.size) return;
+    if (s.error) {
+      ui.pendingStage.clear();
+      return;
+    }
+    const changes = s.changes || { staged: [], unstaged: [] };
+    const staged = new Set((changes.staged || []).map((f) => f.path));
+    const unstaged = new Set((changes.unstaged || []).map((f) => f.path));
+    const now = Date.now();
+    ui.pendingStage.forEach((pending, path) => {
+      const settled = pending.staged
+        ? staged.has(path) && !unstaged.has(path)
+        : unstaged.has(path) && !staged.has(path);
+      if (settled || now - pending.ts > 5000) {
+        ui.pendingStage.delete(path);
+      }
+    });
+  }
+
+  function optimisticChanges(changes) {
+    let staged = (changes.staged || []).slice();
+    let unstaged = (changes.unstaged || []).slice();
+    ui.pendingStage.forEach((pending, path) => {
+      if (pending.staged) {
+        const moved = unstaged.filter((f) => f.path === path);
+        unstaged = unstaged.filter((f) => f.path !== path);
+        staged = staged.filter((f) => f.path !== path);
+        staged = staged.concat((moved.length ? moved : [{ path, displayPath: path, status: "M" }]).map((f) => withStage(f, true)));
+      } else {
+        const moved = staged.filter((f) => f.path === path);
+        staged = staged.filter((f) => f.path !== path);
+        unstaged = unstaged.filter((f) => f.path !== path);
+        unstaged = unstaged.concat((moved.length ? moved : [{ path, displayPath: path, status: "M" }]).map((f) => withStage(f, false)));
+      }
+    });
+    return { staged, unstaged, conflicts: changes.conflicts || [] };
+  }
+
+  function withStage(file, staged) {
+    return Object.assign({}, file, { staged });
   }
 
   function renderBranches(s) {
@@ -1375,13 +1424,14 @@
   }
 
   function renderCombinedFile(f, isStaged) {
+    const pending = ui.pendingStage.get(f.path);
     const checkTitle = isStaged
       ? `Uncheck to unstage: ${f.displayPath || f.path}`
       : `Check to stage: ${f.displayPath || f.path}`;
     const discardTitle = `Discard changes — ${f.displayPath || f.path}`;
     return `
       <li class="gx-file${isStaged ? " gx-file-staged" : ""}" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
-        <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" title="${escapeHtml(checkTitle)}" aria-label="${escapeHtml(checkTitle)}" ${isStaged ? "checked" : ""} />
+        <input type="checkbox" class="gx-check${pending ? " gx-check-pending" : ""}" data-path="${escapeHtml(f.path)}" title="${escapeHtml(checkTitle)}" aria-label="${escapeHtml(checkTitle)}" ${isStaged ? "checked" : ""} />
         ${fileIcon(f.path)}
         <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
         <span class="gx-right">

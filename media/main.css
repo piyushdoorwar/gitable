@@ -765,20 +765,17 @@ button[aria-disabled="true"],
   background: transparent;
   position: relative;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 .gx-check:hover {
   border-color: var(--gx-pink);
+  transform: scale(1.04);
 }
 .gx-check:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--gx-pink-line);
 }
-.gx-check:checked {
-  background: var(--gx-pink);
-  border-color: var(--gx-pink);
-}
-.gx-check:checked::after {
+.gx-check::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -787,7 +784,20 @@ button[aria-disabled="true"],
   height: 4px;
   border: solid var(--gx-pink-ink);
   border-width: 0 0 2px 2px;
-  transform: translate(-50%, -60%) rotate(-45deg);
+  opacity: 0;
+  transform: translate(-50%, -60%) rotate(-45deg) scale(0.75);
+  transition: opacity 0.12s ease, transform 0.14s ease;
+}
+.gx-check:checked {
+  background: var(--gx-pink);
+  border-color: var(--gx-pink);
+}
+.gx-check:checked::after {
+  opacity: 1;
+  transform: translate(-50%, -60%) rotate(-45deg) scale(1);
+}
+.gx-check-pending {
+  box-shadow: 0 0 0 2px rgba(255, 128, 171, 0.12);
 }
 /* File-type icon (left), coloured by extension */
 .gx-ftype {
