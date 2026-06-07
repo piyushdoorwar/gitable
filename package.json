@@ -2,7 +2,7 @@
   "name": "gitable",
   "displayName": "Gitable",
   "description": "AI-powered Git workflow panel for VS Code. Generate commit messages, review changes, and manage Git visually using your own AI API key.",
-  "version": "0.0.14",
+  "version": "0.0.35",
   "icon": "media/icon.png",
   "publisher": "piyushdoorwar",
   "license": "MIT",

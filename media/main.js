@@ -701,10 +701,10 @@
     const s = ui.state;
     switch (action) {
       case "stageAll":
-        post({ type: "stageAll" });
+        post({ type: "stageAll", count: (s.changes.unstaged || []).length });
         break;
       case "unstageAll":
-        post({ type: "unstageAll" });
+        post({ type: "unstageAll", count: (s.changes.staged || []).length });
         break;
       case "stageSelected": {
         const paths = selectedPaths(s.changes.unstaged, false);

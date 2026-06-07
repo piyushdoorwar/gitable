@@ -157,28 +157,36 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "stageFile": {
         const fp = String(message.filePath ?? "");
         if (fp) {
-          await this.runGit(() => this.git.stageFiles([fp]));
+          await this.runGit(() => this.git.stageFiles([fp]), "stage", "Staging file...");
         }
         break;
       }
       case "unstageFile": {
         const fp = String(message.filePath ?? "");
         if (fp) {
-          await this.runGit(() => this.git.unstageFiles([fp]));
+          await this.runGit(() => this.git.unstageFiles([fp]), "unstage", "Unstaging file...");
         }
         break;
       }
       case "stageFiles":
-        await this.runGit(() => this.git.stageFiles(message.filePaths ?? []));
+        await this.runGit(
+          () => this.git.stageFiles(message.filePaths ?? []),
+          "stage",
+          this.countFilesText(message.filePaths, "Staging")
+        );
         break;
       case "unstageFiles":
-        await this.runGit(() => this.git.unstageFiles(message.filePaths ?? []));
+        await this.runGit(
+          () => this.git.unstageFiles(message.filePaths ?? []),
+          "unstage",
+          this.countFilesText(message.filePaths, "Unstaging")
+        );
         break;
       case "stageAll":
-        await this.runGit(() => this.git.stageAll());
+        await this.runGit(() => this.git.stageAll(), "stage", this.countFilesText(message.count, "Staging"));
         break;
       case "unstageAll":
-        await this.runGit(() => this.git.unstageAll());
+        await this.runGit(() => this.git.unstageAll(), "unstage", this.countFilesText(message.count, "Unstaging"));
         break;
       case "commit":
         await this.runCommit(message.summary, message.description);
@@ -447,10 +455,25 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.fail(error);
     } finally {
       if (kind || text) {
+        await this.refresh();
         this.clearBusy();
+        await this.postState();
+        return;
       }
     }
     await this.refresh();
+  }
+
+  private countFilesText(paths: unknown, verb: string): string {
+    const count = Array.isArray(paths)
+      ? paths.length
+      : typeof paths === "number" && Number.isFinite(paths)
+        ? paths
+        : 0;
+    if (count <= 1) {
+      return `${verb} file...`;
+    }
+    return `${verb} ${count} files...`;
   }
 
   private async runCommit(summary: string, description?: string): Promise<void> {
