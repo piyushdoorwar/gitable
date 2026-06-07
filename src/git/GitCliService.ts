@@ -345,6 +345,10 @@ export class GitCliService implements GitService {
     await this.run(["branch", "-d", name], this.requireRoot());
   }
 
+  async mergeBranch(name: string): Promise<void> {
+    await this.run(["merge", name], this.requireRoot());
+  }
+
   async getCommitStat(hash: string): Promise<CommitStat> {
     const output = await this.run(
       ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--stat", "-r", "-M", "--root", hash],

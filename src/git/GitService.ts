@@ -98,6 +98,9 @@ export interface GitService {
   /** Deletes a local branch (safe delete — fails if unmerged). */
   deleteBranch(name: string): Promise<void>;
 
+  /** Merges the given branch into the currently checked-out branch. */
+  mergeBranch(name: string): Promise<void>;
+
   /** Full unified diff of a single commit (vs its parent). */
   getCommitDiff(hash: string): Promise<string>;
 }

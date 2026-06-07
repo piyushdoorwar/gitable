@@ -9,6 +9,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>',
     branch:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="14"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M18 9.4c0 4-3.5 5.6-6 5.6"/></svg>',
+    merge:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><line x1="6" y1="8.4" x2="6" y2="15.6"/><path d="M18 8.4c0 5.6-4.5 9.6-12 9.6"/></svg>',
     sparkle:
       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2l1.9 5.4 5.4 1.9-5.4 1.9L12 16.8l-1.9-5.4L4.7 9.5l5.4-1.9z"/><path d="M18.7 13.6l.85 2.45 2.45.85-2.45.85-.85 2.45-.85-2.45-2.45-.85 2.45-.85z"/></svg>',
     commit:
@@ -909,6 +911,8 @@
       `<button data-bmenu-action="copyBranchName" role="menuitem" type="button">${icon("copy", "sm")}<span>Copy branch name</span></button>` +
       (!isCurrent
         ? `<span class="gx-menu-sep"></span>` +
+          `<button data-bmenu-action="mergeBranch" role="menuitem" type="button">${icon("merge", "sm")}<span>Merge into current</span></button>` +
+          `<span class="gx-menu-sep"></span>` +
           `<button data-bmenu-action="deleteBranch" role="menuitem" type="button" class="gx-menu-danger">${icon("trash", "sm")}<span>Delete…</span></button>`
         : "");
     menu.classList.remove("hidden");
@@ -938,6 +942,9 @@
         break;
       case "copyBranchName":
         post({ type: "copyBranchName", name: branch.name });
+        break;
+      case "mergeBranch":
+        post({ type: "mergeBranch", name: branch.name });
         break;
       case "deleteBranch":
         post({ type: "deleteBranch", name: branch.name });

@@ -297,6 +297,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "deleteBranch":
         await this.deleteBranch(String(message.name ?? ""));
         break;
+      case "mergeBranch":
+        await this.mergeBranch(String(message.name ?? ""));
+        break;
       case "copyBranchName": {
         const name = String(message.name ?? "");
         await vscode.env.clipboard.writeText(name);
@@ -641,6 +644,29 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       () => this.git.deleteBranch(name),
       `Branch ${name} deleted.`
     );
+  }
+
+  private async mergeBranch(name: string): Promise<void> {
+    if (!name) return;
+    const summary = await this.git.getRepoSummary().catch(() => undefined);
+    const current = summary?.branch ?? "current branch";
+    this.setBusy("git", `Merging ${name}…`);
+    await this.postState();
+    try {
+      await this.git.mergeBranch(name);
+      this.pendingNotice = `Merged ${name} into ${current}.`;
+      vscode.window.showInformationMessage(`Gitable: Merged ${name} into ${current}.`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("CONFLICT") || msg.includes("Automatic merge failed")) {
+        this.pendingError = "Merge conflict — resolve conflicts, stage all files, and commit.";
+      } else {
+        this.fail(error);
+      }
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
   }
 
   // ---- AI operations ----

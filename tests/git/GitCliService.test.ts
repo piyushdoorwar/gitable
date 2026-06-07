@@ -541,4 +541,42 @@ describe("GitCliService integration", () => {
       expect(afterFetch.ahead).toBe(0);
     });
   });
+
+  describe("mergeBranch", () => {
+    it("merges a feature branch into the current branch", async () => {
+      // Create a feature branch with one commit
+      await git(["checkout", "-b", "feature/merge-me"], root);
+      await writeFile(path.join(root, "feature.txt"), "feature content\n");
+      await git(["add", "feature.txt"], root);
+      await git(["commit", "-m", "feat: add feature"], root);
+      await git(["checkout", "main"], root);
+
+      await service.mergeBranch("feature/merge-me");
+
+      const history = await service.getHistory(5);
+      const messages = history.map((c) => c.subject);
+      expect(messages).toContain("feat: add feature");
+    });
+
+    it("throws GitServiceError when merging a branch with conflicts", async () => {
+      // Create conflicting file on main
+      await writeFile(path.join(root, "conflict.txt"), "main version\n");
+      await git(["add", "conflict.txt"], root);
+      await git(["commit", "-m", "main: add conflict file"], root);
+
+      // Create a branch that edits the same file differently
+      await git(["checkout", "-b", "conflicting"], root);
+      await writeFile(path.join(root, "conflict.txt"), "branch version\n");
+      await git(["add", "conflict.txt"], root);
+      await git(["commit", "-m", "branch: edit conflict file"], root);
+      await git(["checkout", "main"], root);
+
+      // Overwrite the file on main again so the merge cannot auto-resolve
+      await writeFile(path.join(root, "conflict.txt"), "main modified\n");
+      await git(["add", "conflict.txt"], root);
+      await git(["commit", "-m", "main: modify conflict file again"], root);
+
+      await expect(service.mergeBranch("conflicting")).rejects.toThrow();
+    });
+  });
 });

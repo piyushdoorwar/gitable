@@ -357,6 +357,12 @@ export class VsCodeGitService implements GitService {
     this.syncCliRoot();
     return this.cli.deleteBranch(name);
   }
+
+  mergeBranch(name: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.mergeBranch(name);
+  }
+
   // ---- internals ----
 
   /**
