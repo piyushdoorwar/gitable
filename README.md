@@ -16,7 +16,7 @@ selected Git diff is ever sent to the AI provider you choose.
 
 ## Features
 
-- 🗂️ **Changes tab** — staged/unstaged file lists with status (added, modified, deleted, renamed, untracked), per-file and bulk stage/unstage, and selection-based actions.
+- 🗂️ **Changes tab** — unified file list where a checked checkbox means staged and unchecked means unstaged. Check or uncheck any file to stage/unstage it instantly; "Check all" / "Uncheck all" buttons act on everything at once. File status (added, modified, deleted, renamed, untracked) is shown on each row. Right-click any file to discard it.
 - ⚠️ **Conflict resolution** — after a merge or pull with conflicts, conflicted files appear in a dedicated section with "Open in merge editor" and "Mark as resolved" actions. Commit is blocked until all conflicts are cleared.
 - 📦 **Stash** — stash only your staged files with one click, then pop/apply/drop stashes from the same panel.
 - 🔀 **Merge branch** — right-click any branch → "Merge into current"; conflict detection surfaces the error inline.
@@ -60,7 +60,7 @@ appears in the Activity Bar — click it to open the panel.
 
 ## Generating commit messages
 
-1. Stage the changes you want to commit (Changes tab → **Stage selected** / **Stage all**, or the per-file **+**).
+1. Check the files you want to commit in the Changes tab (check a file to stage it, or click **Check all** to stage everything).
 2. Click **✨ Generate AI message**.
 3. Gitable reads your staged diff, filters noisy files, truncates if needed, and
    asks your provider for a concise message.

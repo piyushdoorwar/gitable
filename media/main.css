@@ -847,13 +847,6 @@ button[aria-disabled="true"],
   pointer-events: none;
   z-index: 2;
 }
-.gx-file-staged:hover .gx-stat {
-  opacity: 0;
-}
-.gx-file-staged:hover .gx-row-action {
-  opacity: 1;
-  pointer-events: auto;
-}
 .gx-row-action:hover {
   color: var(--gx-pink);
   background: var(--gx-pink-soft);

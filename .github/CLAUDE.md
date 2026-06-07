@@ -218,6 +218,12 @@ workspace, never committed to the repo.
 - **AI key storage.** Keys are written with `context.secrets` under
   `gitable.<provider>.apiKey` and read back at call time — never touch settings,
   globalState, or files.
+- **Unified Changes list.** Staged and unstaged files appear in a single "Changes"
+  list — no separate sections. A checked checkbox means the file is staged; unchecked
+  means unstaged. Toggling a checkbox posts `stageFile` or `unstageFile` directly,
+  with no client-side selection state. "Check all" / "Uncheck all" header buttons map
+  to `stageAll` / `unstageAll`. The visual distinction is purely the checkbox: checked
+  (filled pink) = staged, unchecked = unstaged.
 - **Activity bar badge.** The Gitable icon shows the count of changed files
   (staged + unstaged) as a badge, mirroring VS Code's built-in SCM indicator.
 - **Conflict resolution state.** When a pull or merge leaves unresolved conflicts,
