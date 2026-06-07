@@ -925,7 +925,10 @@ button[aria-disabled="true"],
   background: var(--gx-pink-soft);
   border-color: var(--gx-pink-line);
 }
-.gx-file:hover .gx-row-discard {
+.gx-file:hover .gx-stat {
+  opacity: 0;
+}
+.gx-file:hover .gx-row-action {
   opacity: 1;
   pointer-events: auto;
 }

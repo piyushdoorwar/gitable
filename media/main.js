@@ -140,13 +140,13 @@
   /** Local UI state preserved across re-renders. */
   const ui = {
     activeTab: "changes",
+    selected: new Set(),
     branchFilter: "",
     expandedCommits: new Set(),
     commitFiles: /** @type {Record<string, any>} */ ({}),
     commitStats: /** @type {Record<string, any>} */ ({}),
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
-    pendingStage: new Map(),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -407,16 +407,33 @@
           </div>
 
           <div class="gx-section-head">
-            <span class="gx-section-title">Changes</span>
-            <span id="changesCount" class="gx-count hidden">0</span>
+            <span class="gx-section-title">Staged</span>
+            <span id="stagedCount" class="gx-count">0</span>
             <span class="spacer"></span>
             <span class="gx-section-actions">
               <button id="stagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="1" title="Security review of staged changes" aria-label="Security review of staged changes" type="button">${ICONS.shieldAi}</button>
               <span class="gx-mini-sep"></span>
               <button id="stashBtn" class="gx-mini-action" data-action="stashStaged" title="Stash staged changes (git stash push --staged)" aria-label="Stash staged changes" type="button">${ICONS.stash}</button>
+              <span class="gx-mini-sep"></span>
+              <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
+              <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
             </span>
           </div>
-          <ul id="changesList" class="gx-files"></ul>
+          <ul id="stagedList" class="gx-files"></ul>
+
+          <div class="gx-section-head">
+            <span class="gx-section-title">Changes</span>
+            <span id="unstagedCount" class="gx-count">0</span>
+            <span class="spacer"></span>
+            <span class="gx-section-actions">
+              <button id="unstagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="0" title="Security review of unstaged changes" aria-label="Security review of unstaged changes" type="button">${ICONS.shieldAi}</button>
+              <span class="gx-mini-sep"></span>
+              <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
+              <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
+              <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
+            </span>
+          </div>
+          <ul id="unstagedList" class="gx-files"></ul>
 
           <div class="gx-section-head">
             <span class="gx-section-title">Stashes</span>
@@ -648,19 +665,18 @@
     window.addEventListener("resize", closeAllMenus);
     window.addEventListener("scroll", closeAllMenus, true);
 
-    // Checkbox toggles staged state directly
-    byId("changesList").addEventListener("change", (e) => {
-      const box = e.target;
-      if (!box.classList.contains("gx-check")) return;
-      const path = box.getAttribute("data-path");
-      if (!path) return;
-      ui.pendingStage.set(path, { staged: box.checked, ts: Date.now() });
-      render();
-      if (box.checked) {
-        post({ type: "stageFile", filePath: path });
-      } else {
-        post({ type: "unstageFile", filePath: path });
-      }
+    // Checkbox selection for bulk stage/unstage/discard actions.
+    [byId("stagedList"), byId("unstagedList")].forEach((listEl) => {
+      listEl.addEventListener("change", (e) => {
+        const box = e.target;
+        if (!box.classList.contains("gx-check")) return;
+        const path = box.getAttribute("data-path");
+        if (!path) return;
+        const key = selectionKey(path, box.getAttribute("data-staged") === "1");
+        if (box.checked) ui.selected.add(key);
+        else ui.selected.delete(key);
+        updateChangeActionButtons(ui.state);
+      });
     });
   }
 
@@ -687,6 +703,27 @@
         break;
       case "unstageAll":
         post({ type: "unstageAll" });
+        break;
+      case "stageSelected": {
+        const paths = selectedPaths(s.changes.unstaged, false);
+        if (paths.length) post({ type: "stageFiles", filePaths: paths });
+        break;
+      }
+      case "discardSelected": {
+        const paths = selectedPaths(s.changes.unstaged, false);
+        if (paths.length) post({ type: "discardFiles", filePaths: paths, staged: false });
+        break;
+      }
+      case "unstageSelected": {
+        const paths = selectedPaths(s.changes.staged, true);
+        if (paths.length) post({ type: "unstageFiles", filePaths: paths });
+        break;
+      }
+      case "stageOne":
+        post({ type: "stageFile", filePath: elm.getAttribute("data-path") });
+        break;
+      case "unstageOne":
+        post({ type: "unstageFile", filePath: elm.getAttribute("data-path") });
         break;
       case "undoLastCommit":
         post({ type: "undoLastCommit" });
@@ -1129,11 +1166,17 @@
     byId("changesNotice").innerHTML = `<div class="gx-notice ${kind}">${escapeHtml(message)}</div>`;
   }
 
+  function selectionKey(path, staged) {
+    return `${staged ? "staged" : "unstaged"}:${path}`;
+  }
+
+  function selectedPaths(files, staged) {
+    return (files || []).filter((f) => ui.selected.has(selectionKey(f.path, staged))).map((f) => f.path);
+  }
+
   // ---------- Render ----------
   function render() {
     const s = ui.state;
-    settlePendingStage(s);
-    const visibleChanges = optimisticChanges(s.changes || { staged: [], unstaged: [], conflicts: [] });
 
     // Header
     byId("repoName").textContent = s.repositoryName || "—";
@@ -1147,16 +1190,12 @@
 
     renderNotice(s);
 
-    // Unified changes list (checked = staged, unchecked = unstaged)
-    byId("changesList").innerHTML = renderCombinedList(visibleChanges.staged || [], visibleChanges.unstaged || []);
-    const totalChanges = (visibleChanges.staged || []).length + (visibleChanges.unstaged || []).length;
-    const changesCountEl = byId("changesCount");
-    if (totalChanges > 0) {
-      changesCountEl.textContent = String(totalChanges);
-      changesCountEl.classList.remove("hidden");
-    } else {
-      changesCountEl.classList.add("hidden");
-    }
+    const stagedFiles = s.changes.staged || [];
+    const unstagedFiles = s.changes.unstaged || [];
+    byId("stagedList").innerHTML = renderFileList(stagedFiles, true);
+    byId("unstagedList").innerHTML = renderFileList(unstagedFiles, false);
+    byId("stagedCount").textContent = String(stagedFiles.length);
+    byId("unstagedCount").textContent = String(unstagedFiles.length);
 
     // Conflicts section
     const conflicts = (s.changes && s.changes.conflicts) || [];
@@ -1187,8 +1226,6 @@
     }
 
     const busy = !!s.isLoading;
-    const stagedFiles = visibleChanges.staged || [];
-    const unstagedFiles = visibleChanges.unstaged || [];
     const hasStaged = stagedFiles.length > 0;
     const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
     const genBtn = byId("generateBtn");
@@ -1223,7 +1260,7 @@
       const short = s.lastCommitSummary.length > 42 ? s.lastCommitSummary.slice(0, 42) + "…" : s.lastCommitSummary;
       byId("undoMsg").textContent = `Last commit: "${short}"`;
     }
-    updateChangeActionButtons(s, visibleChanges);
+    updateChangeActionButtons(s);
 
     renderHistory(s);
     renderSettings(s);
@@ -1233,55 +1270,47 @@
     byId("panel-security").classList.toggle("hidden", !ui.activeSecurityReview);
   }
 
-  function updateChangeActionButtons(s, changes) {
+  function updateChangeActionButtons(s) {
     const busy = !!s.isLoading;
-    const stagedFiles = (changes || s.changes).staged || [];
+    const stagedFiles = s.changes.staged || [];
+    const unstagedFiles = s.changes.unstaged || [];
     const hasConflictsNow = ((s.changes && s.changes.conflicts) || []).length > 0;
     setDisabled(byId("stagedSecurityBtn"), busy || stagedFiles.length === 0);
+    setDisabled(byId("unstagedSecurityBtn"), busy || unstagedFiles.length === 0);
     setDisabled(byId("stashBtn"), busy || stagedFiles.length === 0 || hasConflictsNow);
-  }
-
-  function settlePendingStage(s) {
-    if (!ui.pendingStage.size) return;
-    if (s.error) {
-      ui.pendingStage.clear();
-      return;
-    }
-    const changes = s.changes || { staged: [], unstaged: [] };
-    const staged = new Set((changes.staged || []).map((f) => f.path));
-    const unstaged = new Set((changes.unstaged || []).map((f) => f.path));
-    const now = Date.now();
-    ui.pendingStage.forEach((pending, path) => {
-      const settled = pending.staged
-        ? staged.has(path) && !unstaged.has(path)
-        : unstaged.has(path) && !staged.has(path);
-      if (settled || now - pending.ts > 5000) {
-        ui.pendingStage.delete(path);
-      }
-    });
-  }
-
-  function optimisticChanges(changes) {
-    let staged = (changes.staged || []).slice();
-    let unstaged = (changes.unstaged || []).slice();
-    ui.pendingStage.forEach((pending, path) => {
-      if (pending.staged) {
-        const moved = unstaged.filter((f) => f.path === path);
-        unstaged = unstaged.filter((f) => f.path !== path);
-        staged = staged.filter((f) => f.path !== path);
-        staged = staged.concat((moved.length ? moved : [{ path, displayPath: path, status: "M" }]).map((f) => withStage(f, true)));
-      } else {
-        const moved = staged.filter((f) => f.path === path);
-        staged = staged.filter((f) => f.path !== path);
-        unstaged = unstaged.filter((f) => f.path !== path);
-        unstaged = unstaged.concat((moved.length ? moved : [{ path, displayPath: path, status: "M" }]).map((f) => withStage(f, false)));
-      }
-    });
-    return { staged, unstaged, conflicts: changes.conflicts || [] };
-  }
-
-  function withStage(file, staged) {
-    return Object.assign({}, file, { staged });
+    const selectedStaged = selectedPaths(stagedFiles, true).length;
+    const selectedUnstaged = selectedPaths(unstagedFiles, false).length;
+    const unstageSelected = byId("unstageSelectedBtn");
+    const unstageAll = byId("unstageAllBtn");
+    const stageSelected = byId("stageSelectedBtn");
+    const stageAll = byId("stageAllBtn");
+    const discardSelected = byId("discardSelectedBtn");
+    setHint(
+      unstageSelected,
+      selectedStaged ? `Unstage ${plural(selectedStaged, "selected file")}` : "Select staged files to unstage"
+    );
+    setHint(
+      unstageAll,
+      stagedFiles.length ? `Unstage all ${plural(stagedFiles.length, "file")}` : "No staged files to unstage"
+    );
+    setHint(
+      stageSelected,
+      selectedUnstaged ? `Stage ${plural(selectedUnstaged, "selected file")}` : "Select changed files to stage"
+    );
+    setHint(
+      stageAll,
+      unstagedFiles.length ? `Stage all ${plural(unstagedFiles.length, "file")}` : "No changed files to stage"
+    );
+    setHint(
+      discardSelected,
+      selectedUnstaged ? `Discard ${plural(selectedUnstaged, "selected file")}` : "Select changed files to discard"
+    );
+    setDisabled(unstageSelected, busy || selectedStaged === 0);
+    setDisabled(unstageAll, busy || stagedFiles.length === 0);
+    setDisabled(stageSelected, busy || selectedUnstaged === 0);
+    setDisabled(stageAll, busy || unstagedFiles.length === 0);
+    discardSelected.classList.toggle("hidden", selectedUnstaged === 0);
+    setDisabled(discardSelected, busy || selectedUnstaged === 0);
   }
 
   function renderBranches(s) {
@@ -1423,27 +1452,27 @@
     return `<span class="gx-stat gx-stat-M" title="Modified">${ICONS.dot}</span>`;
   }
 
-  function renderCombinedList(staged, unstaged) {
-    if (!staged.length && !unstaged.length) {
-      return `<li class="gx-empty">No changes</li>`;
+  function renderFileList(files, isStaged) {
+    if (!files || !files.length) {
+      return `<li class="gx-empty">No files</li>`;
     }
-    return staged.map((f) => renderCombinedFile(f, true)).join("") +
-           unstaged.map((f) => renderCombinedFile(f, false)).join("");
+    return files.map((f) => renderFile(f, isStaged)).join("");
   }
 
-  function renderCombinedFile(f, isStaged) {
-    const pending = ui.pendingStage.get(f.path);
-    const checkTitle = isStaged
-      ? `Uncheck to unstage: ${f.displayPath || f.path}`
-      : `Check to stage: ${f.displayPath || f.path}`;
-    const discardTitle = `Discard changes — ${f.displayPath || f.path}`;
+  function renderFile(f, isStaged) {
+    const checked = ui.selected.has(selectionKey(f.path, isStaged)) ? "checked" : "";
+    const selectTitle = `Select ${f.displayPath || f.path}`;
+    const stageTitle = `Stage ${f.displayPath || f.path}`;
+    const unstageTitle = `Unstage ${f.displayPath || f.path}`;
     return `
       <li class="gx-file${isStaged ? " gx-file-staged" : ""}" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
-        <input type="checkbox" class="gx-check${pending ? " gx-check-pending" : ""}" data-path="${escapeHtml(f.path)}" title="${escapeHtml(checkTitle)}" aria-label="${escapeHtml(checkTitle)}" ${isStaged ? "checked" : ""} />
+        <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" title="${escapeHtml(selectTitle)}" aria-label="${escapeHtml(selectTitle)}" ${checked} />
         ${fileIcon(f.path)}
         <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
         <span class="gx-right">
-          <button class="gx-row-action gx-row-discard gx-danger" data-action="discardOne" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" title="${escapeHtml(discardTitle)}" aria-label="${escapeHtml(discardTitle)}" type="button">${ICONS.trash}</button>
+          ${isStaged
+            ? `<button class="gx-row-action" data-action="unstageOne" data-path="${escapeHtml(f.path)}" title="${escapeHtml(unstageTitle)}" aria-label="${escapeHtml(unstageTitle)}" type="button">${ICONS.minus}</button>`
+            : `<button class="gx-row-action" data-action="stageOne" data-path="${escapeHtml(f.path)}" title="${escapeHtml(stageTitle)}" aria-label="${escapeHtml(stageTitle)}" type="button">${ICONS.plus}</button>`}
           ${statusGlyph(f.status)}
         </span>
       </li>`;
@@ -1796,6 +1825,7 @@
     switch (message.type) {
       case "state":
         ui.state = Object.assign(ui.state, message.data);
+        pruneSelection();
         render();
         break;
       case "setCommitFields":
@@ -1843,6 +1873,15 @@
         break;
     }
   });
+
+  function pruneSelection() {
+    const present = new Set();
+    (ui.state.changes.staged || []).forEach((f) => present.add(selectionKey(f.path, true)));
+    (ui.state.changes.unstaged || []).forEach((f) => present.add(selectionKey(f.path, false)));
+    Array.from(ui.selected).forEach((path) => {
+      if (!present.has(path)) ui.selected.delete(path);
+    });
+  }
 
   // ---------- Boot ----------
   buildShell();
