@@ -209,6 +209,9 @@ button[aria-disabled="true"],
 }
 .gx-sync-pill-badge {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: 10px;
   font-weight: 700;
   color: var(--gx-pink);
@@ -216,6 +219,7 @@ button[aria-disabled="true"],
   padding: 1px 5px;
   border-radius: 8px;
   letter-spacing: 0.02em;
+  line-height: 1;
 }
 
 /* Stash section ------------------------------------------------------------ */
