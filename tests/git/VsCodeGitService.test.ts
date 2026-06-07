@@ -198,11 +198,19 @@ describe("VsCodeGitService", () => {
       expect(cliSpy).toHaveBeenCalledWith(["file.ts"]);
     });
 
-    it("commit calls CLI, not repo.commit()", async () => {
+    it("commit prefers repo.commit() over CLI so the Git API state stays fresh", async () => {
+      const cliSpy = vi.spyOn(cli, "commit").mockResolvedValue(undefined);
+      await service.commit("feat: test", "body");
+      // API should be tried first; CLI should not be called when API succeeds
+      expect(mockRepo.commit).toHaveBeenCalledWith("feat: test\n\nbody");
+      expect(cliSpy).not.toHaveBeenCalled();
+    });
+
+    it("commit falls back to CLI when repo.commit() throws", async () => {
+      mockRepo.commit = vi.fn().mockRejectedValue(new Error("api error"));
       const cliSpy = vi.spyOn(cli, "commit").mockResolvedValue(undefined);
       await service.commit("feat: test", "body");
       expect(cliSpy).toHaveBeenCalledWith("feat: test", "body");
-      expect(mockRepo.commit).not.toHaveBeenCalled();
     });
 
     it("stageAll calls CLI", async () => {
