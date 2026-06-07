@@ -246,6 +246,7 @@ button[aria-disabled="true"],
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
+  min-width: 0;
   background: var(--gx-navy-card);
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
@@ -268,11 +269,20 @@ button[aria-disabled="true"],
   font-size: 10.5px;
   color: var(--vscode-descriptionForeground);
 }
+.gx-stash-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
 .gx-stash-pop-btn {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   width: auto;
+  min-width: 44px;
+  height: 24px;
   padding: 0 6px;
   font-size: 10.5px;
   font-weight: 600;
@@ -281,6 +291,13 @@ button[aria-disabled="true"],
 .gx-stash-pop-btn svg {
   width: 12px;
   height: 12px;
+}
+.gx-stash-more-btn {
+  flex: 0 0 24px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 /* Conflicts ---------------------------------------------------------- */
@@ -723,7 +740,6 @@ button[aria-disabled="true"],
   color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
   background: var(--vscode-menu-selectionBackground, var(--gx-pink-soft));
 }
-.gx-context-menu button:first-child:hover,
 .gx-context-menu button.gx-menu-danger:hover {
   color: var(--vscode-errorForeground, var(--gx-pink-strong));
 }

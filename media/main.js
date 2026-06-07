@@ -567,7 +567,12 @@
         e.preventDefault();
         return;
       }
-      if (target) handleAction(target.getAttribute("data-action"), target);
+      if (target) {
+        if (target.getAttribute("data-action") === "openStashMenu") {
+          e.stopPropagation();
+        }
+        handleAction(target.getAttribute("data-action"), target);
+      }
     });
     app.addEventListener("contextmenu", (e) => {
       const branchBtn = e.target.closest(".gx-branch-btn");
@@ -735,7 +740,7 @@
         break;
       case "openStashMenu": {
         const rect = elm.getBoundingClientRect();
-        openStashMenu(elm.getAttribute("data-ref"), rect.left, rect.bottom + 4);
+        openStashMenu(elm.getAttribute("data-ref"), rect.right, rect.bottom + 4, true);
         break;
       }
       case "openMergeEditor":
@@ -1015,8 +1020,8 @@
   // ---- Stash context menu ----
   let contextStash = null;
 
-  function openStashMenu(ref, x, y) {
-    closeCommitMenu(); closeFileMenu(); closeBranchMenu();
+  function openStashMenu(ref, x, y, alignRight) {
+    closeCommitMenu(); closeFileMenu(); closeBranchMenu(); closeTagMenu();
     contextStash = { ref };
     const menu = byId("stashContextMenu");
     menu.innerHTML =
@@ -1027,7 +1032,8 @@
     menu.style.left = "0px"; menu.style.top = "0px";
     const rect = menu.getBoundingClientRect();
     const margin = 6;
-    const left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin));
+    const anchorLeft = alignRight ? x - rect.width : x;
+    const left = Math.max(margin, Math.min(anchorLeft, window.innerWidth - rect.width - margin));
     const top  = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin));
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top  = `${Math.round(top)}px`;
@@ -1087,8 +1093,10 @@
           <span class="gx-stash-msg" title="${escapeHtml(s.message)}">${escapeHtml(s.message)}</span>
           <span class="gx-stash-meta">${escapeHtml(s.date)}</span>
         </span>
-        <button class="gx-mini-action gx-stash-pop-btn" data-action="stashPop" data-ref="${escapeHtml(s.ref)}" title="Pop: apply and remove this stash" type="button">${icon("stashPop", "sm")}<span>Pop</span></button>
-        <button class="gx-mini-action" data-action="openStashMenu" data-ref="${escapeHtml(s.ref)}" title="More options" type="button">···</button>
+        <span class="gx-stash-actions">
+          <button class="gx-mini-action gx-stash-pop-btn" data-action="stashPop" data-ref="${escapeHtml(s.ref)}" title="Pop: apply and remove this stash" aria-label="Pop: apply and remove this stash" type="button">${icon("stashPop", "sm")}<span>Pop</span></button>
+          <button class="gx-mini-action gx-stash-more-btn" data-action="openStashMenu" data-ref="${escapeHtml(s.ref)}" title="More stash actions" aria-label="More stash actions" type="button"><span aria-hidden="true">···</span></button>
+        </span>
       </li>`
     ).join("");
   }
