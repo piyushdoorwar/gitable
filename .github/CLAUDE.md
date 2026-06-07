@@ -6,8 +6,8 @@ or AI) can orient quickly.
 
 ## Overview
 
-Gitable is a VS Code extension that renders a GitHub Desktop–style Git workflow
-panel in the left sidebar (a Webview View). It can generate commit messages,
+Gitable is a VS Code extension that renders a visual Git workflow panel in the
+left sidebar (a Webview View). It can generate commit messages,
 explain commits in plain English, and review staged/unstaged diffs for security
 risks — all using a user-supplied AI provider key. It has **no backend, no
 telemetry, and no database** — everything runs in the VS Code extension host.
@@ -34,7 +34,7 @@ src/
   views/
     GitableViewProvider.ts WebviewViewProvider: message protocol + orchestration + state
   git/
-    models.ts              FileChange / CommitInfo / CommitStat / RepoSummary / SyncInfo
+    models.ts              FileChange / RepoChanges / CommitInfo / CommitStat / RepoSummary / SyncInfo / StashEntry
     GitService.ts          GitService interface + GitServiceError
     VsCodeGitService.ts    primary: Git API for read/stage/commit/watch; delegates rest to CLI
     GitCliService.ts       execFile-based implementation of the full contract (fallback)
@@ -88,7 +88,9 @@ tests/
   `openCommitFile`, `toggleCommit`, `push`, `pull`, `fetchOrigin`, `createBranch`,
   `switchBranch`, `checkoutBranchWithChanges`, `checkoutBranchKeepingChanges`,
   `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`,
-  `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`
+  `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`, `mergeBranch`,
+  `openMergeEditor`, `markResolved`,
+  `stashStaged`, `stashPop`, `stashApply`, `stashDrop`
 - AI: `generateCommitMessage`, `summarizeCommit`, `securityReview`,
   `saveAndValidate`, `saveProvider`, `saveModel`, `fetchModels`, `copySummaryText`
 - Analytics: `getReports`
@@ -104,8 +106,10 @@ tests/
 **`state` payload:**
 ```
 repositoryName, branchName, activeRoot, repositories,
-changes:{staged,unstaged}, history, branches,
+changes:{staged, unstaged, conflicts}, stashes,
+history, branches,
 ahead, behind, hasUpstream, syncAction, lastFetchedAt,
+hasConflicts,
 provider, model, models, hasApiKey,
 busyKind, busyText, isLoading, error, notice
 ```
@@ -216,3 +220,16 @@ workspace, never committed to the repo.
   globalState, or files.
 - **Activity bar badge.** The Gitable icon shows the count of changed files
   (staged + unstaged) as a badge, mirroring VS Code's built-in SCM indicator.
+- **Conflict resolution state.** When a pull or merge leaves unresolved conflicts,
+  `RepoChanges.conflicts` is populated (CLI detects XY porcelain codes containing `U`,
+  `AA`, or `DD`; VS Code Git API uses `mergeChanges`). The Changes tab shows a
+  warning banner and a dedicated Conflicts section. Each file gets two row actions:
+  "Open in merge editor" (`git.openMergeEditor` command, falls back to plain open)
+  and "Mark as resolved" (stages the file via `stageFiles`). The Commit and AI
+  generate buttons are disabled until all conflicts are cleared.
+- **Stash (staged-only).** `git stash push --staged` stashes only currently staged
+  files, leaving unstaged changes intact. The Stash section in the Changes tab lists
+  all stash entries with Pop / Apply / Drop actions.
+- **Merge branch.** Right-click a branch in the Branches tab → "Merge into current".
+  Conflict detection surfaces the error as a panel notice pointing users to the
+  conflict resolution flow.

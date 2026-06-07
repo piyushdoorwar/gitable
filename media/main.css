@@ -223,28 +223,6 @@ button[aria-disabled="true"],
 }
 
 /* Stash section ------------------------------------------------------------ */
-.gx-stash-save-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--vscode-foreground);
-  background: transparent;
-  border: 1px solid var(--gx-line);
-  border-radius: var(--gx-radius-sm);
-  transition: border-color 0.12s, background 0.12s;
-}
-.gx-stash-save-btn:hover:not(:disabled) {
-  border-color: var(--gx-pink-line);
-  background: var(--gx-pink-soft);
-}
-.gx-stash-save-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
 .gx-stash-list {
   list-style: none;
   margin: 0 0 4px;
@@ -293,6 +271,47 @@ button[aria-disabled="true"],
 .gx-stash-pop-btn svg {
   width: 12px;
   height: 12px;
+}
+
+/* Conflicts ---------------------------------------------------------- */
+.gx-conflicts-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 2px 2px;
+  padding: 6px 10px;
+  background: rgba(232, 181, 0, 0.1);
+  border: 1px solid rgba(232, 181, 0, 0.28);
+  border-radius: var(--gx-radius-sm);
+  font-size: 11.5px;
+  color: var(--vscode-editorWarning-foreground, #e8b500);
+}
+.gx-section-head-conflict .gx-section-title {
+  color: var(--vscode-editorWarning-foreground, #e8b500);
+}
+.gx-section-head-conflict .gx-count {
+  color: #000;
+  background: var(--vscode-editorWarning-foreground, #e8b500);
+}
+.gx-file-conflict {
+  background: rgba(232, 181, 0, 0.05);
+}
+.gx-file-conflict .gx-row-action {
+  opacity: 1;
+  pointer-events: auto;
+}
+.gx-file-conflict .gx-row-action:hover {
+  color: var(--vscode-editorWarning-foreground, #e8b500);
+  background: rgba(232, 181, 0, 0.12);
+  border-color: rgba(232, 181, 0, 0.3);
+}
+.gx-conflict-resolve-btn {
+  color: #62d39a;
+}
+.gx-conflict-resolve-btn:hover {
+  color: #62d39a !important;
+  background: rgba(98, 211, 154, 0.12) !important;
+  border-color: rgba(98, 211, 154, 0.3) !important;
 }
 
 /* Branches tab */
@@ -817,6 +836,7 @@ button[aria-disabled="true"],
 .gx-stat-A { color: #62d39a; }
 .gx-stat-D { color: var(--gx-pink-strong); }
 .gx-stat-R { color: #7aa2ff; }
+.gx-stat-X { color: var(--vscode-editorWarning-foreground, #e8b500); }
 
 .gx-row-action {
   color: var(--vscode-descriptionForeground);

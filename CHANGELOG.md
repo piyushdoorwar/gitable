@@ -129,7 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial MVP of the Gitable sidebar panel (GitHub Desktop–style) in the VS Code Activity Bar.
+- Initial MVP of the Gitable sidebar panel in the VS Code Activity Bar.
 - Repository selector, current branch display, and refresh.
 - **Changes** tab: staged/unstaged file lists with status, per-file and bulk stage/unstage, and selection-based actions.
 - Commit summary and description inputs with a Commit action.

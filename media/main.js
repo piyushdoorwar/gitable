@@ -64,7 +64,9 @@
     shieldAi:
       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5.5V11c0 5.25 3.6 9.74 8 11.5 4.4-1.76 8-6.25 8-11.5V5.5L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 8l.75 2.1 2.1.75-2.1.75L12 13.7l-.75-2.1-2.1-.75 2.1-.75z" fill="currentColor" stroke="none"/></svg>',
     reports:
-      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.8321 9.5547C18.1384 9.09517 18.0142 8.4743 17.5547 8.16795C17.0952 7.8616 16.4743 7.98577 16.168 8.4453L13.3925 12.6085L10.0529 10.3542C9.421 9.92768 8.55941 10.1339 8.18917 10.8004L6.12584 14.5144C5.85763 14.9971 6.03157 15.6059 6.51436 15.8742C6.99714 16.1424 7.60594 15.9684 7.87416 15.4856L9.56672 12.439L12.8571 14.66C13.4546 15.0634 14.2662 14.9035 14.6661 14.3036L17.8321 9.5547Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M7 2C4.23858 2 2 4.23858 2 7V17C2 19.7614 4.23858 22 7 22H17C19.7614 22 22 19.7614 22 17V7C22 4.23858 19.7614 2 17 2H7ZM4 7C4 5.34315 5.34315 4 7 4H17C18.6569 4 20 5.34315 20 7V17C20 18.6569 18.6569 20 17 20H7C5.34315 20 4 18.6569 4 17V7Z" fill="currentColor"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.8321 9.5547C18.1384 9.09517 18.0142 8.4743 17.5547 8.16795C17.0952 7.8616 16.4743 7.98577 16.168 8.4453L13.3925 12.6085L10.0529 10.3542C9.421 9.92768 8.55941 10.1339 8.18917 10.8004L6.12584 14.5144C5.85763 14.9971 6.03157 15.6059 6.51436 15.8742C6.99714 16.1424 7.60594 15.9684 7.87416 15.4856L9.56672 12.439L12.8571 14.66C13.4546 15.0634 14.2662 14.9035 14.6661 14.3036L17.8321 9.5547Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M7 2C4.23858 2 2 4.23858 2 7V17C2 19.7614 4.23858 22 7 22H17C19.7614 22 22 19.7614 22 17V7C22 4.23858 19.7614 2 17 2H7ZM4 7C4 5.34315 5.34315 4 7 4H17C18.6569 4 20 5.34315 20 7V17C20 18.6569 18.6569 20 17 20H7C5.34315 20 4 18.6569 4 17V7Z" fill="currentColor"/></svg>',
+    conflict:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -392,12 +394,26 @@
         <div class="gx-changes-scroll">
           <div id="changesNotice"></div>
 
+          <div id="conflictsBanner" class="gx-conflicts-banner hidden">
+            ${icon("conflict", "sm")}<span id="conflictsBannerText"></span>
+          </div>
+
+          <div id="conflictsSection" class="hidden">
+            <div class="gx-section-head gx-section-head-conflict">
+              <span class="gx-section-title">Conflicts</span>
+              <span id="conflictsCount" class="gx-count">0</span>
+            </div>
+            <ul id="conflictsList" class="gx-files"></ul>
+          </div>
+
           <div class="gx-section-head">
             <span class="gx-section-title">Staged</span>
             <span id="stagedCount" class="gx-count">0</span>
             <span class="spacer"></span>
             <span class="gx-section-actions">
               <button id="stagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="1" title="Security review of staged changes" aria-label="Security review of staged changes" type="button">${ICONS.shieldAi}</button>
+              <span class="gx-mini-sep"></span>
+              <button id="stashBtn" class="gx-mini-action" data-action="stashStaged" title="Stash staged changes (git stash push --staged)" aria-label="Stash staged changes" type="button">${ICONS.stash}</button>
               <span class="gx-mini-sep"></span>
               <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
               <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
@@ -422,10 +438,6 @@
           <div class="gx-section-head">
             <span class="gx-section-title">Stashes</span>
             <span id="stashCount" class="gx-count hidden">0</span>
-            <span class="spacer"></span>
-            <button id="stashBtn" class="gx-stash-save-btn" data-action="stashStaged" type="button" title="Stash staged changes (git stash push --staged)" disabled>
-              ${icon("stash", "sm")}<span>Stash staged</span>
-            </button>
           </div>
           <ul id="stashList" class="gx-stash-list"></ul>
         </div>
@@ -731,6 +743,12 @@
         openStashMenu(elm.getAttribute("data-ref"), rect.left, rect.bottom + 4);
         break;
       }
+      case "openMergeEditor":
+        post({ type: "openMergeEditor", filePath: elm.getAttribute("data-path") });
+        break;
+      case "markResolved":
+        post({ type: "markResolved", filePath: elm.getAttribute("data-path") });
+        break;
       case "openBranches":
         switchTab("branches");
         break;
@@ -1037,6 +1055,21 @@
     ).join("");
   }
 
+  function renderConflictList(files) {
+    if (!files || !files.length) return "";
+    return files.map((f) =>
+      `<li class="gx-file gx-file-conflict" data-path="${escapeHtml(f.path)}" data-staged="0" data-status="X">
+        ${fileIcon(f.path)}
+        <span class="gx-path" title="${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
+        <span class="gx-right">
+          <button class="gx-row-action" data-action="openMergeEditor" data-path="${escapeHtml(f.path)}" title="Open in merge editor" aria-label="Open in merge editor" type="button">${ICONS.merge}</button>
+          <button class="gx-row-action gx-conflict-resolve-btn" data-action="markResolved" data-path="${escapeHtml(f.path)}" title="Mark as resolved (stages the file)" aria-label="Mark as resolved" type="button">${ICONS.check}</button>
+          ${statusGlyph("X")}
+        </span>
+      </li>`
+    ).join("");
+  }
+
   function selectedPaths(files) {
     return files.filter((f) => ui.selected.has(f.path)).map((f) => f.path);
   }
@@ -1075,6 +1108,23 @@
     byId("stagedCount").textContent = String((s.changes.staged || []).length);
     byId("unstagedCount").textContent = String((s.changes.unstaged || []).length);
 
+    // Conflicts section
+    const conflicts = (s.changes && s.changes.conflicts) || [];
+    const hasConflicts = conflicts.length > 0;
+    const conflictsBanner = byId("conflictsBanner");
+    const conflictsSection = byId("conflictsSection");
+    if (hasConflicts) {
+      conflictsBanner.classList.remove("hidden");
+      byId("conflictsBannerText").textContent =
+        `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all before committing`;
+      conflictsSection.classList.remove("hidden");
+      byId("conflictsCount").textContent = String(conflicts.length);
+      byId("conflictsList").innerHTML = renderConflictList(conflicts);
+    } else {
+      conflictsBanner.classList.add("hidden");
+      conflictsSection.classList.add("hidden");
+    }
+
     // Stash section
     const stashes = s.stashes || [];
     byId("stashList").innerHTML = renderStashList(stashes);
@@ -1092,28 +1142,31 @@
     const hasStaged = stagedFiles.length > 0;
     const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
     const genBtn = byId("generateBtn");
-    const generateHint = hasStaged
-      ? `Generate commit message with ${provLabel}${s.model ? " · " + s.model : " · select a model first"}`
-      : "Stage files to generate an AI commit message";
+    const generateHint = hasConflicts
+      ? "Resolve all conflicts before generating a commit message"
+      : hasStaged
+        ? `Generate commit message with ${provLabel}${s.model ? " · " + s.model : " · select a model first"}`
+        : "Stage files to generate an AI commit message";
     genBtn.innerHTML =
       `<span class="gx-vsep"></span>` +
       (s.busyKind === "generate"
         ? `<span class="gx-spin"></span>`
         : `<span class="gx-ic">${ICONS.sparkle}</span>`);
     setHint(genBtn, generateHint);
-    // Generate reads the staged diff and Commit commits the index — both need staged changes.
-    setDisabled(genBtn, busy || !hasStaged);
+    setDisabled(genBtn, busy || !hasStaged || hasConflicts);
     const commitBtn = byId("commitBtn");
     commitBtn.innerHTML = `${icon("commit")}<span>Commit${
       s.branchName ? " to " + escapeHtml(s.branchName) : ""
     }</span>`;
     setHint(
       commitBtn,
-      hasStaged
-        ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
-        : "Stage files before committing"
+      hasConflicts
+        ? `Resolve ${plural(conflicts.length, "conflict")} before committing`
+        : hasStaged
+          ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
+          : "Stage files before committing"
     );
-    setDisabled(commitBtn, busy || !hasStaged);
+    setDisabled(commitBtn, busy || !hasStaged || hasConflicts);
     updateChangeActionButtons(s);
 
     renderHistory(s);
@@ -1128,9 +1181,10 @@
     const busy = !!s.isLoading;
     const stagedFiles = s.changes.staged || [];
     const unstagedFiles = s.changes.unstaged || [];
+    const hasConflictsNow = ((s.changes && s.changes.conflicts) || []).length > 0;
     setDisabled(byId("stagedSecurityBtn"), busy || stagedFiles.length === 0);
     setDisabled(byId("unstagedSecurityBtn"), busy || unstagedFiles.length === 0);
-    setDisabled(byId("stashBtn"), busy || !hasStaged);
+    setDisabled(byId("stashBtn"), busy || stagedFiles.length === 0 || hasConflictsNow);
     const selectedStaged = selectedPaths(stagedFiles).length;
     const selectedUnstaged = selectedPaths(unstagedFiles).length;
     const unstageSelected = byId("unstageSelectedBtn");
@@ -1283,6 +1337,9 @@
 
   /** Right-side status marker: yellow dot = modified, green + = added, etc. */
   function statusGlyph(status) {
+    if (status === "X") {
+      return `<span class="gx-stat gx-stat-X" title="Conflict">${ICONS.conflict}</span>`;
+    }
     if (status === "A" || status === "U") {
       return `<span class="gx-stat gx-stat-A" title="${status === "U" ? "Untracked" : "Added"}">${ICONS.plus}</span>`;
     }

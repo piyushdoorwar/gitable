@@ -140,7 +140,11 @@ export class VsCodeGitService implements GitService {
     const root = repo.rootUri.fsPath;
     const staged = repo.state.indexChanges.map((change) => this.toFileChange(change, root, true));
     const unstaged = repo.state.workingTreeChanges.map((change) => this.toFileChange(change, root, false));
-    return { staged, unstaged };
+    const conflicts = repo.state.mergeChanges.map((change) => ({
+      ...this.toFileChange(change, root, false),
+      status: "X" as const
+    }));
+    return { staged, unstaged, conflicts };
   }
 
   getStagedDiff(): Promise<string> {
@@ -367,6 +371,18 @@ export class VsCodeGitService implements GitService {
   mergeBranch(name: string): Promise<void> {
     this.syncCliRoot();
     return this.cli.mergeBranch(name);
+  }
+
+  async openMergeEditor(filePath: string): Promise<void> {
+    const repo = this.getActiveRepository();
+    const root = repo ? repo.rootUri.fsPath : this.getActiveRoot();
+    if (!root) return;
+    const fileUri = vscode.Uri.file(path.join(root, filePath));
+    try {
+      await vscode.commands.executeCommand("git.openMergeEditor", fileUri);
+    } catch {
+      await vscode.commands.executeCommand("vscode.open", fileUri);
+    }
   }
 
   stashStaged(): Promise<void> {

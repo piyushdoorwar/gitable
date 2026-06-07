@@ -100,7 +100,7 @@ describe("GitCliService integration", () => {
 
     expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\n");
     expect(await fileExists(path.join(root, "newdir", "new.txt"))).toBe(false);
-    expect(await service.getChanges()).toEqual({ staged: [], unstaged: [] });
+    expect(await service.getChanges()).toEqual({ staged: [], unstaged: [], conflicts: [] });
   });
 
   it("discards staged files from index and working tree", async () => {
@@ -112,7 +112,7 @@ describe("GitCliService integration", () => {
 
     expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\n");
     expect(await fileExists(path.join(root, "added.txt"))).toBe(false);
-    expect(await service.getChanges()).toEqual({ staged: [], unstaged: [] });
+    expect(await service.getChanges()).toEqual({ staged: [], unstaged: [], conflicts: [] });
   });
 
   it("switches branches and brings local changes to the target branch", async () => {
@@ -652,6 +652,61 @@ describe("GitCliService integration", () => {
       await git(["commit", "-m", "main: modify conflict file again"], root);
 
       await expect(service.mergeBranch("conflicting")).rejects.toThrow();
+    });
+  });
+
+  describe("conflict detection in getChanges()", () => {
+    async function createConflictState() {
+      // Set up two branches with conflicting edits to the same file
+      await writeFile(path.join(root, "conflict.txt"), "base\n");
+      await git(["add", "conflict.txt"], root);
+      await git(["commit", "-m", "base"], root);
+
+      await git(["checkout", "-b", "other"], root);
+      await writeFile(path.join(root, "conflict.txt"), "branch edit\n");
+      await git(["add", "conflict.txt"], root);
+      await git(["commit", "-m", "branch"], root);
+
+      await git(["checkout", "main"], root);
+      await writeFile(path.join(root, "conflict.txt"), "main edit\n");
+      await git(["add", "conflict.txt"], root);
+      await git(["commit", "-m", "main"], root);
+
+      // Merge will fail and leave conflict markers in the working tree
+      try {
+        await git(["merge", "other"], root);
+      } catch {
+        // expected — conflict left in working tree
+      }
+    }
+
+    it("reports conflicted files in the conflicts array with status X", async () => {
+      await createConflictState();
+      const changes = await service.getChanges();
+      expect(changes.conflicts).toHaveLength(1);
+      expect(changes.conflicts[0]).toMatchObject({ path: "conflict.txt", status: "X", staged: false });
+    });
+
+    it("does not include conflicted files in staged or unstaged", async () => {
+      await createConflictState();
+      const changes = await service.getChanges();
+      const allPaths = [...changes.staged, ...changes.unstaged].map((f) => f.path);
+      expect(allPaths).not.toContain("conflict.txt");
+    });
+
+    it("returns empty conflicts array on a clean working tree", async () => {
+      const changes = await service.getChanges();
+      expect(changes.conflicts).toEqual([]);
+    });
+
+    it("staging a conflict file after manual resolution removes it from conflicts", async () => {
+      await createConflictState();
+      // Simulate user resolving the conflict by overwriting with clean content
+      await writeFile(path.join(root, "conflict.txt"), "resolved\n");
+      await git(["add", "conflict.txt"], root);
+      const changes = await service.getChanges();
+      expect(changes.conflicts).toHaveLength(0);
+      expect(changes.staged.map((f) => f.path)).toContain("conflict.txt");
     });
   });
 });

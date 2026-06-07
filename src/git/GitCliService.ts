@@ -64,6 +64,7 @@ export class GitCliService implements GitService {
     const output = await this.run(["-c", "core.quotepath=false", "status", "--porcelain"], root);
     const staged: FileChange[] = [];
     const unstaged: FileChange[] = [];
+    const conflicts: FileChange[] = [];
 
     for (const line of output.split("\n")) {
       if (!line.trim()) {
@@ -80,6 +81,14 @@ export class GitCliService implements GitService {
         filePath = filePath.slice(arrow + 4);
       }
 
+      // Merge conflict: U in either XY column, or both-added (AA), both-deleted (DD).
+      const isConflict =
+        x === "U" || y === "U" || (x === "A" && y === "A") || (x === "D" && y === "D");
+      if (isConflict) {
+        conflicts.push({ path: filePath, displayPath: filePath, status: "X", staged: false });
+        continue;
+      }
+
       if (x !== " " && x !== "?") {
         staged.push({
           path: filePath,
@@ -94,7 +103,7 @@ export class GitCliService implements GitService {
         unstaged.push({ path: filePath, displayPath: filePath, status, staged: false, originalPath });
       }
     }
-    return { staged, unstaged };
+    return { staged, unstaged, conflicts };
   }
 
   async getStagedDiff(): Promise<string> {
@@ -348,6 +357,10 @@ export class GitCliService implements GitService {
   async mergeBranch(name: string): Promise<void> {
     await this.run(["merge", name], this.requireRoot());
   }
+
+  // openMergeEditor is handled by VsCodeGitService; this service has no VS Code commands.
+  async openMergeEditor(_filePath: string): Promise<void> {}
+
 
   async stashStaged(): Promise<void> {
     await this.run(["stash", "push", "--staged"], this.requireRoot());

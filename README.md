@@ -1,6 +1,6 @@
 # Gitable
 
-**AI-powered Git workflow panel for VS Code.** Generate commit messages, review changes, and manage Git visually using your own AI API key — all from a GitHub Desktop–style panel in the left sidebar.
+**AI-powered Git workflow panel for VS Code.** Generate commit messages, review changes, and manage Git visually using your own AI API key — all from a clean, visual panel in the left sidebar.
 
 ## What Gitable does
 
@@ -17,6 +17,9 @@ selected Git diff is ever sent to the AI provider you choose.
 ## Features
 
 - 🗂️ **Changes tab** — staged/unstaged file lists with status (added, modified, deleted, renamed, untracked), per-file and bulk stage/unstage, and selection-based actions.
+- ⚠️ **Conflict resolution** — after a merge or pull with conflicts, conflicted files appear in a dedicated section with "Open in merge editor" and "Mark as resolved" actions. Commit is blocked until all conflicts are cleared.
+- 📦 **Stash** — stash only your staged files with one click, then pop/apply/drop stashes from the same panel.
+- 🔀 **Merge branch** — right-click any branch → "Merge into current"; conflict detection surfaces the error inline.
 - 📝 **Commit box** — summary and description inputs with a one-click commit.
 - ✨ **AI commit messages** — generate a commit message from your staged changes; review and edit before committing (never auto-commits).
 - 🕑 **History tab** — recent commits for the current branch with short hash, subject, author, and relative date.

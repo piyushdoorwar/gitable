@@ -325,6 +325,25 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.postState();
         break;
       }
+      case "openMergeEditor": {
+        const filePath = String(message.filePath ?? "");
+        if (filePath) {
+          try {
+            await this.git.openMergeEditor(filePath);
+          } catch (error) {
+            this.fail(error);
+            await this.postState();
+          }
+        }
+        break;
+      }
+      case "markResolved":
+        await this.runGit(
+          () => this.git.stageFiles([String(message.filePath ?? "")]),
+          "stage",
+          "Marking as resolved…"
+        );
+        break;
       default:
         break;
     }
@@ -360,6 +379,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private async runCommit(summary: string, description?: string): Promise<void> {
     if (!summary || !summary.trim()) {
       this.fail("Commit summary is required.");
+      await this.postState();
+      return;
+    }
+    const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [], conflicts: [] }));
+    if (changes.conflicts.length > 0) {
+      this.fail(`Resolve ${changes.conflicts.length} conflict${changes.conflicts.length === 1 ? "" : "s"} before committing.`);
       await this.postState();
       return;
     }
@@ -1002,7 +1027,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let repositories: Array<{ name: string; root: string }> = [];
     let repositoryName = "No repository";
     let branchName = "";
-    let changes: RepoChanges = { staged: [], unstaged: [] };
+    let changes: RepoChanges = { staged: [], unstaged: [], conflicts: [] };
     let history: unknown[] = [];
     let branches: string[] = [];
     let stashes: StashEntry[] = [];
@@ -1058,6 +1083,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       busyKind: this.busyKind,
       busyText: this.busyText,
       isLoading: !!this.busyKind,
+      hasConflicts: changes.conflicts.length > 0,
       error: stateError,
       notice: this.pendingNotice
     };

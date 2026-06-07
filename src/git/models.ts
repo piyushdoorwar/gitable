@@ -1,5 +1,5 @@
-/** Single-letter Git status used across the UI. */
-export type FileStatusLetter = "A" | "M" | "D" | "R" | "C" | "U";
+/** Single-letter Git status used across the UI. X = merge conflict. */
+export type FileStatusLetter = "A" | "M" | "D" | "R" | "C" | "U" | "X";
 
 export interface FileChange {
   /** Path relative to the repository root, with forward slashes. */
@@ -15,6 +15,8 @@ export interface FileChange {
 export interface RepoChanges {
   staged: FileChange[];
   unstaged: FileChange[];
+  /** Files with unresolved merge conflicts (XY codes containing U, AA, DD). */
+  conflicts: FileChange[];
 }
 
 export interface CommitInfo {

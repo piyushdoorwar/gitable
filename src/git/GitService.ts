@@ -101,6 +101,9 @@ export interface GitService {
   /** Merges the given branch into the currently checked-out branch. */
   mergeBranch(name: string): Promise<void>;
 
+  /** Opens the conflicted file in VS Code's 3-way merge editor (falls back to plain open). */
+  openMergeEditor(filePath: string): Promise<void>;
+
   /** Full unified diff of a single commit (vs its parent). */
   getCommitDiff(hash: string): Promise<string>;
 
