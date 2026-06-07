@@ -1246,7 +1246,6 @@
               <span class="rail gx-ic">${ICONS.commit}</span>
               <span class="gx-commit-col-bottom">
                 <span class="gx-commit-caret gx-ic sm">${ICONS.chevron}</span>
-                <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>
               </span>
             </span>
             <span class="body">
@@ -1260,6 +1259,7 @@
                 <span>${escapeHtml(c.relativeDate)}</span>
               </div>
             </span>
+            <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>
           </div>
           ${expanded ? renderCommitFiles(c.hash) : ""}
         </li>`;
