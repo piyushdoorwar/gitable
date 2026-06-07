@@ -413,9 +413,6 @@
               <button id="stagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="1" title="Security review of staged changes" aria-label="Security review of staged changes" type="button">${ICONS.shieldAi}</button>
               <span class="gx-mini-sep"></span>
               <button id="stashBtn" class="gx-mini-action" data-action="stashStaged" title="Stash staged changes (git stash push --staged)" aria-label="Stash staged changes" type="button">${ICONS.stash}</button>
-              <span class="gx-mini-sep"></span>
-              <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Uncheck all files" aria-label="Uncheck all files" type="button">${ICONS.unstageAll}</button>
-              <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Check all files" aria-label="Check all files" type="button">${ICONS.stageAll}</button>
             </span>
           </div>
           <ul id="changesList" class="gx-files"></ul>
@@ -514,6 +511,7 @@
       <div id="commitContextMenu" class="gx-context-menu hidden" role="menu"></div>
       <div id="branchContextMenu" class="gx-context-menu hidden" role="menu"></div>
       <div id="stashContextMenu" class="gx-context-menu hidden" role="menu"></div>
+      <div id="tagContextMenu" class="gx-context-menu hidden" role="menu"></div>
     `;
     initTooltips();
 
@@ -550,6 +548,13 @@
 
     // Delegated button actions
     app.addEventListener("click", (e) => {
+      const tagBadge = e.target.closest(".gx-tag[data-tag-name]");
+      if (tagBadge) {
+        e.stopPropagation();
+        const rect = tagBadge.getBoundingClientRect();
+        openTagMenu(tagBadge.getAttribute("data-tag-name"), rect.left, rect.bottom + 4);
+        return;
+      }
       const target = e.target.closest("[data-action]");
       if (target && target.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
@@ -617,7 +622,15 @@
       handleStashMenuAction(item.getAttribute("data-smenu-action"));
     });
 
-    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); closeStashMenu(); }
+    const tagMenu = byId("tagContextMenu");
+    tagMenu.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-tmenu-action]");
+      if (!item) return;
+      e.stopPropagation();
+      handleTagMenuAction(item.getAttribute("data-tmenu-action"), item);
+    });
+
+    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); closeStashMenu(); closeTagMenu(); }
     document.addEventListener("click", closeAllMenus);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllMenus(); });
     window.addEventListener("resize", closeAllMenus);
@@ -660,6 +673,9 @@
       case "unstageAll":
         post({ type: "unstageAll" });
         break;
+      case "discardOne":
+        post({ type: "discardFiles", filePaths: [elm.getAttribute("data-path")], staged: elm.getAttribute("data-staged") === "1" });
+        break;
       case "generate":
         post({ type: "generateCommitMessage" });
         break;
@@ -690,7 +706,9 @@
         } else if (s.behind > 0) {
           post({ type: "pull" });
         } else if (s.ahead > 0) {
-          post({ type: "push" });
+          post({ type: "push" }); // push also pushes pending tags via pushAllTags
+        } else if (s.pendingTagCount > 0) {
+          post({ type: "pushTags" });
         } else {
           post({ type: "fetchOrigin" });
         }
@@ -875,6 +893,8 @@
       `<button data-cmenu-action="copySha" role="menuitem" type="button">${icon("copy", "sm")}<span>Copy SHA</span></button>` +
       (tagItems ? `<span class="gx-menu-sep"></span>${tagItems}` : "") +
       `<span class="gx-menu-sep"></span>` +
+      `<button data-cmenu-action="createTag" role="menuitem" type="button">${icon("tag", "sm")}<span>Create tag…</span></button>` +
+      `<span class="gx-menu-sep"></span>` +
       `<button data-cmenu-action="revertCommit" role="menuitem" type="button">${icon("revert", "sm")}<span>Revert commit</span></button>` +
       `<button data-cmenu-action="cherryPickCommit" role="menuitem" type="button">${icon("cherryPick", "sm")}<span>Cherry-pick commit</span></button>`;
     menu.classList.remove("hidden");
@@ -904,6 +924,9 @@
         break;
       case "copyTag":
         post({ type: "copyTag", tag: elm.getAttribute("data-tag") });
+        break;
+      case "createTag":
+        post({ type: "createTag", hash: commit.hash });
         break;
       case "revertCommit":
         post({ type: "revertCommit", hash: commit.hash });
@@ -1003,6 +1026,38 @@
     closeStashMenu();
     if (action === "stashApply") post({ type: "stashApply", ref });
     else if (action === "stashDrop") post({ type: "stashDrop", ref });
+  }
+
+  // ---- Tag context menu ----
+  let contextTag = null;
+
+  function openTagMenu(name, x, y) {
+    closeCommitMenu(); closeFileMenu(); closeBranchMenu(); closeStashMenu();
+    contextTag = { name };
+    const menu = byId("tagContextMenu");
+    menu.innerHTML =
+      `<button data-tmenu-action="deleteTag" role="menuitem" type="button" class="gx-menu-danger">${icon("trash", "sm")}<span>Delete tag…</span></button>`;
+    menu.classList.remove("hidden");
+    menu.style.left = "0px"; menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const margin = 6;
+    const left = Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin));
+    const top = Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin));
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
+  function closeTagMenu() {
+    const menu = document.getElementById("tagContextMenu");
+    if (menu) menu.classList.add("hidden");
+    contextTag = null;
+  }
+
+  function handleTagMenuAction(action) {
+    if (!contextTag) return;
+    const { name } = contextTag;
+    closeTagMenu();
+    if (action === "deleteTag") post({ type: "deleteTag", name });
   }
 
   function renderStashList(stashes) {
@@ -1146,16 +1201,9 @@
   function updateChangeActionButtons(s) {
     const busy = !!s.isLoading;
     const stagedFiles = s.changes.staged || [];
-    const unstagedFiles = s.changes.unstaged || [];
     const hasConflictsNow = ((s.changes && s.changes.conflicts) || []).length > 0;
     setDisabled(byId("stagedSecurityBtn"), busy || stagedFiles.length === 0);
     setDisabled(byId("stashBtn"), busy || stagedFiles.length === 0 || hasConflictsNow);
-    const unstageAll = byId("unstageAllBtn");
-    const stageAll = byId("stageAllBtn");
-    setHint(unstageAll, stagedFiles.length ? `Uncheck all — unstage ${plural(stagedFiles.length, "file")}` : "No staged files to unstage");
-    setHint(stageAll, unstagedFiles.length ? `Check all — stage ${plural(unstagedFiles.length, "file")}` : "No changed files to stage");
-    setDisabled(unstageAll, busy || stagedFiles.length === 0);
-    setDisabled(stageAll, busy || unstagedFiles.length === 0);
   }
 
   function renderBranches(s) {
@@ -1192,11 +1240,16 @@
     return `Last fetched ${mins} minutes ago`;
   }
 
+  const BADGE_UP = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3C12.2652 3 12.5196 3.10536 12.7071 3.29289L19.7071 10.2929C20.0976 10.6834 20.0976 11.3166 19.7071 11.7071C19.3166 12.0976 18.6834 12.0976 18.2929 11.7071L13 6.41421V20C13 20.5523 12.5523 21 12 21C11.4477 21 11 20.5523 11 20V6.41421L5.70711 11.7071C5.31658 12.0976 4.68342 12.0976 4.29289 11.7071C3.90237 11.3166 3.90237 10.6834 4.29289 10.2929L11.2929 3.29289C11.4804 3.10536 11.7348 3 12 3Z" fill="currentColor"/></svg>`;
+  const BADGE_DOWN = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3C12.5523 3 13 3.44772 13 4V17.5858L18.2929 12.2929C18.6834 11.9024 19.3166 11.9024 19.7071 12.2929C20.0976 12.6834 20.0976 13.3166 19.7071 13.7071L12.7071 20.7071C12.3166 21.0976 11.6834 21.0976 11.2929 20.7071L4.29289 13.7071C3.90237 13.3166 3.90237 12.6834 4.29289 12.2929C4.68342 11.9024 5.31658 11.9024 5.70711 12.2929L11 17.5858V4C11 3.44772 11.4477 3 12 3Z" fill="currentColor"/></svg>`;
+  const BADGE_TAG = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
+
   function updateSync(s) {
     const btn = byId("syncBtn");
     const iconEl = byId("syncIcon");
     const labelEl = byId("syncLabel");
     const badgeEl = byId("syncBadge");
+    const pendingTags = s.pendingTagCount || 0;
 
     const syncAction = s.syncAction || "";
 
@@ -1227,13 +1280,21 @@
       iconEl.innerHTML = ICONS.pull;
       labelEl.textContent = "Pull origin";
       btn.title = fetchedText;
-      badgeEl.innerHTML = `${s.behind}<svg viewBox="0 0 24 24" width="10" height="10" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3C12.5523 3 13 3.44772 13 4V17.5858L18.2929 12.2929C18.6834 11.9024 19.3166 11.9024 19.7071 12.2929C20.0976 12.6834 20.0976 13.3166 19.7071 13.7071L12.7071 20.7071C12.3166 21.0976 11.6834 21.0976 11.2929 20.7071L4.29289 13.7071C3.90237 13.3166 3.90237 12.6834 4.29289 12.2929C4.68342 11.9024 5.31658 11.9024 5.70711 12.2929L11 17.5858V4C11 3.44772 11.4477 3 12 3Z" fill="currentColor"/></svg>`;
+      badgeEl.innerHTML = `${s.behind}${BADGE_DOWN}`;
       badgeEl.classList.remove("hidden");
     } else if (s.ahead > 0) {
       iconEl.innerHTML = ICONS.push;
       labelEl.textContent = "Push origin";
-      btn.title = fetchedText;
-      badgeEl.innerHTML = `${s.ahead}<svg viewBox="0 0 24 24" width="10" height="10" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3C12.2652 3 12.5196 3.10536 12.7071 3.29289L19.7071 10.2929C20.0976 10.6834 20.0976 11.3166 19.7071 11.7071C19.3166 12.0976 18.6834 12.0976 18.2929 11.7071L13 6.41421V20C13 20.5523 12.5523 21 12 21C11.4477 21 11 20.5523 11 20V6.41421L5.70711 11.7071C5.31658 12.0976 4.68342 12.0976 4.29289 11.7071C3.90237 11.3166 3.90237 10.6834 4.29289 10.2929L11.2929 3.29289C11.4804 3.10536 11.7348 3 12 3Z" fill="currentColor"/></svg>`;
+      btn.title = pendingTags > 0 ? `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} + ${pendingTags} tag${pendingTags > 1 ? "s" : ""}` : fetchedText;
+      badgeEl.innerHTML = pendingTags > 0
+        ? `${s.ahead}${BADGE_UP}<span class="gx-badge-sep">·</span>${pendingTags}${BADGE_TAG}`
+        : `${s.ahead}${BADGE_UP}`;
+      badgeEl.classList.remove("hidden");
+    } else if (pendingTags > 0) {
+      iconEl.innerHTML = ICONS.push;
+      labelEl.textContent = "Push tags";
+      btn.title = `Push ${pendingTags} unpushed tag${pendingTags > 1 ? "s" : ""} to origin`;
+      badgeEl.innerHTML = `${pendingTags}${BADGE_TAG}`;
       badgeEl.classList.remove("hidden");
     } else {
       iconEl.innerHTML = ICONS.refresh;
@@ -1293,15 +1354,19 @@
   }
 
   function renderCombinedFile(f, isStaged) {
-    const title = isStaged
+    const checkTitle = isStaged
       ? `Uncheck to unstage: ${f.displayPath || f.path}`
       : `Check to stage: ${f.displayPath || f.path}`;
+    const discardTitle = `Discard changes — ${f.displayPath || f.path}`;
     return `
       <li class="gx-file${isStaged ? " gx-file-staged" : ""}" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
-        <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" ${isStaged ? "checked" : ""} />
+        <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" title="${escapeHtml(checkTitle)}" aria-label="${escapeHtml(checkTitle)}" ${isStaged ? "checked" : ""} />
         ${fileIcon(f.path)}
         <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
-        <span class="gx-right">${statusGlyph(f.status)}</span>
+        <span class="gx-right">
+          <button class="gx-row-action gx-row-discard gx-danger" data-action="discardOne" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" title="${escapeHtml(discardTitle)}" aria-label="${escapeHtml(discardTitle)}" type="button">${ICONS.trash}</button>
+          ${statusGlyph(f.status)}
+        </span>
       </li>`;
   }
 
@@ -1446,7 +1511,7 @@
     const names = Array.isArray(tags) ? tags.filter(Boolean) : [];
     if (!names.length) return "";
     return `<span class="gx-commit-tags">${names
-      .map((tagName) => `<span class="gx-tag" title="Git tag ${escapeHtml(tagName)}">${escapeHtml(tagName)}</span>`)
+      .map((tagName) => `<span class="gx-tag gx-tag-btn" data-tag-name="${escapeHtml(tagName)}" title="Click to manage tag: ${escapeHtml(tagName)}" role="button" tabindex="0">${icon("tag", "xs")}${escapeHtml(tagName)}</span>`)
       .join("")}</span>`;
   }
 

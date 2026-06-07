@@ -709,4 +709,30 @@ describe("GitCliService integration", () => {
       expect(changes.staged.map((f) => f.path)).toContain("conflict.txt");
     });
   });
+
+  describe("tag operations", () => {
+    it("createTag creates a lightweight tag at the given commit", async () => {
+      const log = await service.getHistory(1);
+      const hash = log[0].hash;
+      await service.createTag("v1.0.0", hash);
+      const tags = (await git(["tag", "-l", "v1.0.0"], root)).trim();
+      expect(tags).toBe("v1.0.0");
+    });
+
+    it("deleteTag removes a local tag", async () => {
+      const log = await service.getHistory(1);
+      await service.createTag("v1.0.0-del", log[0].hash);
+      await service.deleteTag("v1.0.0-del");
+      const tags = (await git(["tag", "-l", "v1.0.0-del"], root)).trim();
+      expect(tags).toBe("");
+    });
+
+    it("createTag on a non-existent hash throws GitServiceError", async () => {
+      await expect(service.createTag("v0.0.0", "deadbeefdeadbeef")).rejects.toThrow();
+    });
+
+    it("deleteTag on a non-existent tag throws GitServiceError", async () => {
+      await expect(service.deleteTag("does-not-exist")).rejects.toThrow();
+    });
+  });
 });

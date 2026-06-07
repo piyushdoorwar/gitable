@@ -397,6 +397,26 @@ export class GitCliService implements GitService {
     await this.run(["stash", "drop", ref], this.requireRoot());
   }
 
+  async createTag(name: string, hash: string): Promise<void> {
+    await this.run(["tag", name, hash], this.requireRoot());
+  }
+
+  async deleteTag(name: string): Promise<void> {
+    await this.run(["tag", "-d", name], this.requireRoot());
+  }
+
+  async pushTag(name: string): Promise<void> {
+    await this.run(["push", "origin", name], this.requireRoot());
+  }
+
+  async deleteTagFromOrigin(name: string): Promise<void> {
+    await this.run(["push", "origin", "--delete", name], this.requireRoot());
+  }
+
+  async pushAllTags(): Promise<void> {
+    await this.run(["push", "origin", "--tags"], this.requireRoot());
+  }
+
   async getCommitStat(hash: string): Promise<CommitStat> {
     const output = await this.run(
       ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--stat", "-r", "-M", "--root", hash],

@@ -99,6 +99,16 @@ button[aria-disabled="true"],
   width: 13px;
   height: 13px;
 }
+.gx-ic.xs,
+.gx-ic.xs svg {
+  width: 10px;
+  height: 10px;
+}
+.gx-badge-sep {
+  opacity: 0.55;
+  margin: 0 1px;
+  font-size: 9px;
+}
 
 /* Header ------------------------------------------------------------- */
 .gx-header {
@@ -852,6 +862,18 @@ button[aria-disabled="true"],
   background: var(--gx-pink-soft);
   border-color: var(--gx-pink-line);
 }
+.gx-file:hover .gx-row-discard {
+  opacity: 1;
+  pointer-events: auto;
+}
+.gx-file:hover .gx-row-discard ~ .gx-stat {
+  opacity: 0;
+}
+.gx-row-discard:hover {
+  color: var(--gx-pink) !important;
+  background: var(--gx-pink-soft) !important;
+  border-color: var(--gx-pink-line) !important;
+}
 .gx-empty {
   padding: 8px 6px;
   font-size: 12px;
@@ -1434,9 +1456,10 @@ textarea {
 .gx-tag {
   display: inline-flex;
   align-items: center;
-  max-width: 112px;
+  gap: 3px;
+  max-width: 120px;
   min-height: 18px;
-  padding: 1px 7px;
+  padding: 1px 6px 1px 5px;
   border-radius: 999px;
   color: var(--vscode-badge-foreground, var(--gx-pink-ink));
   background: var(--vscode-badge-background, rgba(249, 139, 158, 0.34));
@@ -1446,6 +1469,22 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.gx-tag .gx-ic { flex: 0 0 auto; opacity: 0.7; }
+.gx-tag .gx-ic svg { width: 9px; height: 9px; }
+.gx-tag-btn {
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
+}
+.gx-tag-btn:hover {
+  background: rgba(249, 139, 158, 0.55);
+  border-color: rgba(249, 139, 158, 0.5);
+}
+.gx-tag-btn:focus-visible {
+  outline: none;
+  border-color: var(--gx-pink);
 }
 .gx-commit-meta {
   display: flex;

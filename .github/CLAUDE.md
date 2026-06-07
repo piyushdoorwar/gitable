@@ -90,7 +90,8 @@ tests/
   `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`,
   `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`, `mergeBranch`,
   `openMergeEditor`, `markResolved`,
-  `stashStaged`, `stashPop`, `stashApply`, `stashDrop`
+  `stashStaged`, `stashPop`, `stashApply`, `stashDrop`,
+  `createTag` `{hash}`, `deleteTag` `{name}`, `pushTags`
 - AI: `generateCommitMessage`, `summarizeCommit`, `securityReview`,
   `saveAndValidate`, `saveProvider`, `saveModel`, `fetchModels`, `copySummaryText`
 - Analytics: `getReports`
@@ -109,7 +110,7 @@ repositoryName, branchName, activeRoot, repositories,
 changes:{staged, unstaged, conflicts}, stashes,
 history, branches,
 ahead, behind, hasUpstream, syncAction, lastFetchedAt,
-hasConflicts,
+pendingTagCount, hasConflicts,
 provider, model, models, hasApiKey,
 busyKind, busyText, isLoading, error, notice
 ```
@@ -239,3 +240,12 @@ workspace, never committed to the repo.
 - **Merge branch.** Right-click a branch in the Branches tab → "Merge into current".
   Conflict detection surfaces the error as a panel notice pointing users to the
   conflict resolution flow.
+- **Tag management.** Tags are created via right-click on a commit row → "Create tag…"
+  (VS Code input box for the name, validated inline). Existing tag badges in the History
+  tab are interactive (`gx-tag-btn`): clicking opens a mini `tagContextMenu` with
+  "Delete tag…" (triggers a modal confirmation with "Local only" / "Local + origin").
+  Unpushed tags are tracked in-memory in `GitableViewProvider.pendingTagPushes` (a
+  `Set<string>`). The sync button badge shows pending tags alongside commits (`N↑ · M🏷`).
+  When `ahead > 0` the push also calls `pushAllTags()` and clears the set. When
+  `ahead === 0` the button shows "Push tags" and posts `pushTags`. Pending tags are
+  reset on any successful push and when a tag is deleted.

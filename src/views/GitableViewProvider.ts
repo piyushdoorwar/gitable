@@ -26,6 +26,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private busyText = "";
   private syncAction = "";
   private lastFetchedAt = 0;
+  private pendingTagPushes = new Set<string>();
+  /** Paths the user explicitly unchecked this session — not auto-staged. */
+  private explicitlyUnstaged = new Set<string>();
+  /** Paths that were already unstaged on first load — not auto-staged on next poll. */
+  private initialUnstagedPaths = new Set<string>();
+  private initialStateLoaded = false;
   private pendingError = "";
   private pendingNotice = "";
   private pendingTab: TabName | undefined;
@@ -151,12 +157,22 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         this.git.setActiveRoot(message.root);
         await this.refresh();
         break;
-      case "stageFile":
-        await this.runGit(() => this.git.stageFiles([message.filePath]), "stage", "Staging file…");
+      case "stageFile": {
+        const fp = String(message.filePath ?? "");
+        if (fp) {
+          this.explicitlyUnstaged.delete(fp);
+          await this.runGit(() => this.git.stageFiles([fp]));
+        }
         break;
-      case "unstageFile":
-        await this.runGit(() => this.git.unstageFiles([message.filePath]), "unstage", "Unstaging file…");
+      }
+      case "unstageFile": {
+        const fp = String(message.filePath ?? "");
+        if (fp) {
+          this.explicitlyUnstaged.add(fp);
+          await this.runGit(() => this.git.unstageFiles([fp]));
+        }
         break;
+      }
       case "stageFiles":
         await this.runGit(
           () => this.git.stageFiles(message.filePaths ?? []),
@@ -205,7 +221,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.fetchModels(message.provider);
         break;
       case "push":
-        await this.runSyncOp("Pushing", true, () => this.git.push());
+        await this.runSyncOp("Pushing", true, async () => {
+          await this.git.push();
+          if (this.pendingTagPushes.size > 0) {
+            await this.git.pushAllTags();
+            this.pendingTagPushes.clear();
+          }
+        });
         break;
       case "pull":
         await this.runSyncOp("Pulling", true, () => this.git.pull());
@@ -344,12 +366,97 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           "Marking as resolved…"
         );
         break;
+      case "createTag": {
+        const tagHash = String(message.hash ?? "").trim();
+        if (!tagHash) break;
+        const tagName = await vscode.window.showInputBox({
+          title: "Create tag",
+          prompt: `Tag name for commit ${tagHash.slice(0, 7)}`,
+          placeHolder: "e.g. v1.2.0",
+          validateInput: (v) => {
+            const t = v.trim();
+            if (!t) return "Tag name cannot be empty.";
+            if (/\s/.test(t)) return "Tag name cannot contain spaces.";
+            if (t.includes("..")) return 'Tag name cannot contain "..".';
+            return null;
+          }
+        });
+        if (!tagName) break;
+        await this.runGit(
+          async () => {
+            await this.git.createTag(tagName.trim(), tagHash);
+            this.pendingTagPushes.add(tagName.trim());
+            this.pendingNotice = `Tag "${tagName.trim()}" created.`;
+          },
+          "git",
+          `Creating tag "${tagName.trim()}"…`
+        );
+        break;
+      }
+      case "deleteTag": {
+        const tagName = String(message.name ?? "").trim();
+        if (!tagName) break;
+        const choice = await vscode.window.showWarningMessage(
+          `Delete tag "${tagName}"?`,
+          { modal: true },
+          "Local only",
+          "Local + origin"
+        );
+        if (!choice) break;
+        await this.runGit(
+          async () => {
+            await this.git.deleteTag(tagName);
+            this.pendingTagPushes.delete(tagName);
+            if (choice === "Local + origin") {
+              await this.git.deleteTagFromOrigin(tagName);
+              this.pendingNotice = `Tag "${tagName}" deleted locally and from origin.`;
+            } else {
+              this.pendingNotice = `Tag "${tagName}" deleted locally.`;
+            }
+          },
+          "git",
+          `Deleting tag "${tagName}"…`
+        );
+        break;
+      }
+      case "pushTags":
+        await this.runSyncOp("Pushing tags", false, async () => {
+          await this.git.pushAllTags();
+          this.pendingTagPushes.clear();
+          this.pendingNotice = "Tags pushed to origin.";
+        });
+        break;
       default:
         break;
     }
   }
 
   // ---- Git operations ----
+
+  /**
+   * On first load, records unstaged paths so they aren't auto-staged (respect existing git state).
+   * On subsequent polls, stages any new unstaged files the user hasn't explicitly unchecked,
+   * matching the GitHub Desktop behaviour where new edits appear checked by default.
+   */
+  private async autoStageNewFiles(changes: RepoChanges): Promise<RepoChanges> {
+    if (!this.initialStateLoaded) {
+      this.initialStateLoaded = true;
+      changes.unstaged.forEach((f) => this.initialUnstagedPaths.add(f.path));
+      return changes;
+    }
+    const toStage = changes.unstaged
+      .filter((f) => !this.initialUnstagedPaths.has(f.path) && !this.explicitlyUnstaged.has(f.path))
+      .map((f) => f.path);
+    if (toStage.length > 0) {
+      try {
+        await this.git.stageFiles(toStage);
+        return await this.git.getChanges();
+      } catch {
+        // ignore — file may have been deleted between poll and stage
+      }
+    }
+    return changes;
+  }
 
   private async runGit(action: () => Promise<void>, kind = "", text = ""): Promise<void> {
     if (kind || text) {
@@ -393,6 +500,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.pendingNotice = "Commit created.";
       vscode.window.showInformationMessage("Gitable: commit created.");
       this.view?.webview.postMessage({ type: "clearCommitFields" });
+      // After commit: reset auto-stage tracking so new edits appear checked
+      this.explicitlyUnstaged.clear();
+      this.initialUnstagedPaths.clear();
     } catch (error) {
       this.fail(error);
     }
@@ -1043,6 +1153,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         repositoryName = summary.name;
         branchName = summary.branch;
         changes = await this.git.getChanges();
+        changes = await this.autoStageNewFiles(changes);
         history = await this.git.getHistory(HISTORY_LIMIT);
         branches = await this.git.getBranches();
         stashes = await this.git.stashList();
@@ -1080,6 +1191,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       hasUpstream,
       syncAction: this.syncAction,
       lastFetchedAt: this.lastFetchedAt,
+      pendingTagCount: this.pendingTagPushes.size,
       busyKind: this.busyKind,
       busyText: this.busyText,
       isLoading: !!this.busyKind,

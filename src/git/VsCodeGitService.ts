@@ -410,6 +410,31 @@ export class VsCodeGitService implements GitService {
     return this.cli.stashDrop(ref);
   }
 
+  createTag(name: string, hash: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.createTag(name, hash);
+  }
+
+  deleteTag(name: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.deleteTag(name);
+  }
+
+  pushTag(name: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.pushTag(name);
+  }
+
+  deleteTagFromOrigin(name: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.deleteTagFromOrigin(name);
+  }
+
+  pushAllTags(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.pushAllTags();
+  }
+
   // ---- internals ----
 
   /**

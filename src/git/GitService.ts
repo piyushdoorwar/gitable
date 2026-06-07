@@ -121,4 +121,19 @@ export interface GitService {
 
   /** Removes the stash without applying it. */
   stashDrop(ref: string): Promise<void>;
+
+  /** Creates a lightweight tag at the given commit hash. */
+  createTag(name: string, hash: string): Promise<void>;
+
+  /** Deletes a local tag. */
+  deleteTag(name: string): Promise<void>;
+
+  /** Pushes a single tag to origin. */
+  pushTag(name: string): Promise<void>;
+
+  /** Deletes a tag from origin (remote ref delete). */
+  deleteTagFromOrigin(name: string): Promise<void>;
+
+  /** Pushes all local tags to origin. */
+  pushAllTags(): Promise<void>;
 }
