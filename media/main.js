@@ -491,9 +491,11 @@
         <div class="gx-history-actions">
           <span id="historySelectedCount" class="gx-history-selected">0 selected</span>
           <span class="spacer"></span>
-          <button id="historySummaryBtn" class="gx-mini-action gx-mini-action-ai gx-history-action" data-action="summarizeSelectedCommits" title="AI summary for selected commits" aria-label="AI summary for selected commits" type="button">${ICONS.sparkle}<span>AI Summary</span></button>
-          <button id="historySecurityBtn" class="gx-mini-action gx-mini-action-ai gx-history-action" data-action="securityReviewSelectedCommits" title="Security review for selected commits" aria-label="Security review for selected commits" type="button">${ICONS.shieldAi}<span>Security Review</span></button>
-          <button id="historyClearBtn" class="gx-mini-action gx-history-action" data-action="clearCommitSelection" title="Clear selected commits" aria-label="Clear selected commits" type="button">${ICONS.minus}<span>Clear</span></button>
+          <span class="gx-history-action-group">
+            <button id="historySummaryBtn" class="gx-history-action gx-history-action-primary" data-action="summarizeSelectedCommits" title="AI summary for selected commits" aria-label="AI summary for selected commits" type="button">${ICONS.sparkle}<span>Summary</span></button>
+            <button id="historySecurityBtn" class="gx-history-action gx-history-action-primary" data-action="securityReviewSelectedCommits" title="Security review for selected commits" aria-label="Security review for selected commits" type="button">${ICONS.shieldAi}<span>Security</span></button>
+            <button id="historyClearBtn" class="gx-history-action gx-history-action-clear" data-action="clearCommitSelection" title="Clear selected commits" aria-label="Clear selected commits" type="button">${ICONS.minus}<span>Clear</span></button>
+          </span>
         </div>
         <ul id="commitList" class="gx-commits"></ul>
       </div>
