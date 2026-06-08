@@ -142,6 +142,8 @@
     activeTab: "changes",
     activeChangeTab: "working",
     selected: new Set(),
+    selectedCommits: new Set(),
+    historyAnchorHash: "",
     branchFilter: "",
     expandedCommits: new Set(),
     commitFiles: /** @type {Record<string, any>} */ ({}),
@@ -487,6 +489,13 @@
       </div>
 
       <div id="panel-history" class="gx-panel hidden">
+        <div class="gx-history-actions">
+          <span id="historySelectedCount" class="gx-history-selected">0 selected</span>
+          <span class="spacer"></span>
+          <button id="historySummaryBtn" class="gx-mini-action gx-mini-action-ai gx-history-action" data-action="summarizeSelectedCommits" title="AI summary for selected commits" aria-label="AI summary for selected commits" type="button">${ICONS.sparkle}<span>AI Summary</span></button>
+          <button id="historySecurityBtn" class="gx-mini-action gx-mini-action-ai gx-history-action" data-action="securityReviewSelectedCommits" title="Security review for selected commits" aria-label="Security review for selected commits" type="button">${ICONS.shieldAi}<span>Security Review</span></button>
+          <button id="historyClearBtn" class="gx-mini-action gx-history-action" data-action="clearCommitSelection" title="Clear selected commits" aria-label="Clear selected commits" type="button">${ICONS.minus}<span>Clear</span></button>
+        </div>
         <ul id="commitList" class="gx-commits"></ul>
       </div>
 
@@ -608,7 +617,7 @@
         if (target.getAttribute("data-action") === "openStashMenu") {
           e.stopPropagation();
         }
-        handleAction(target.getAttribute("data-action"), target);
+        handleAction(target.getAttribute("data-action"), target, e);
       }
     });
     app.addEventListener("contextmenu", (e) => {
@@ -721,7 +730,7 @@
     if (shouldRender) render();
   }
 
-  function handleAction(action, elm) {
+  function handleAction(action, elm, event) {
     const s = ui.state;
     switch (action) {
       case "stageAll":
@@ -839,6 +848,33 @@
         switchTab("reports");
         post({ type: "getReports" });
         renderReports(null);
+        break;
+      case "toggleCommitSelection":
+        toggleCommitSelection(elm.getAttribute("data-hash"), !!(event && event.shiftKey));
+        break;
+      case "summarizeSelectedCommits": {
+        const commits = selectedCommitPayload();
+        if (!commits.length) return;
+        const label = selectedCommitLabel(commits);
+        ui.activeSummary = { hash: label, subject: commitSubjectsLabel(commits), loading: true };
+        byId("panel-summary").classList.remove("hidden");
+        renderSummaryPanel();
+        post({ type: "summarizeCommits", commits });
+        break;
+      }
+      case "securityReviewSelectedCommits": {
+        const commits = selectedCommitPayload();
+        if (!commits.length) return;
+        ui.activeSecurityReview = { staged: false, scope: selectedCommitLabel(commits), loading: true };
+        byId("panel-security").classList.remove("hidden");
+        renderSecurityPanel();
+        post({ type: "securityReviewCommits", commits });
+        break;
+      }
+      case "clearCommitSelection":
+        ui.selectedCommits.clear();
+        ui.historyAnchorHash = "";
+        renderHistory(ui.state);
         break;
       case "createBranchNamed": {
         const input = /** @type {HTMLInputElement} */ (byId("newBranchInput"));
@@ -1554,6 +1590,8 @@
   function renderHistory(s) {
     const list = byId("commitList");
     const commits = s.history || [];
+    pruneCommitSelection(commits);
+    renderHistoryActions();
     if (!commits.length) {
       list.innerHTML = `<li class="gx-empty">No commits yet</li>`;
       return;
@@ -1561,9 +1599,12 @@
     list.innerHTML = commits
       .map((c) => {
         const expanded = ui.expandedCommits.has(c.hash);
+        const selected = ui.selectedCommits.has(c.hash);
+        const selectTitle = `Select ${c.subject}`;
         return `
-        <li class="gx-commit${expanded ? " expanded" : ""}">
+        <li class="gx-commit${expanded ? " expanded" : ""}${selected ? " selected" : ""}">
           <div class="gx-commit-head" data-action="toggleCommit" data-hash="${escapeHtml(c.hash)}" title="Show changed files" aria-label="Show changed files in ${escapeHtml(c.hash)}">
+            <input type="checkbox" class="gx-check gx-commit-check" data-action="toggleCommitSelection" data-hash="${escapeHtml(c.hash)}" title="${escapeHtml(selectTitle)}" aria-label="${escapeHtml(selectTitle)}" ${selected ? "checked" : ""} />
             <span class="gx-commit-col-left">
               <span class="rail gx-ic">${ICONS.commit}</span>
               <span class="gx-commit-col-bottom">
@@ -1581,12 +1622,68 @@
                 ${renderCommitTags(c.tags)}
               </div>
             </span>
-            <button class="gx-ai-sum gx-ic sm" data-action="summarizeCommit" data-hash="${escapeHtml(c.hash)}" data-subject="${escapeHtml(c.subject)}" title="Generate AI summary" aria-label="Generate AI summary" type="button">${ICONS.sparkle}</button>
           </div>
           ${expanded ? renderCommitFiles(c.hash) : ""}
         </li>`;
       })
       .join("");
+  }
+
+  function renderHistoryActions() {
+    const count = ui.selectedCommits.size;
+    byId("historySelectedCount").textContent = `${count} selected`;
+    setDisabled(byId("historySummaryBtn"), count === 0 || !!ui.state.isLoading);
+    setDisabled(byId("historySecurityBtn"), count === 0 || !!ui.state.isLoading);
+    setDisabled(byId("historyClearBtn"), count === 0);
+  }
+
+  function toggleCommitSelection(hash, range) {
+    if (!hash) return;
+    const commits = ui.state.history || [];
+    if (range && ui.historyAnchorHash) {
+      const from = commits.findIndex((commit) => commit.hash === ui.historyAnchorHash);
+      const to = commits.findIndex((commit) => commit.hash === hash);
+      if (from >= 0 && to >= 0) {
+        const start = Math.min(from, to);
+        const end = Math.max(from, to);
+        commits.slice(start, end + 1).forEach((commit) => ui.selectedCommits.add(commit.hash));
+        renderHistory(ui.state);
+        return;
+      }
+    }
+    if (ui.selectedCommits.has(hash)) {
+      ui.selectedCommits.delete(hash);
+    } else {
+      ui.selectedCommits.add(hash);
+    }
+    ui.historyAnchorHash = hash;
+    renderHistory(ui.state);
+  }
+
+  function pruneCommitSelection(commits) {
+    const present = new Set((commits || []).map((commit) => commit.hash));
+    Array.from(ui.selectedCommits).forEach((hash) => {
+      if (!present.has(hash)) ui.selectedCommits.delete(hash);
+    });
+    if (ui.historyAnchorHash && !present.has(ui.historyAnchorHash)) {
+      ui.historyAnchorHash = "";
+    }
+  }
+
+  function selectedCommitPayload() {
+    return (ui.state.history || [])
+      .filter((commit) => ui.selectedCommits.has(commit.hash))
+      .map((commit) => ({ hash: commit.hash, subject: commit.subject }));
+  }
+
+  function selectedCommitLabel(commits) {
+    if (commits.length === 1) return commits[0].hash.slice(0, 7);
+    return `${commits.length} commits`;
+  }
+
+  function commitSubjectsLabel(commits) {
+    if (commits.length === 1) return commits[0].subject || "";
+    return commits.map((commit) => commit.subject).filter(Boolean).slice(0, 3).join(" · ");
   }
 
   function renderSummaryPanel() {
@@ -1595,7 +1692,8 @@
     const s = ui.activeSummary;
     if (!s) { el.innerHTML = ""; return; }
 
-    const hashEl = `<span class="gx-hash">${escapeHtml(s.hash.slice(0, 7))}</span>`;
+    const summaryScope = /^[a-f0-9]{7,40}$/i.test(s.hash) ? s.hash.slice(0, 7) : s.hash;
+    const hashEl = `<span class="gx-hash">${escapeHtml(summaryScope)}</span>`;
     const subjectEl = s.subject ? `<span class="gx-ai-subject">${escapeHtml(s.subject)}</span>` : "";
 
     if (s.loading) {
@@ -1623,6 +1721,7 @@
       <div class="gx-ai-panel">
         <div class="gx-ai-panel-meta">${hashEl}${subjectEl}</div>
         <div class="gx-ai-panel-body">
+          ${s.note ? `<div class="gx-ai-panel-note">${escapeHtml(s.note)}</div>` : ""}
           <p class="gx-ai-panel-summary">${escapeHtml(s.summary || "")}</p>
           ${s.description ? `<p class="gx-ai-panel-desc">${escapeHtml(s.description)}</p>` : ""}
         </div>
@@ -1639,7 +1738,7 @@
     const sr = ui.activeSecurityReview;
     if (!sr) { container.innerHTML = ""; return; }
 
-    const scope = sr.staged ? "Staged Changes" : "Working Tree Changes";
+    const scope = sr.scope || (sr.staged ? "Staged Changes" : "Working Tree Changes");
 
     if (sr.loading) {
       container.innerHTML = `
@@ -1680,7 +1779,10 @@
           <span class="gx-sec-scope">${escapeHtml(scope)}</span>
           ${findings.length ? `<span class="gx-sec-count">${findings.length} issue${findings.length === 1 ? "" : "s"}</span>` : ""}
         </div>
-        <div class="gx-ai-panel-body gx-sec-body">${bodyHtml}</div>
+        <div class="gx-ai-panel-body gx-sec-body">
+          ${sr.note ? `<div class="gx-ai-panel-note">${escapeHtml(sr.note)}</div>` : ""}
+          ${bodyHtml}
+        </div>
         <div class="gx-ai-panel-actions">
           <button class="gx-btn gx-btn-primary" data-action="copySecurityReview" type="button">${icon("copy", "sm")}<span>Copy</span></button>
           <button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("changes", "sm")}<span>Back to Changes</span></button>
@@ -1932,7 +2034,7 @@
           if (message.error) {
             ui.activeSummary = { ...ui.activeSummary, loading: false, error: message.error };
           } else {
-            ui.activeSummary = { ...ui.activeSummary, loading: false, summary: message.summary, description: message.description };
+            ui.activeSummary = { ...ui.activeSummary, loading: false, summary: message.summary, description: message.description, note: message.note };
           }
           renderSummaryPanel();
         }
@@ -1942,7 +2044,7 @@
           if (message.error) {
             ui.activeSecurityReview = { ...ui.activeSecurityReview, loading: false, error: message.error };
           } else {
-            ui.activeSecurityReview = { ...ui.activeSecurityReview, loading: false, findings: message.findings, safe: !!message.safe };
+            ui.activeSecurityReview = { ...ui.activeSecurityReview, loading: false, findings: message.findings, safe: !!message.safe, note: message.note, scope: message.scope || ui.activeSecurityReview.scope };
           }
           renderSecurityPanel();
         }

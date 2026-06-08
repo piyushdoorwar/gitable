@@ -14,6 +14,7 @@ import { Logger } from "../utils/Logger";
 
 type TabName = "changes" | "history" | "settings";
 type BranchSwitchChoice = "bring" | "keep";
+type SelectedCommit = { hash: string; subject: string };
 const MIN_STAGE_BUSY_VISIBLE_MS = 2000;
 
 /**
@@ -308,8 +309,14 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "summarizeCommit":
         await this.handleSummarizeCommit(String(message.hash ?? ""), String(message.subject ?? ""));
         break;
+      case "summarizeCommits":
+        await this.handleSummarizeCommits(this.parseSelectedCommits(message.commits));
+        break;
       case "securityReview":
         await this.handleSecurityReview(!!message.staged);
+        break;
+      case "securityReviewCommits":
+        await this.handleSecurityReviewCommits(this.parseSelectedCommits(message.commits));
         break;
       case "getReports":
         this.view?.webview.postMessage({ type: "reports", entries: this.usage.getLast30Days() });
@@ -749,6 +756,46 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async handleSummarizeCommits(commits: SelectedCommit[]): Promise<void> {
+    if (!commits.length || !this.view) return;
+    const label = this.selectedCommitLabel(commits);
+    const post = (payload: object) => this.view!.webview.postMessage(payload);
+    try {
+      const providerId = this.settings.getProvider() as ProviderId;
+      const apiKey = await this.secrets.getApiKey(providerId);
+      if (!apiKey) {
+        post({ type: "commitSummary", hash: label, error: "No API key saved — go to Settings to add one." });
+        return;
+      }
+      const model = this.settings.getModel(providerId);
+      if (!model) {
+        post({ type: "commitSummary", hash: label, error: "No model selected — go to Settings to pick one." });
+        return;
+      }
+      const prepared = await this.prepareSelectedCommitDiffs(commits);
+      if (!prepared.diff.trim()) {
+        post({ type: "commitSummary", hash: label, error: "No reviewable diff found for the selected commits." });
+        return;
+      }
+      const subject = this.selectedCommitSubject(commits);
+      const { system, user } = buildCommitSummaryPrompt(subject, prepared.diff);
+      const provider = AiProviderFactory.create(providerId);
+      const text = await provider.generate(system, user, model, apiKey);
+      const result = parseGeneratedMessage(text);
+      this.usage.record({ provider: providerId, model, type: "commitSummary" });
+      post({
+        type: "commitSummary",
+        hash: label,
+        summary: result.summary,
+        description: result.description,
+        note: this.selectedDiffNote(prepared, commits.length)
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to generate summary.";
+      post({ type: "commitSummary", hash: label, error: msg });
+    }
+  }
+
   private async handleSecurityReview(staged: boolean): Promise<void> {
     if (!this.view) return;
     const post = (payload: object) => this.view!.webview.postMessage(payload);
@@ -777,6 +824,129 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const msg = error instanceof Error ? error.message : "Failed to run security review.";
       this.view?.webview.postMessage({ type: "securityReview", error: msg });
     }
+  }
+
+  private async handleSecurityReviewCommits(commits: SelectedCommit[]): Promise<void> {
+    if (!commits.length || !this.view) return;
+    const scope = this.selectedCommitLabel(commits);
+    const post = (payload: object) => this.view!.webview.postMessage(payload);
+    try {
+      const providerId = this.settings.getProvider() as ProviderId;
+      const apiKey = await this.secrets.getApiKey(providerId);
+      if (!apiKey) {
+        post({ type: "securityReview", scope, error: "No API key saved — go to Settings to add one." });
+        return;
+      }
+      const model = this.settings.getModel(providerId);
+      if (!model) {
+        post({ type: "securityReview", scope, error: "No model selected — go to Settings to pick one." });
+        return;
+      }
+      const prepared = await this.prepareSelectedCommitDiffs(commits);
+      if (!prepared.diff.trim()) {
+        post({ type: "securityReview", scope, error: "No reviewable diff found for the selected commits." });
+        return;
+      }
+      const { system, user } = buildSecurityReviewPrompt(prepared.diff, this.selectedCommitSubject(commits));
+      const provider = AiProviderFactory.create(providerId);
+      const text = await provider.generate(system, user, model, apiKey);
+      const review = parseSecurityReview(text);
+      this.usage.record({ provider: providerId, model, type: "security" });
+      post({
+        type: "securityReview",
+        scope,
+        findings: review.findings,
+        safe: review.safe,
+        note: this.selectedDiffNote(prepared, commits.length)
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to run security review.";
+      post({ type: "securityReview", scope, error: msg });
+    }
+  }
+
+  private parseSelectedCommits(value: unknown): SelectedCommit[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .map((item) => {
+        const record = item as { hash?: unknown; subject?: unknown };
+        return {
+          hash: String(record.hash ?? "").trim(),
+          subject: String(record.subject ?? "").trim()
+        };
+      })
+      .filter((commit) => /^[a-f0-9]{7,40}$/i.test(commit.hash));
+  }
+
+  private async prepareSelectedCommitDiffs(commits: SelectedCommit[]): Promise<{
+    diff: string;
+    includedCount: number;
+    ignoredFiles: string[];
+    safeSubset: boolean;
+  }> {
+    const chunks: string[] = [];
+    let includedCount = 0;
+    let safeSubset = false;
+    let ignoredFiles: string[] = [];
+
+    for (const commit of commits) {
+      const rawDiff = await this.git.getCommitDiff(commit.hash);
+      const heading = `# Commit ${commit.hash.slice(0, 7)}${commit.subject ? `: ${commit.subject}` : ""}`;
+      const chunk = `${heading}\n${rawDiff}`;
+      const candidate = DiffLimiter.prepare([...chunks, chunk].join("\n\n"));
+
+      if (candidate.truncated && chunks.length > 0) {
+        safeSubset = true;
+        break;
+      }
+
+      chunks.push(chunk);
+      includedCount += 1;
+      ignoredFiles = candidate.ignoredFiles;
+
+      if (candidate.truncated) {
+        safeSubset = true;
+        break;
+      }
+    }
+
+    const prepared = DiffLimiter.prepare(chunks.join("\n\n"));
+    return {
+      diff: prepared.diff,
+      includedCount,
+      ignoredFiles: prepared.ignoredFiles.length ? prepared.ignoredFiles : ignoredFiles,
+      safeSubset: safeSubset || includedCount < commits.length
+    };
+  }
+
+  private selectedCommitLabel(commits: SelectedCommit[]): string {
+    return commits.length === 1 ? commits[0].hash.slice(0, 7) : `${commits.length} commits`;
+  }
+
+  private selectedCommitSubject(commits: SelectedCommit[]): string {
+    if (commits.length === 1) {
+      return commits[0].subject;
+    }
+    const subjects = commits
+      .map((commit) => `- ${commit.hash.slice(0, 7)} ${commit.subject}`.trim())
+      .join("\n");
+    return `Selected commits (${commits.length}):\n${subjects}`;
+  }
+
+  private selectedDiffNote(
+    prepared: { includedCount: number; ignoredFiles: string[]; safeSubset: boolean },
+    selectedCount: number
+  ): string {
+    const notes: string[] = [];
+    if (prepared.safeSubset) {
+      notes.push(`Diff too big; analyzed a safe subset (${prepared.includedCount} of ${selectedCount} selected commits).`);
+    }
+    if (prepared.ignoredFiles.length) {
+      notes.push(`${prepared.ignoredFiles.length} generated/noisy file(s) ignored.`);
+    }
+    return notes.join(" ");
   }
 
   private async renameBranch(oldName: string): Promise<void> {
