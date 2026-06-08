@@ -400,8 +400,6 @@
 
       <div id="panel-changes" class="gx-panel">
         <div class="gx-changes-scroll">
-          <div id="changesNotice"></div>
-
           <div id="conflictsBanner" class="gx-conflicts-banner hidden">
             ${icon("conflict", "sm")}<span id="conflictsBannerText"></span>
           </div>
@@ -462,6 +460,7 @@
           </div>
         </div>
 
+        <div id="changesNotice" class="gx-bottom-notice"></div>
         <div id="commitCard" class="gx-card">
           <div class="gx-field">
             <label class="gx-label" for="commitSummary">Summary</label>
@@ -1542,19 +1541,30 @@
 
   /** Right-side status marker: yellow dot = modified, green + = added, etc. */
   function statusGlyph(status) {
+    const label = statusLabel(status);
     if (status === "X") {
-      return `<span class="gx-stat gx-stat-X" title="Conflict">${ICONS.conflict}</span>`;
+      return `<span class="gx-stat gx-stat-X" data-tooltip="${label}" aria-label="${label}">${ICONS.conflict}</span>`;
     }
     if (status === "A" || status === "U") {
-      return `<span class="gx-stat gx-stat-A" title="${status === "U" ? "Untracked" : "Added"}">${ICONS.plus}</span>`;
+      return `<span class="gx-stat gx-stat-A" data-tooltip="${label}" aria-label="${label}">${ICONS.plus}</span>`;
     }
     if (status === "D") {
-      return `<span class="gx-stat gx-stat-D" title="Deleted">${ICONS.minus}</span>`;
+      return `<span class="gx-stat gx-stat-D" data-tooltip="${label}" aria-label="${label}">${ICONS.minus}</span>`;
     }
     if (status === "R" || status === "C") {
-      return `<span class="gx-stat gx-stat-R" title="${status === "R" ? "Renamed" : "Copied"}">${ICONS.dot}</span>`;
+      return `<span class="gx-stat gx-stat-R" data-tooltip="${label}" aria-label="${label}">${ICONS.dot}</span>`;
     }
-    return `<span class="gx-stat gx-stat-M" title="Modified">${ICONS.dot}</span>`;
+    return `<span class="gx-stat gx-stat-M" data-tooltip="${label}" aria-label="${label}">${ICONS.dot}</span>`;
+  }
+
+  function statusLabel(status) {
+    if (status === "X") return "Conflict";
+    if (status === "U") return "Untracked";
+    if (status === "A") return "Added";
+    if (status === "D") return "Deleted";
+    if (status === "R") return "Renamed";
+    if (status === "C") return "Copied";
+    return "Modified";
   }
 
   function renderFileList(files, isStaged, partialPaths) {
@@ -1567,8 +1577,6 @@
   function renderFile(f, isStaged, isPartial) {
     const checked = ui.selected.has(selectionKey(f.path, isStaged)) ? "checked" : "";
     const selectTitle = `Select ${f.displayPath || f.path}`;
-    const stageTitle = `Stage ${f.displayPath || f.path}`;
-    const unstageTitle = `Unstage ${f.displayPath || f.path}`;
     const partialBadge = isPartial
       ? `<span class="gx-partial-badge" title="Partially staged: this file also has ${isStaged ? "working tree" : "staged"} changes">Partial</span>`
       : "";
@@ -1579,9 +1587,6 @@
         <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
         ${partialBadge}
         <span class="gx-right">
-          ${isStaged
-            ? `<button class="gx-row-action" data-action="unstageOne" data-path="${escapeHtml(f.path)}" title="${escapeHtml(unstageTitle)}" aria-label="${escapeHtml(unstageTitle)}" type="button">${ICONS.minus}</button>`
-            : `<button class="gx-row-action" data-action="stageOne" data-path="${escapeHtml(f.path)}" title="${escapeHtml(stageTitle)}" aria-label="${escapeHtml(stageTitle)}" type="button">${ICONS.plus}</button>`}
           ${statusGlyph(f.status)}
         </span>
       </li>`;
@@ -1831,10 +1836,11 @@
   }
 
   function commitStatusGlyph(status) {
-    if (status === "A" || status === "U") return `<span class="gx-cstat gx-stat-A">${ICONS.plus}</span>`;
-    if (status === "D") return `<span class="gx-cstat gx-stat-D">${ICONS.minus}</span>`;
-    if (status === "R" || status === "C") return `<span class="gx-cstat gx-stat-R">${ICONS.dot}</span>`;
-    return `<span class="gx-cstat gx-stat-M">${ICONS.dot}</span>`;
+    const label = statusLabel(status);
+    if (status === "A" || status === "U") return `<span class="gx-cstat gx-stat-A" data-tooltip="${label}" aria-label="${label}">${ICONS.plus}</span>`;
+    if (status === "D") return `<span class="gx-cstat gx-stat-D" data-tooltip="${label}" aria-label="${label}">${ICONS.minus}</span>`;
+    if (status === "R" || status === "C") return `<span class="gx-cstat gx-stat-R" data-tooltip="${label}" aria-label="${label}">${ICONS.dot}</span>`;
+    return `<span class="gx-cstat gx-stat-M" data-tooltip="${label}" aria-label="${label}">${ICONS.dot}</span>`;
   }
 
   function renderSettings(s) {
