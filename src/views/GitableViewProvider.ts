@@ -515,6 +515,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.pendingNotice = "Commit created.";
       vscode.window.showInformationMessage("Gitable: commit created.");
       this.view?.webview.postMessage({ type: "clearCommitFields" });
+      this.view?.webview.postMessage({ type: "changesSubTab", tab: "working" });
     } catch (error) {
       this.fail(error);
     }
