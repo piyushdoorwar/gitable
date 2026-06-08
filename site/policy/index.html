@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Gitable privacy policy. Gitable has no backend, stores API keys in VS Code SecretStorage, and only sends selected diffs to your configured AI provider."
+    />
+    <title>Gitable Privacy Policy</title>
+    <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="../" aria-label="Gitable home">
+        <img src="../assets/icons/icon.svg" alt="" />
+        <span>Gitable</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="../#features">Features</a>
+        <a href="../#workflow">Workflow</a>
+        <a href="../#privacy">Privacy</a>
+        <a class="icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
+          <img src="../assets/icons/github.svg" alt="" />
+          <span>GitHub</span>
+        </a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="band policy-page">
+        <div class="section-heading" data-reveal>
+          <p class="eyebrow">Privacy policy</p>
+          <h1>Gitable Privacy Policy</h1>
+          <p class="lede">Gitable is a local-first VS Code extension for Git workflows and AI-assisted commit messages.</p>
+        </div>
+
+        <div class="policy-content" data-reveal>
+          <h2>Data Gitable reads</h2>
+          <p>Gitable reads Git repository metadata, file status, diffs, branch information, commit history, and stash information so it can show the panel and perform Git actions you request.</p>
+
+          <h2>AI requests</h2>
+          <p>When you generate a commit message, summary, or security review, Gitable sends the selected diff or selected commit data directly from VS Code to the AI provider you configured: OpenAI, Gemini, or Claude.</p>
+
+          <h2>API keys</h2>
+          <p>API keys are stored using VS Code SecretStorage. They are not written to your repository, committed to files, or sent to any server owned by this extension.</p>
+
+          <h2>No backend and no telemetry</h2>
+          <p>Gitable does not operate a backend service for extension data. It does not collect analytics, crash reports, repository contents, prompts, AI responses, or usage history.</p>
+
+          <h2>Local usage reports</h2>
+          <p>Usage reports, when shown in the extension, are computed locally from local extension storage to help you understand your AI calls. They are not transmitted by Gitable.</p>
+
+          <h2>Contact</h2>
+          <p>For privacy questions, email <a href="mailto:piyushdoorwar+gitable@gmail.com">piyushdoorwar+gitable@gmail.com</a>.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Gitable</span>
+      <div class="footer-links">
+        <a href="../">Home</a>
+        <a href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">GitHub</a>
+      </div>
+    </footer>
+
+    <script src="../app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Gitable is an AI-powered Git workflow panel for VS Code. Stage files, generate commit messages, review diffs, manage branches, and keep your API keys local."
+    />
+    <title>Gitable - AI Git workflow panel for VS Code</title>
+    <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Gitable home">
+        <img src="assets/icons/icon.svg" alt="" />
+        <span>Gitable</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features">Features</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#privacy">Privacy</a>
+        <a class="icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
+          <img src="assets/icons/github.svg" alt="" />
+          <span>GitHub</span>
+        </a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">VS Code extension</p>
+          <h1>Gitable</h1>
+          <p class="lede">
+            A focused Git sidebar for VS Code with visual staging, AI commit messages,
+            branch actions, stashes, history, and security reviews using your own API key.
+          </p>
+          <div class="hero-modes" aria-label="Core workflows">
+            <div class="hero-mode">
+              <span class="hero-mode-icon" aria-hidden="true"><img src="assets/icons/files.svg" alt="" /></span>
+              <div class="hero-mode-text">
+                <strong>Stage with intent</strong>
+                <span>Move files between Working and Staged without leaving the panel</span>
+              </div>
+            </div>
+            <div class="hero-mode">
+              <span class="hero-mode-icon" aria-hidden="true"><img src="assets/icons/icon.svg" alt="" /></span>
+              <div class="hero-mode-text">
+                <strong>Generate commits</strong>
+                <span>Ask OpenAI, Gemini, or Claude to draft a clean message</span>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=piyushdoorwar.gitable" rel="noreferrer">
+              <img src="assets/icons/vscode.svg" alt="" />
+              <span>Install for VS Code</span>
+            </a>
+            <a class="button secondary icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
+              <img src="assets/icons/github.svg" alt="" />
+              <span>View source</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="vscode-mockup" aria-label="Gitable VS Code sidebar preview">
+          <div class="vs-titlebar">
+            <div class="vs-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>gitable - Visual Studio Code</span>
+            <img src="assets/icons/vscode.svg" alt="" />
+          </div>
+          <div class="vs-body">
+            <aside class="activity" aria-hidden="true">
+              <img src="assets/icons/icon.svg" alt="" class="active" />
+              <img src="assets/icons/files.svg" alt="" />
+              <img src="assets/icons/search.svg" alt="" />
+              <img src="assets/icons/history.svg" alt="" />
+            </aside>
+            <section class="panel">
+              <div class="repo-row">
+                <span class="repo-name"><img src="assets/icons/icon.svg" alt="" />gitable</span>
+                <span class="gear">...</span>
+              </div>
+              <div class="branch-row">
+                <span class="branch-pill">main</span>
+                <span class="sync-pill">Fetch origin <b>2</b></span>
+              </div>
+              <div class="tabs">
+                <button type="button">Working <b>3</b></button>
+                <button type="button" class="active">Staged <b>4</b></button>
+                <button type="button">Stashes <b>1</b></button>
+              </div>
+              <div class="section-head">
+                <span>Staged</span>
+                <div class="mini-actions" aria-hidden="true"><i></i><i></i><i></i></div>
+              </div>
+              <ul class="file-list">
+                <li><span class="file-icon ts"></span><span>src/views/GitableViewProvider.ts</span><b>M</b></li>
+                <li><span class="file-icon css"></span><span>media/main.css</span><b>M</b></li>
+                <li><span class="file-icon js"></span><span>media/main.js</span><b>M</b></li>
+                <li><span class="file-icon md"></span><span>README.md</span><b>A</b></li>
+              </ul>
+              <div class="commit-card">
+                <label>
+                  <span>Prefix</span>
+                  <input value="GIT-142" aria-label="Commit prefix" />
+                </label>
+                <label>
+                  <span>Summary</span>
+                  <div class="summary-wrap">
+                    <input value="GIT-142 add commit prefix support" aria-label="Commit summary" />
+                    <button type="button" aria-label="Generate commit message"><img src="assets/icons/icon.svg" alt="" /></button>
+                  </div>
+                </label>
+                <textarea aria-label="Commit description">Persist optional JIRA-style prefixes and prepend them to generated commit summaries.</textarea>
+                <button class="commit-btn" type="button">Commit to main</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="marquee-wrap" aria-hidden="true">
+          <div class="marquee-track">
+            <ul class="marquee-row">
+              <li>AI commit messages</li>
+              <li>Staged diff only</li>
+              <li>OpenAI</li>
+              <li>Gemini</li>
+              <li>Claude</li>
+              <li>Branch switching</li>
+              <li>Conflict helper</li>
+              <li>Security review</li>
+              <li>Usage reports</li>
+              <li>Stash staged files</li>
+              <li>Commit history</li>
+              <li>SecretStorage keys</li>
+            </ul>
+            <ul class="marquee-row" aria-hidden="true">
+              <li>AI commit messages</li>
+              <li>Staged diff only</li>
+              <li>OpenAI</li>
+              <li>Gemini</li>
+              <li>Claude</li>
+              <li>Branch switching</li>
+              <li>Conflict helper</li>
+              <li>Security review</li>
+              <li>Usage reports</li>
+              <li>Stash staged files</li>
+              <li>Commit history</li>
+              <li>SecretStorage keys</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="features">
+        <div class="section-heading" data-reveal>
+          <p class="eyebrow">What it does</p>
+          <h2>Git work, gathered into one calm panel.</h2>
+          <p class="section-sub">
+            Gitable keeps the common Git loop visible: inspect files, stage the right changes,
+            write a commit, and move on.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article data-reveal>
+            <div class="feat-icon"><img src="assets/icons/files.svg" alt="" /></div>
+            <h3>Visual staging</h3>
+            <p>Working, Staged, and Stashes live under one Changes tab with bulk actions and per-file controls.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.08s">
+            <div class="feat-icon"><img src="assets/icons/icon.svg" alt="" /></div>
+            <h3>AI commit messages</h3>
+            <p>Generate a summary and description from staged diffs, then edit before committing.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.16s">
+            <div class="provider-logos" aria-hidden="true">
+              <span><img src="assets/icons/openai.svg" alt="" /></span>
+              <span><img src="assets/icons/gemini.svg" alt="" /></span>
+              <span><img src="assets/icons/claude.svg" alt="" /></span>
+            </div>
+            <h3>Bring your provider</h3>
+            <p>Use OpenAI, Gemini, or Claude with your own API key and a live model picker.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.24s">
+            <div class="feat-icon"><img src="assets/icons/history.svg" alt="" /></div>
+            <h3>History and summaries</h3>
+            <p>Browse recent commits, select commits, and ask AI for a readable summary.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.32s">
+            <div class="feat-icon"><img src="assets/icons/shield-ai.svg" alt="" /></div>
+            <h3>Security review</h3>
+            <p>Run an AI review on staged changes, unstaged changes, or selected history before merging.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.4s">
+            <div class="feat-icon"><img src="assets/icons/branch.svg" alt="" /></div>
+            <h3>Branch workflow</h3>
+            <p>Create, switch, merge, push, pull, and fetch while keeping the active branch in view.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="band band--alt" id="workflow">
+        <div class="section-heading" data-reveal>
+          <p class="eyebrow">Workflow</p>
+          <h2>From changed files to a polished commit.</h2>
+        </div>
+        <div class="workflow">
+          <article data-reveal>
+            <span class="step-n">1</span>
+            <h3>Review changed files</h3>
+            <p>Open file diffs from the panel and decide what belongs in this commit.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.08s">
+            <span class="step-n">2</span>
+            <h3>Stage intentionally</h3>
+            <p>Stage one file, selected files, or everything. Stash staged work if you need to context-switch.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.16s">
+            <span class="step-n">3</span>
+            <h3>Generate or write</h3>
+            <p>Use AI for a first draft, add a prefix like a JIRA number, or write the message yourself.</p>
+          </article>
+          <article data-reveal style="--reveal-delay: 0.24s">
+            <span class="step-n">4</span>
+            <h3>Commit and sync</h3>
+            <p>Commit to the current branch, undo the last commit if needed, and push when ready.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="privacy-band" id="privacy">
+        <div class="privacy-inner">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow">Privacy first</p>
+            <h2>Your repo stays on your machine.</h2>
+            <p class="section-sub">
+              Gitable has no backend. It only sends the selected diff to the AI provider you configure.
+            </p>
+          </div>
+          <div class="privacy-grid">
+            <article data-reveal>
+              <h3>No extension server</h3>
+              <p>AI requests go from VS Code to your chosen provider. Gitable does not proxy or store them.</p>
+            </article>
+            <article data-reveal style="--reveal-delay: 0.08s">
+              <h3>SecretStorage keys</h3>
+              <p>API keys are stored using VS Code SecretStorage, not plain-text settings files.</p>
+            </article>
+            <article data-reveal style="--reveal-delay: 0.16s">
+              <h3>Staged diff control</h3>
+              <p>Commit generation reads staged changes and filters noisy generated files before sending.</p>
+            </article>
+            <article data-reveal style="--reveal-delay: 0.24s">
+              <h3>No telemetry</h3>
+              <p>There is no analytics pipeline. Usage reports are local and exist to help you understand your own AI calls.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="install-section" id="install">
+        <div data-reveal>
+          <p class="eyebrow">Install</p>
+          <h2>Put Gitable in your VS Code sidebar.</h2>
+          <p>Install the extension, pick your AI provider, save your API key, and start committing from the Gitable activity bar panel.</p>
+        </div>
+        <div class="install-actions" data-reveal style="--reveal-delay: 0.12s">
+          <a class="button primary large" href="https://marketplace.visualstudio.com/items?itemName=piyushdoorwar.gitable" rel="noreferrer">
+            <img src="assets/icons/vscode.svg" alt="" />
+            <span>VS Code Marketplace</span>
+          </a>
+          <a class="button secondary large icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
+            <img src="assets/icons/github.svg" alt="" />
+            <span>View on GitHub</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Gitable</span>
+      <div class="footer-links">
+        <a href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">GitHub</a>
+        <a href="policy/">Privacy policy</a>
+        <a href="mailto:piyushdoorwar+gitable@gmail.com">Support</a>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
