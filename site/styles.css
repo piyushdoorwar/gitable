@@ -815,34 +815,49 @@ main {
 
 .policy-page {
   min-height: calc(100vh - 136px);
+  padding: clamp(44px, 7vw, 76px) clamp(18px, 5vw, 64px);
+  background:
+    radial-gradient(circle at 14% 12%, rgba(249, 139, 158, 0.08), transparent 24rem),
+    linear-gradient(180deg, #111820 0%, #0d1117 100%);
 }
 
-.policy-page h1 {
+.policy-hero {
+  max-width: 820px;
+  margin-bottom: 34px;
+  min-width: 0;
+}
+
+.policy-hero h1 {
   max-width: 880px;
   font-size: clamp(42px, 7vw, 82px);
+  overflow-wrap: anywhere;
 }
 
 .policy-content {
-  max-width: 820px;
-  padding: 28px;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.policy-content article {
+  min-width: 0;
+  padding: 22px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(16, 47, 99, 0.82);
+  background: rgba(16, 47, 99, 0.62);
 }
 
 .policy-content h2 {
-  margin-top: 28px;
   margin-bottom: 8px;
-  font-size: 22px;
-}
-
-.policy-content h2:first-child {
   margin-top: 0;
+  font-size: 20px;
 }
 
 .policy-content p {
   margin-bottom: 0;
   color: var(--soft);
+  overflow-wrap: anywhere;
 }
 
 .policy-content a {
@@ -984,8 +999,17 @@ footer > span {
 
   .feature-grid,
   .privacy-grid,
-  .workflow {
+  .workflow,
+  .policy-content {
     grid-template-columns: 1fr;
+  }
+
+  .policy-page {
+    overflow: hidden;
+  }
+
+  .policy-hero h1 {
+    font-size: clamp(38px, 12vw, 48px);
   }
 
   footer {
