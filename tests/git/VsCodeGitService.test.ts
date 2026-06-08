@@ -339,6 +339,24 @@ describe("VsCodeGitService", () => {
       expect(cliSpy).toHaveBeenCalled();
     });
 
+    it("getRemotes delegates to CLI", async () => {
+      const cliSpy = vi.spyOn(cli, "getRemotes").mockResolvedValue(["origin", "upstream"]);
+      await expect(service.getRemotes()).resolves.toEqual(["origin", "upstream"]);
+      expect(cliSpy).toHaveBeenCalled();
+    });
+
+    it("publishBranch delegates to CLI with remote and branch", async () => {
+      const cliSpy = vi.spyOn(cli, "publishBranch").mockResolvedValue(undefined);
+      await service.publishBranch("upstream", "feature/test");
+      expect(cliSpy).toHaveBeenCalledWith("upstream", "feature/test");
+    });
+
+    it("setUpstream delegates to CLI with local and remote branch", async () => {
+      const cliSpy = vi.spyOn(cli, "setUpstream").mockResolvedValue(undefined);
+      await service.setUpstream("upstream", "feature/test", "feature/test");
+      expect(cliSpy).toHaveBeenCalledWith("upstream", "feature/test", "feature/test");
+    });
+
     it("pull uses the API when it succeeds", async () => {
       const cliSpy = vi.spyOn(cli, "pull").mockResolvedValue(undefined);
       await service.pull();

@@ -328,6 +328,21 @@ export class VsCodeGitService implements GitService {
     return this.apiOrCli(repo ? () => repo.push() : undefined, () => this.cli.push());
   }
 
+  getRemotes(): Promise<string[]> {
+    this.syncCliRoot();
+    return this.cli.getRemotes();
+  }
+
+  publishBranch(remote: string, branch: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.publishBranch(remote, branch);
+  }
+
+  setUpstream(remote: string, localBranch: string, remoteBranch: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.setUpstream(remote, localBranch, remoteBranch);
+  }
+
   pull(): Promise<void> {
     const repo = this.getActiveRepository();
     return this.apiOrCli(repo ? () => repo.pull() : undefined, () => this.cli.pull());

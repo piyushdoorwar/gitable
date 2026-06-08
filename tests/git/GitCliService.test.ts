@@ -434,6 +434,47 @@ describe("GitCliService integration", () => {
     });
   });
 
+  describe("remote publishing and upstream tracking", () => {
+    let remoteDir: string;
+
+    beforeEach(async () => {
+      remoteDir = await mkdtemp(path.join(os.tmpdir(), "gitable-remote-"));
+      await git(["clone", "--bare", root, remoteDir], os.tmpdir());
+      await git(["remote", "add", "upstream", remoteDir], root);
+    });
+
+    afterEach(async () => {
+      await rm(remoteDir, { recursive: true, force: true });
+    });
+
+    it("lists configured remotes", async () => {
+      expect(await service.getRemotes()).toEqual(["upstream"]);
+    });
+
+    it("publishes a new branch to a chosen remote and sets upstream", async () => {
+      await service.createBranch("feature/publish");
+      expect((await service.getSyncInfo()).hasUpstream).toBe(false);
+
+      await service.publishBranch("upstream", "feature/publish");
+
+      const sync = await service.getSyncInfo();
+      expect(sync.hasUpstream).toBe(true);
+      expect((await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], root)).trim()).toBe("upstream/feature/publish");
+    });
+
+    it("sets upstream for an existing remote branch after the fact", async () => {
+      await service.createBranch("feature/tracking");
+      await git(["push", "upstream", "feature/tracking"], root);
+      expect((await service.getSyncInfo()).hasUpstream).toBe(false);
+
+      await service.setUpstream("upstream", "feature/tracking", "feature/tracking");
+
+      const sync = await service.getSyncInfo();
+      expect(sync.hasUpstream).toBe(true);
+      expect((await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], root)).trim()).toBe("upstream/feature/tracking");
+    });
+  });
+
   // ---- getCommitFiles edge cases --------------------------------------------
 
   describe("getCommitFiles — additional", () => {

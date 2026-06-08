@@ -324,6 +324,22 @@ export class GitCliService implements GitService {
     await this.run(["push"], this.requireRoot());
   }
 
+  async getRemotes(): Promise<string[]> {
+    const output = await this.run(["remote"], this.requireRoot());
+    return output
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+
+  async publishBranch(remote: string, branch: string): Promise<void> {
+    await this.run(["push", "-u", remote, branch], this.requireRoot());
+  }
+
+  async setUpstream(remote: string, localBranch: string, remoteBranch: string): Promise<void> {
+    await this.run(["branch", "--set-upstream-to", `${remote}/${remoteBranch}`, localBranch], this.requireRoot());
+  }
+
   async pull(): Promise<void> {
     await this.run(["pull"], this.requireRoot());
   }

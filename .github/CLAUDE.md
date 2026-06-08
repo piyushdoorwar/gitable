@@ -7,10 +7,11 @@ or AI) can orient quickly.
 ## Overview
 
 Gitable is a VS Code extension that renders a visual Git workflow panel in the
-left sidebar (a Webview View). It can generate commit messages,
-explain commits in plain English, and review staged/unstaged diffs for security
-risks — all using a user-supplied AI provider key. It has **no backend, no
-telemetry, and no database** — everything runs in the VS Code extension host.
+left sidebar (a Webview View). It can generate commit messages, explain one or
+more selected commits in plain English, and review staged/unstaged or selected
+commit diffs for security risks — all using a user-supplied AI provider key. It
+has **no backend, no telemetry, and no database** — everything runs in the VS
+Code extension host.
 
 ## Tech stack
 
@@ -54,6 +55,7 @@ src/
 tests/
   git/
     GitCliService.test.ts  integration tests for all CLI operations (real git repo via mkdtemp)
+    VsCodeGitService.test.ts unit tests for Git API routing + CLI delegation
     models.test.ts         unit tests for status letter mapping
   ai/
     AiProvider.test.ts     unit tests for parseGeneratedMessage + error mapping
@@ -83,23 +85,24 @@ tests/
 ### Webview message protocol
 
 **Webview → host:**
-- Git: `ready`, `refresh`, `selectRepo`, `stageFile`, `unstageFile`, `stageFiles`,
+- Git: `ready`, `refresh`, `stateRendered`, `selectRepo`, `stageFile`, `unstageFile`, `stageFiles`,
   `unstageFiles`, `stageAll`, `unstageAll`, `discardFiles`, `commit`, `openDiff`,
   `openCommitFile`, `toggleCommit`, `push`, `pull`, `fetchOrigin`, `createBranch`,
   `switchBranch`, `checkoutBranchWithChanges`, `checkoutBranchKeepingChanges`,
   `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`,
-  `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`, `mergeBranch`,
+  `setUpstream`, `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`, `mergeBranch`,
   `openMergeEditor`, `markResolved`,
   `stashStaged`, `stashPop`, `stashApply`, `stashDrop`,
   `createTag` `{hash}`, `deleteTag` `{name}`, `pushTags`,
   `addToGitignore` `{filePath}`, `undoLastCommit`
-- AI: `generateCommitMessage`, `summarizeCommit`, `securityReview`,
+- AI: `generateCommitMessage`, `summarizeCommit`, `summarizeCommits`,
+  `securityReview`, `securityReviewCommits`,
   `saveAndValidate`, `saveProvider`, `saveModel`, `fetchModels`, `copySummaryText`
 - Analytics: `getReports`
 
 **Host → webview:**
 - `state` (full snapshot on every change)
-- `setCommitFields`, `clearCommitFields`, `switchTab`
+- `setCommitFields`, `clearCommitFields`, `switchTab`, `changesSubTab`
 - `commitFiles` (lazy-loaded on first expand of a commit row)
 - `commitSummary` (AI result for a specific commit hash)
 - `securityReview` (AI security findings)
@@ -147,6 +150,15 @@ Pull/push/fetch each use `runSyncOp(label, globalBusy, fn)`:
 - Clears both after completion.
 - Sync operations do not show info/error notification popups — feedback is inline.
 
+If the branch has no upstream, `push` routes through `pushCurrentBranch()`:
+- With multiple remotes, the user picks a remote.
+- With one remote, Gitable uses it directly.
+- It runs `git push -u <remote> <branch>` so tracking is set immediately.
+- If no remotes exist, it surfaces a clear panel error.
+
+The current branch context menu includes **Set upstream…**, which prompts for a
+remote and remote branch, then runs `git branch --set-upstream-to`.
+
 ## Conventions
 
 - Concrete, single-responsibility `{Domain}Service` classes; interfaces only where
@@ -185,8 +197,9 @@ vsce package         # produce .vsix
 
 Tests live in `tests/` and run under **Vitest**. The `vscode` module is aliased
 to `tests/mocks/vscode.ts`. Git integration tests create real temporary
-repositories via `mkdtemp` and clean up in `afterEach`. The `fetchOrigin` tests
-set up a local bare remote to verify remote-tracking ref updates.
+repositories via `mkdtemp` and clean up in `afterEach`. The remote tests set up
+a local bare remote to verify fetch, publish (`push -u`), and after-the-fact
+upstream tracking.
 
 ## Analytics (UsageStore)
 
@@ -204,14 +217,20 @@ workspace, never committed to the repo.
 ## Notable design decisions
 
 - **Hybrid Git access.** Local mutations go through CLI; reads, watches, and
-  push/pull prefer the built-in API for credential/UI integration, with a
-  transparent CLI fallback via `apiOrCli()`.
+  ordinary push/pull prefer the built-in API for credential/UI integration, with
+  a transparent CLI fallback via `apiOrCli()`. Remote-aware publishing and
+  upstream tracking are CLI-backed because they need explicit `remote` and
+  tracking arguments (`push -u`, `branch --set-upstream-to`).
 - **Full SHA in history.** `git log` uses `%H` (40-char). Display truncates to 7
   chars. All git operations (diff, revert, cherry-pick, AI summary) use the full hash.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from
   the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
-- **Expandable commit history.** Files are lazy-loaded on first expand and cached
-  in the webview so refreshes do not collapse expanded rows.
+- **Selectable commit history.** Files are lazy-loaded on first expand and cached
+  in the webview so refreshes do not collapse expanded rows. Commit cards have
+  checkboxes; shift-click selects a contiguous range. The History action bar
+  enables batch **Summary**, **Security**, and **Clear** actions once one or more
+  commits are selected. Batch AI combines selected commit diffs and uses
+  `DiffLimiter`; oversized selections analyze a safe subset and display a note.
 - **Settings UX.** "Save key" + "Validate" are merged into one "Save & Validate"
   button (enabled when the input has text or a key is already saved). Model
   auto-saves on dropdown change. Refresh is a small icon next to the Model label.
@@ -220,12 +239,22 @@ workspace, never committed to the repo.
 - **AI key storage.** Keys are written with `context.secrets` under
   `gitable.<provider>.apiKey` and read back at call time — never touch settings,
   globalState, or files.
-- **Two-section Changes UI.** Staged and unstaged files appear in separate
-  "Staged" and "Changes" sections. Checkboxes select rows for bulk actions; they
-  do not represent staged state. A file with both staged and unstaged hunks appears
-  in both sections, matching standard Git behavior. Header buttons map to
-  `stageAll` / `unstageAll`, while selected-row actions map to `stageFiles` /
-  `unstageFiles`.
+- **Tabbed Changes UI.** The Changes parent tab contains three subtabs:
+  **Working**, **Staged**, and **Stashes**. Counts live in the subtabs. The
+  default is Working; staging moves the user to Staged, unstaging and successful
+  commits move back to Working, stashing staged changes moves to Stashes, and
+  stash pop/apply moves to Working. The commit summary panel is active only on
+  Staged. Checkboxes select rows for bulk actions; they do not represent staged
+  state. A file with both staged and unstaged hunks appears in both Working and
+  Staged with a `Partial` marker, matching standard Git behavior.
+- **File row actions and status markers.** Normal file rows do not expose
+  one-click stage/unstage actions; users stage/unstage via selected/all toolbar
+  buttons. Right-side status markers stay visible and expose tooltips
+  (`Modified`, `Added`, `Untracked`, etc.). File path hover changes color only;
+  it does not underline like a web link.
+- **Changes notices.** Errors, notices, and busy messages render in a reserved
+  bottom notice slot above the commit summary panel. This avoids pushing the file
+  list/tabs around when a message appears.
 - **Activity bar badge.** The Gitable icon shows the count of changed files
   (staged + unstaged) as a badge, mirroring VS Code's built-in SCM indicator.
 - **Conflict resolution state.** When a pull or merge leaves unresolved conflicts,
@@ -237,8 +266,13 @@ workspace, never committed to the repo.
   generate buttons are disabled until all conflicts are cleared.
 - **Stash (staged-only).** `git stash push --staged` stashes only currently staged
   files, leaving unstaged changes intact. Pop / Apply restores the stash with
-  `--index` so previously staged files return checked. The Stash section in the
-  Changes tab lists all stash entries with Pop / Apply / Drop actions.
+  `--index` so previously staged files return checked. The Stashes subtab lists
+  all stash entries with Pop / Apply / Drop actions.
+- **Remote publishing and upstream tracking.** When the current branch has no
+  upstream, the sync button's Publish flow chooses a remote (or uses the only
+  configured remote) and runs `push -u`. The current-branch context menu also
+  exposes **Set upstream…** for branches that already exist remotely but are not
+  tracking yet.
 - **Merge branch.** Right-click a branch in the Branches tab → "Merge into current".
   Conflict detection surfaces the error as a panel notice pointing users to the
   conflict resolution flow.

@@ -1,6 +1,7 @@
 .vscode/**
 .github/**
 .claude/**
+site/**
 src/**
 node_modules/**
 out/**

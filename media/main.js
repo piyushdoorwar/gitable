@@ -1089,6 +1089,9 @@
       `<button data-bmenu-action="renameBranch" role="menuitem" type="button">${icon("pencil", "sm")}<span>Rename…</span></button>` +
       `<span class="gx-menu-sep"></span>` +
       `<button data-bmenu-action="copyBranchName" role="menuitem" type="button">${icon("copy", "sm")}<span>Copy branch name</span></button>` +
+      (isCurrent
+        ? `<button data-bmenu-action="setUpstream" role="menuitem" type="button">${icon("push", "sm")}<span>Set upstream…</span></button>`
+        : "") +
       (!isCurrent
         ? `<span class="gx-menu-sep"></span>` +
           `<button data-bmenu-action="mergeBranch" role="menuitem" type="button">${icon("merge", "sm")}<span>Merge into current</span></button>` +
@@ -1122,6 +1125,9 @@
         break;
       case "copyBranchName":
         post({ type: "copyBranchName", name: branch.name });
+        break;
+      case "setUpstream":
+        post({ type: "setUpstream", name: branch.name });
         break;
       case "mergeBranch":
         post({ type: "mergeBranch", name: branch.name });

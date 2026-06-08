@@ -113,7 +113,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   async pushCommand(): Promise<void> {
-    await this.runSyncOp("Pushing", true, () => this.git.push());
+    await this.pushCurrentBranch();
   }
 
   async pullCommand(): Promise<void> {
@@ -229,14 +229,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.fetchModels(message.provider);
         break;
       case "push":
-        await this.runSyncOp("Pushing", true, async () => {
-          await this.git.push();
-          if (this.pendingTagPushes.size > 0) {
-            await this.git.pushAllTags();
-            this.pendingTagPushes.clear();
-          }
-          this.lastCommitSummary = "";
-        });
+        await this.pushCurrentBranch();
         break;
       case "pull":
         await this.runSyncOp("Pulling", true, () => this.git.pull());
@@ -336,6 +329,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       case "mergeBranch":
         await this.mergeBranch(String(message.name ?? ""));
+        break;
+      case "setUpstream":
+        await this.setUpstreamForBranch(String(message.name ?? ""));
         break;
       case "stashStaged":
         await this.runBusyGit("git", "Stashing staged changes…", () => this.git.stashStaged(), "Changes stashed.");
@@ -1003,6 +999,90 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       this.clearBusy();
       await this.refresh();
     }
+  }
+
+  private async pushCurrentBranch(): Promise<void> {
+    const summary = await this.git.getRepoSummary().catch(() => undefined);
+    const branch = summary?.branch ?? "";
+    if (!branch || branch === "(no branch)") {
+      this.fail("Cannot push because no branch is checked out.");
+      await this.postState();
+      return;
+    }
+
+    const sync = await this.git.getSyncInfo().catch(() => ({ ahead: 0, behind: 0, hasUpstream: false }));
+    if (!sync.hasUpstream) {
+      await this.publishCurrentBranch(branch);
+      return;
+    }
+
+    await this.runSyncOp("Pushing", true, async () => {
+      await this.git.push();
+      if (this.pendingTagPushes.size > 0) {
+        await this.git.pushAllTags();
+        this.pendingTagPushes.clear();
+      }
+      this.lastCommitSummary = "";
+    });
+  }
+
+  private async publishCurrentBranch(branch: string): Promise<void> {
+    const remote = await this.pickRemote(`Publish ${branch} to remote`);
+    if (!remote) {
+      return;
+    }
+
+    await this.runSyncOp(`Publishing to ${remote}`, true, async () => {
+      await this.git.publishBranch(remote, branch);
+      if (this.pendingTagPushes.size > 0) {
+        await this.git.pushAllTags();
+        this.pendingTagPushes.clear();
+      }
+      this.lastCommitSummary = "";
+      this.pendingNotice = `Published ${branch} to ${remote} and set upstream.`;
+    });
+  }
+
+  private async setUpstreamForBranch(branch: string): Promise<void> {
+    const localBranch = branch.trim();
+    if (!localBranch) {
+      return;
+    }
+
+    const remote = await this.pickRemote(`Set upstream for ${localBranch}`);
+    if (!remote) {
+      return;
+    }
+
+    const remoteBranch = await vscode.window.showInputBox({
+      prompt: `Remote branch on ${remote}`,
+      value: localBranch,
+      placeHolder: localBranch
+    });
+    if (!remoteBranch || !remoteBranch.trim()) {
+      return;
+    }
+
+    await this.runSyncOp("Setting upstream", true, async () => {
+      await this.git.setUpstream(remote, localBranch, remoteBranch.trim());
+      this.pendingNotice = `Tracking set to ${remote}/${remoteBranch.trim()}.`;
+    });
+  }
+
+  private async pickRemote(placeHolder: string): Promise<string | undefined> {
+    const remotes = await this.git.getRemotes().catch((error) => {
+      this.fail(error);
+      return [];
+    });
+    if (!remotes.length) {
+      this.fail("No Git remotes configured. Add a remote first, then publish the branch.");
+      await this.postState();
+      return undefined;
+    }
+    if (remotes.length === 1) {
+      return remotes[0];
+    }
+    return vscode.window.showQuickPick(remotes, { placeHolder });
   }
 
   // ---- AI operations ----

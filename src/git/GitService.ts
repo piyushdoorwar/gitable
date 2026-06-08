@@ -77,6 +77,15 @@ export interface GitService {
   /** Pushes the current branch to its remote. */
   push(): Promise<void>;
 
+  /** Local remote names such as origin/upstream. */
+  getRemotes(): Promise<string[]>;
+
+  /** Pushes the local branch to the chosen remote and sets upstream tracking. */
+  publishBranch(remote: string, branch: string): Promise<void>;
+
+  /** Sets upstream tracking for a local branch to remote/remoteBranch. */
+  setUpstream(remote: string, localBranch: string, remoteBranch: string): Promise<void>;
+
   /** Pulls the current branch from its remote. */
   pull(): Promise<void>;
 
