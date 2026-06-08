@@ -137,6 +137,38 @@
     { value: "claude", label: "Claude" }
   ];
 
+  const COMMIT_PREFIX_STORAGE_KEY = "gitable.commitPrefix.v1";
+
+  function readCommitPrefixState() {
+    try {
+      const stored = window.localStorage && window.localStorage.getItem(COMMIT_PREFIX_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          enabled: !!parsed.enabled,
+          value: typeof parsed.value === "string" ? parsed.value : ""
+        };
+      }
+    } catch (_) {
+      // Ignore unavailable storage; VS Code webview state below is the fallback.
+    }
+
+    try {
+      const state = vscode.getState && vscode.getState();
+      const saved = state && state.commitPrefix;
+      if (saved) {
+        return {
+          enabled: !!saved.enabled,
+          value: typeof saved.value === "string" ? saved.value : ""
+        };
+      }
+    } catch (_) {
+      // No persisted state available.
+    }
+
+    return { enabled: false, value: "" };
+  }
+
   /** Local UI state preserved across re-renders. */
   const ui = {
     activeTab: "changes",
@@ -150,6 +182,7 @@
     commitStats: /** @type {Record<string, any>} */ ({}),
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
+    commitPrefix: readCommitPrefixState(),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -194,6 +227,47 @@
   }
   function icon(name, cls) {
     return `<span class="gx-ic ${cls || ""}">${ICONS[name]}</span>`;
+  }
+  function commitPrefixValue() {
+    return ui.commitPrefix && ui.commitPrefix.enabled ? ui.commitPrefix.value.trim() : "";
+  }
+  function applyCommitPrefix(summary) {
+    const text = String(summary || "").trim();
+    const prefix = commitPrefixValue();
+    if (!prefix || !text) return text;
+    if (text === prefix || text.startsWith(prefix + " ")) return text;
+    return `${prefix} ${text}`;
+  }
+  function persistCommitPrefix() {
+    const payload = {
+      enabled: !!(ui.commitPrefix && ui.commitPrefix.enabled),
+      value: ui.commitPrefix && typeof ui.commitPrefix.value === "string" ? ui.commitPrefix.value : ""
+    };
+    try {
+      window.localStorage && window.localStorage.setItem(COMMIT_PREFIX_STORAGE_KEY, JSON.stringify(payload));
+    } catch (_) {
+      // Best effort; webview state is enough for the current panel lifecycle.
+    }
+    try {
+      if (vscode.setState) {
+        const state = vscode.getState && vscode.getState();
+        vscode.setState({ ...(state || {}), commitPrefix: payload });
+      }
+    } catch (_) {
+      // Persisting prefix is non-critical.
+    }
+  }
+  function updatePrefixUi() {
+    const enabled = !!(ui.commitPrefix && ui.commitPrefix.enabled);
+    const row = byId("commitPrefixRow");
+    const input = /** @type {HTMLInputElement} */ (byId("commitPrefix"));
+    const toggle = byId("prefixToggleBtn");
+    const remove = byId("prefixRemoveBtn");
+    if (row) row.classList.toggle("hidden", !enabled);
+    if (toggle) toggle.classList.toggle("hidden", enabled);
+    if (input && input.value !== ui.commitPrefix.value) input.value = ui.commitPrefix.value || "";
+    setHint(toggle, ui.commitPrefix.value.trim() ? `Prefix: ${ui.commitPrefix.value.trim()}` : "Prefix");
+    setHint(remove, "Remove prefix");
   }
   function escapeHtml(value) {
     return String(value == null ? "" : value)
@@ -462,8 +536,18 @@
 
         <div id="changesNotice" class="gx-bottom-notice"></div>
         <div id="commitCard" class="gx-card">
+          <div id="commitPrefixRow" class="gx-field gx-prefix-field hidden">
+            <label class="gx-label gx-label-row" for="commitPrefix">
+              <span>Prefix</span>
+              <button id="prefixRemoveBtn" class="gx-iconbtn gx-prefix-btn" data-action="removePrefix" title="Remove prefix" aria-label="Remove prefix" type="button">${icon("minus", "sm")}</button>
+            </label>
+            <input id="commitPrefix" type="text" placeholder="JIRA-123" maxlength="48" autocomplete="off" spellcheck="false" />
+          </div>
           <div class="gx-field">
-            <label class="gx-label" for="commitSummary">Summary</label>
+            <label class="gx-label gx-label-row" for="commitSummary">
+              <span>Summary</span>
+              <button id="prefixToggleBtn" class="gx-iconbtn gx-prefix-btn" data-action="enablePrefix" title="Prefix" aria-label="Prefix" type="button">${icon("plus", "sm")}</button>
+            </label>
             <div class="gx-input-wrap">
               <input id="commitSummary" class="has-action" type="text" placeholder="Summary (required)" maxlength="120" />
               <button id="generateBtn" class="gx-input-action" data-action="generate" type="button" title="Generate commit message with AI" aria-label="Generate commit message with AI">
@@ -590,6 +674,14 @@
     });
     byId("newBranchInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") handleAction("createBranchNamed");
+    });
+    byId("commitPrefix").addEventListener("input", (e) => {
+      ui.commitPrefix.value = e.target.value;
+      persistCommitPrefix();
+      updatePrefixUi();
+    });
+    byId("commitPrefix").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") byId("commitSummary").focus();
     });
 
     // Tabs
@@ -783,15 +875,29 @@
         break;
       case "commit": {
         if (ui.activeChangeTab !== "staged") return;
-        const summary = /** @type {HTMLInputElement} */ (byId("commitSummary")).value.trim();
+        const rawSummary = /** @type {HTMLInputElement} */ (byId("commitSummary")).value.trim();
         const description = /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value.trim();
-        if (!summary) {
+        if (!rawSummary) {
           flashNotice("Please enter a commit summary.", "error");
           return;
         }
+        const summary = applyCommitPrefix(rawSummary);
         post({ type: "commit", summary, description });
         break;
       }
+      case "enablePrefix":
+        ui.commitPrefix.enabled = true;
+        persistCommitPrefix();
+        updatePrefixUi();
+        byId("commitPrefix").focus();
+        break;
+      case "removePrefix":
+        ui.commitPrefix.enabled = false;
+        ui.commitPrefix.value = "";
+        persistCommitPrefix();
+        updatePrefixUi();
+        byId("commitSummary").focus();
+        break;
       case "saveAndValidate": {
         const apiKey = /** @type {HTMLInputElement} */ (byId("apiKeyInput")).value.trim();
         const provider = ui.dd.provider.getValue();
@@ -1344,9 +1450,13 @@
           : "Stage files before committing"
     );
     setDisabled(commitBtn, busy || !commitPanelActive || !hasStaged || hasConflicts);
-    byId("commitCard").classList.toggle("gx-card-disabled", !commitPanelActive);
-    setInputDisabled(byId("commitSummary"), !commitPanelActive || busy);
-    setInputDisabled(byId("commitDescription"), !commitPanelActive || busy);
+    byId("commitCard").classList.toggle("hidden", !commitPanelActive);
+    setInputDisabled(byId("commitPrefix"), busy);
+    setInputDisabled(byId("commitSummary"), busy);
+    setInputDisabled(byId("commitDescription"), busy);
+    setDisabled(byId("prefixToggleBtn"), busy);
+    setDisabled(byId("prefixRemoveBtn"), busy);
+    updatePrefixUi();
     const undoBar = byId("undoBar");
     undoBar.classList.toggle("hidden", !s.canUndoCommit);
     if (s.canUndoCommit && s.lastCommitSummary) {
@@ -2024,7 +2134,7 @@
         break;
       case "setCommitFields":
         if (typeof message.summary === "string")
-          /** @type {HTMLInputElement} */ (byId("commitSummary")).value = message.summary;
+          /** @type {HTMLInputElement} */ (byId("commitSummary")).value = applyCommitPrefix(message.summary);
         if (typeof message.description === "string")
           /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = message.description;
         break;

@@ -1089,6 +1089,9 @@ button[aria-disabled="true"],
   align-items: center;
   justify-content: space-between;
 }
+.gx-label.gx-label-row > span {
+  min-width: 0;
+}
 .gx-refresh-icon-btn {
   color: var(--vscode-descriptionForeground);
   opacity: 0.7;
@@ -1185,6 +1188,23 @@ textarea {
 }
 .gx-card .gx-field:last-child {
   margin-bottom: 0;
+}
+.gx-prefix-field {
+  margin-bottom: 12px;
+}
+.gx-prefix-btn {
+  width: 20px;
+  height: 20px;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.85;
+}
+.gx-prefix-btn:hover {
+  opacity: 1;
+}
+.gx-prefix-btn .gx-ic,
+.gx-prefix-btn .gx-ic svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* Custom dropdown ---------------------------------------------------- */
