@@ -535,6 +535,14 @@
   function closeAllDropdowns() {
     openDropdowns.forEach((fn) => fn());
   }
+  function closeAllMenus() {
+    closeFileMenu();
+    closeCommitMenu();
+    closeBranchMenu();
+    closeStashMenu();
+    closeTagMenu();
+    closeJiraMenu();
+  }
   document.addEventListener("click", closeAllDropdowns);
 
   // ---------- Shell (built once) ----------
@@ -917,15 +925,6 @@
         openTagMenu(tagBadge.getAttribute("data-tag-name"), rect.left, rect.bottom + 4);
         return;
       }
-      const jiraDots = e.target.closest(".gx-jira-dots");
-      if (jiraDots) {
-        e.stopPropagation();
-        const key = jiraDots.getAttribute("data-jira-key") || "";
-        const summary = jiraDots.getAttribute("data-jira-summary") || "";
-        const rect = jiraDots.getBoundingClientRect();
-        if (key) openJiraMenu(key, summary, rect.right, rect.bottom + 4, true);
-        return;
-      }
       const target = e.target.closest("[data-action]");
       if (target && target.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
@@ -933,7 +932,7 @@
       }
       if (target) {
         const act = target.getAttribute("data-action");
-        if (act === "openStashMenu") {
+        if (act === "openStashMenu" || act === "openJiraIssueMenu") {
           e.stopPropagation();
         }
         handleAction(act, target, e);
@@ -1015,7 +1014,6 @@
       handleJiraMenuAction(item.getAttribute("data-jira-action"));
     });
 
-    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); closeStashMenu(); closeTagMenu(); closeJiraMenu(); }
     document.addEventListener("click", closeAllMenus);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllMenus(); });
     window.addEventListener("resize", closeAllMenus);
@@ -1270,7 +1268,7 @@
         const key = elm.getAttribute("data-jira-key") || "";
         const summary = elm.getAttribute("data-jira-summary") || "";
         const rect = elm.getBoundingClientRect();
-        if (key) openJiraMenu(key, summary, rect.right, rect.bottom + 4, true);
+        if (key) openJiraMenu(key, summary, rect.right, rect.bottom + 4, true, elm);
         break;
       }
       case "toggleCommitSelection":
@@ -2338,9 +2336,11 @@
 
   // ---------- Jira ----------
 
-  function openJiraMenu(key, summary, x, y, alignRight) {
+  function openJiraMenu(key, summary, x, y, alignRight, trigger) {
     closeAllMenus();
     contextJiraIssue = { key, summary };
+    document.querySelectorAll(".gx-jira-dots[aria-expanded]").forEach((btn) => btn.setAttribute("aria-expanded", "false"));
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
     const menu = byId("jiraIssueMenu");
     menu.classList.remove("hidden");
     menu.style.left = "0px";
@@ -2355,6 +2355,7 @@
   function closeJiraMenu() {
     const menu = byId("jiraIssueMenu");
     if (menu) menu.classList.add("hidden");
+    document.querySelectorAll(".gx-jira-dots[aria-expanded]").forEach((btn) => btn.setAttribute("aria-expanded", "false"));
     contextJiraIssue = null;
   }
 
@@ -2419,7 +2420,7 @@
         <span class="gx-jira-status">${escapeHtml(issue.status)}</span>
         <button class="gx-iconbtn gx-jira-dots" data-action="openJiraIssueMenu"
           data-jira-key="${escapeHtml(issue.key)}" data-jira-summary="${escapeHtml(issue.summary)}"
-          title="Actions" aria-label="Issue actions" type="button">${icon("dots", "sm")}</button>
+          title="Actions" aria-label="Issue actions" aria-haspopup="menu" aria-expanded="false" type="button">${icon("dots", "sm")}</button>
       </div>`).join("");
     updateJiraSortHeaders();
   }
