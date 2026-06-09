@@ -383,6 +383,10 @@ export class GitCliService implements GitService {
     await this.run(["stash", "push", "--staged"], this.requireRoot());
   }
 
+  async stashAll(): Promise<void> {
+    await this.run(["stash", "push", "--include-untracked"], this.requireRoot());
+  }
+
   async stashList(): Promise<StashEntry[]> {
     const root = this.requireRoot();
     let output: string;

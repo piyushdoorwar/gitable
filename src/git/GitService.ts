@@ -119,6 +119,9 @@ export interface GitService {
   /** Stashes only the currently staged files (git stash push --staged). */
   stashStaged(): Promise<void>;
 
+  /** Stashes all local changes including untracked files. */
+  stashAll(): Promise<void>;
+
   /** Returns all stash entries, newest first. Empty array when there are none. */
   stashList(): Promise<StashEntry[]>;
 

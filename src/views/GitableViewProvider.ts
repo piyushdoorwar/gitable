@@ -117,7 +117,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   async pullCommand(): Promise<void> {
-    await this.runSyncOp("Pulling", true, () => this.git.pull());
+    await this.pullWithLocalChangesCheck();
   }
 
   async createBranchCommand(): Promise<void> {
@@ -232,7 +232,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.pushCurrentBranch();
         break;
       case "pull":
-        await this.runSyncOp("Pulling", true, () => this.git.pull());
+        await this.pullWithLocalChangesCheck();
         break;
       case "fetchOrigin":
         await this.runSyncOp("Fetching origin", false, async () => {
@@ -1338,6 +1338,43 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private clearBusy(): void {
     this.busyKind = "";
     this.busyText = "";
+  }
+
+  private async pullWithLocalChangesCheck(): Promise<void> {
+    const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [], conflicts: [] } as RepoChanges));
+    const hasLocalChanges = changes.staged.length > 0 || changes.unstaged.length > 0;
+
+    if (!hasLocalChanges) {
+      await this.runSyncOp("Pulling", true, () => this.git.pull());
+      return;
+    }
+
+    const picked = await vscode.window.showWarningMessage(
+      "You have local changes.",
+      {
+        modal: true,
+        detail: "Stash your changes, pull from origin, then restore them? Conflicts will be shown if any arise.",
+      },
+      "Stash, pull & restore"
+    );
+    if (!picked) return;
+
+    await this.runSyncOp("Pulling", true, async () => {
+      await this.git.stashAll();
+      try {
+        await this.git.pull();
+      } catch (err) {
+        // Pull failed — restore changes so nothing is lost
+        await this.git.stashPop("stash@{0}").catch(() => {});
+        throw err;
+      }
+      try {
+        await this.git.stashPop("stash@{0}");
+      } catch {
+        // Pop produced conflicts — refresh will surface them in the Conflicts section
+        this.pendingError = "Conflicts detected after restoring your stashed changes. Resolve them before committing.";
+      }
+    });
   }
 
   /** Runs a sync operation (fetch/pull/push), showing state in the sync button.

@@ -405,6 +405,11 @@ export class VsCodeGitService implements GitService {
     return this.cli.stashStaged();
   }
 
+  stashAll(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.stashAll();
+  }
+
   stashList() {
     this.syncCliRoot();
     return this.cli.stashList();
