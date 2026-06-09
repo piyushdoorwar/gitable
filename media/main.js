@@ -141,7 +141,37 @@
     { value: "claude",  label: "Claude", keyUrl: "https://platform.claude.com/settings/keys" }
   ];
 
+  const CONFIG_STORAGE_KEY = "gitable.config.v1";
   const THEME_STORAGE_KEY = "gitable.theme.v1";
+
+  const TOKEN_PRESETS = { low: 10_000, mid: 40_000, high: 80_000 };
+
+  function readConfig() {
+    try {
+      const raw = window.localStorage && window.localStorage.getItem(CONFIG_STORAGE_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        return {
+          jiraEnabled: !!p.jiraEnabled,
+          budgets: {
+            commit:   ["low","mid","high"].includes(p.budgets?.commit)   ? p.budgets.commit   : "mid",
+            summary:  ["low","mid","high"].includes(p.budgets?.summary)  ? p.budgets.summary  : "mid",
+            security: ["low","mid","high"].includes(p.budgets?.security) ? p.budgets.security : "mid"
+          }
+        };
+      }
+    } catch (_) {}
+    return { jiraEnabled: false, budgets: { commit: "mid", summary: "mid", security: "mid" } };
+  }
+
+  function saveConfig(cfg) {
+    try { window.localStorage && window.localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg)); } catch (_) {}
+  }
+
+  function getMaxChars(feature) {
+    const key = ui.config.budgets[feature] || "mid";
+    return TOKEN_PRESETS[key] || TOKEN_PRESETS.mid;
+  }
 
   function readTheme() {
     try {
@@ -161,6 +191,35 @@
   function updateThemePicker() {
     document.querySelectorAll(".gx-theme-opt").forEach((btn) => {
       btn.classList.toggle("active", btn.getAttribute("data-theme") === ui.activeTheme);
+    });
+  }
+
+  function updateJiraVisibility() {
+    const enabled = ui.config.jiraEnabled;
+    const btn = byId("jiraHeaderBtn");
+    const tab = byId("settingsTabJira");
+    if (btn) btn.classList.toggle("hidden", !enabled);
+    if (tab) tab.classList.toggle("hidden", !enabled);
+    if (!enabled && ui.activeTab === "jira") switchTab("changes");
+    if (!enabled && ui.activeSettingsTab === "jira") {
+      ui.activeSettingsTab = "ai";
+      byId("settingsTabAi").classList.add("active");
+      byId("settingsPaneAi").classList.remove("hidden");
+      byId("settingsPaneJira").classList.add("hidden");
+    }
+  }
+
+  function updateConfigUi() {
+    const cfg = ui.config;
+    const toggleBtn = byId("jiraToggleBtn");
+    if (toggleBtn) {
+      toggleBtn.classList.toggle("on", cfg.jiraEnabled);
+      toggleBtn.setAttribute("aria-pressed", String(cfg.jiraEnabled));
+    }
+    document.querySelectorAll(".gx-budget-btn").forEach((btn) => {
+      const feature = btn.getAttribute("data-feature");
+      const preset = btn.getAttribute("data-preset");
+      btn.classList.toggle("active", cfg.budgets[feature] === preset);
     });
   }
 
@@ -210,12 +269,13 @@
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
     commitPrefix: readCommitPrefixState(),
+    config: readConfig(),
     activeTheme: readTheme(),
     activeSettingsTab: "ai",
     jiraIssues: /** @type {null | any[]} */ (null),
     jiraLoading: false,
     jiraError: "",
-    jiraSearchTimer: /** @type {null | ReturnType<typeof setTimeout>} */ (null),
+    jiraSort: /** @type {{ col: string|null, dir: "asc"|"desc" }} */ ({ col: null, dir: "asc" }),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -486,7 +546,7 @@
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
           <span class="gx-header-actions">
             <button class="gx-iconbtn gx-hdr-btn" data-action="openReports" title="Usage reports" aria-label="Usage reports" type="button">${icon("reports", "sm")}</button>
-            <button class="gx-iconbtn gx-hdr-btn" data-action="openJira" title="Jira issues" aria-label="Jira issues" type="button">${icon("jira", "sm")}</button>
+            <button id="jiraHeaderBtn" class="gx-iconbtn gx-hdr-btn" data-action="openJira" title="Jira issues" aria-label="Jira issues" type="button">${icon("jira", "sm")}</button>
             <button class="gx-iconbtn gx-hdr-btn" data-action="openSettings" title="Settings" aria-label="Settings" type="button">${icon("settings", "sm")}</button>
           </span>
         </div>
@@ -685,7 +745,40 @@
                 <span>VS Code</span>
               </button>
             </div>
-            <p class="gx-hint" style="margin-top:10px">VS Code follows your active editor color theme. Changes apply immediately.</p>
+            <p class="gx-hint" style="margin-top:10px">VS Code follows your active editor color theme.</p>
+          </div>
+          <div class="gx-field">
+            <div class="gx-config-toggle-row">
+              <span class="gx-label" style="margin:0">Jira Integration</span>
+              <button id="jiraToggleBtn" class="gx-toggle" data-action="toggleJira" type="button" aria-pressed="false">
+                <span class="gx-toggle-thumb"></span>
+              </button>
+            </div>
+            <p class="gx-hint" style="margin-top:6px">Shows the Jira icon and settings tab when enabled.</p>
+          </div>
+          <div class="gx-field">
+            <label class="gx-label">AI Token Budget</label>
+            <p class="gx-hint" style="margin-bottom:8px">Controls how much diff is sent per AI call. Low~10k · Mid~40k · High~80k chars.</p>
+            <div class="gx-budget-table">
+              <span class="gx-budget-label">Commit message</span>
+              <div class="gx-budget-btns" data-budget-feature="commit">
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="low" type="button">Low</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="mid" type="button">Mid</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="high" type="button">High</button>
+              </div>
+              <span class="gx-budget-label">AI summary</span>
+              <div class="gx-budget-btns" data-budget-feature="summary">
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="low" type="button">Low</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="mid" type="button">Mid</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="high" type="button">High</button>
+              </div>
+              <span class="gx-budget-label">Security review</span>
+              <div class="gx-budget-btns" data-budget-feature="security">
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="low" type="button">Low</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="mid" type="button">Mid</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="high" type="button">High</button>
+              </div>
+            </div>
           </div>
         </div>
         <div id="settingsPaneJira" class="hidden">
@@ -723,6 +816,12 @@
         <div class="gx-jira-search-row">
           <input id="jiraSearchInput" type="text" placeholder="Search your issues…" autocomplete="off" spellcheck="false" />
           <button class="gx-iconbtn" data-action="refreshJira" title="Refresh" aria-label="Refresh" type="button">${icon("refresh", "sm")}</button>
+        </div>
+        <div id="jiraListHeader" class="gx-jira-list-header">
+          <button class="gx-jira-col-hdr" data-action="sortJira" data-col="key" type="button"><span>Jira ID</span><span class="gx-sort-ind"></span></button>
+          <button class="gx-jira-col-hdr" data-action="sortJira" data-col="summary" type="button"><span>Description</span><span class="gx-sort-ind"></span></button>
+          <button class="gx-jira-col-hdr" data-action="sortJira" data-col="status" type="button"><span>Status</span><span class="gx-sort-ind"></span></button>
+          <span></span>
         </div>
         <div id="jiraContent"></div>
       </div>
@@ -780,15 +879,8 @@
     });
 
     // Jira search: debounce 300ms
-    byId("jiraSearchInput").addEventListener("input", (e) => {
-      if (ui.jiraSearchTimer) clearTimeout(ui.jiraSearchTimer);
-      const query = e.target.value.trim();
-      ui.jiraSearchTimer = setTimeout(() => {
-        ui.jiraLoading = true;
-        ui.jiraError = "";
-        renderJira();
-        post({ type: "fetchJiraIssues", query });
-      }, 300);
+    byId("jiraSearchInput").addEventListener("input", () => {
+      renderJira();
     });
 
     // Branches tab: filter (client-side) + create-on-Enter
@@ -831,10 +923,11 @@
         return;
       }
       if (target) {
-        if (target.getAttribute("data-action") === "openStashMenu") {
+        const act = target.getAttribute("data-action");
+        if (act === "openStashMenu" || act === "openJiraIssueMenu") {
           e.stopPropagation();
         }
-        handleAction(target.getAttribute("data-action"), target, e);
+        handleAction(act, target, e);
       }
     });
     app.addEventListener("contextmenu", (e) => {
@@ -1003,7 +1096,7 @@
         break;
       case "generate":
         if (ui.activeChangeTab !== "staged") return;
-        post({ type: "generateCommitMessage" });
+        post({ type: "generateCommitMessage", maxChars: getMaxChars("commit") });
         break;
       case "commit": {
         if (ui.activeChangeTab !== "staged") return;
@@ -1092,7 +1185,24 @@
         byId("settingsPaneAi").classList.toggle("hidden", stab !== "ai");
         byId("settingsPaneJira").classList.toggle("hidden", stab !== "jira");
         byId("settingsPaneConfig").classList.toggle("hidden", stab !== "config");
-        if (stab === "config") updateThemePicker();
+        if (stab === "config") { updateThemePicker(); updateConfigUi(); }
+        break;
+      }
+      case "toggleJira": {
+        ui.config.jiraEnabled = !ui.config.jiraEnabled;
+        saveConfig(ui.config);
+        updateJiraVisibility();
+        updateConfigUi();
+        break;
+      }
+      case "setTokenBudget": {
+        const feature = elm.getAttribute("data-feature");
+        const preset = elm.getAttribute("data-preset");
+        if (feature && preset) {
+          ui.config.budgets[feature] = preset;
+          saveConfig(ui.config);
+          updateConfigUi();
+        }
         break;
       }
       case "setTheme": {
@@ -1108,6 +1218,7 @@
         renderReports(null);
         break;
       case "openJira":
+        if (!ui.config.jiraEnabled) break;
         switchTab("jira");
         if (ui.jiraIssues === null && !ui.jiraLoading) {
           ui.jiraLoading = true;
@@ -1119,8 +1230,24 @@
         ui.jiraLoading = true;
         ui.jiraError = "";
         renderJira();
-        post({ type: "fetchJiraIssues", query: (/** @type {HTMLInputElement} */ (byId("jiraSearchInput"))).value.trim() });
+        post({ type: "fetchJiraIssues", query: "" });
         break;
+      case "sortJira": {
+        const col = elm.getAttribute("data-col") || "";
+        if (ui.jiraSort.col === col) {
+          if (ui.jiraSort.dir === "asc") {
+            ui.jiraSort.dir = "desc";
+          } else {
+            ui.jiraSort.col = null;
+            ui.jiraSort.dir = "asc";
+          }
+        } else {
+          ui.jiraSort.col = col;
+          ui.jiraSort.dir = "asc";
+        }
+        renderJira();
+        break;
+      }
       case "saveJiraConfig": {
         const baseUrl = (/** @type {HTMLInputElement} */ (byId("jiraBaseUrlInput"))).value.trim();
         const email = (/** @type {HTMLInputElement} */ (byId("jiraEmailInput"))).value.trim();
@@ -1146,7 +1273,7 @@
         ui.activeSummary = { hash: label, subject: commitSubjectsLabel(commits), loading: true };
         byId("panel-summary").classList.remove("hidden");
         renderSummaryPanel();
-        post({ type: "summarizeCommits", commits });
+        post({ type: "summarizeCommits", commits, maxChars: getMaxChars("summary") });
         break;
       }
       case "securityReviewSelectedCommits": {
@@ -1155,7 +1282,7 @@
         ui.activeSecurityReview = { staged: false, scope: selectedCommitLabel(commits), loading: true };
         byId("panel-security").classList.remove("hidden");
         renderSecurityPanel();
-        post({ type: "securityReviewCommits", commits });
+        post({ type: "securityReviewCommits", commits, maxChars: getMaxChars("security") });
         break;
       }
       case "clearCommitSelection":
@@ -1213,7 +1340,7 @@
         ui.activeSummary = { hash, subject, loading: true };
         byId("panel-summary").classList.remove("hidden");
         renderSummaryPanel();
-        post({ type: "summarizeCommit", hash, subject });
+        post({ type: "summarizeCommit", hash, subject, maxChars: getMaxChars("summary") });
         break;
       }
       case "closeSummary":
@@ -1225,7 +1352,7 @@
         ui.activeSecurityReview = { staged, loading: true };
         byId("panel-security").classList.remove("hidden");
         renderSecurityPanel();
-        post({ type: "securityReview", staged });
+        post({ type: "securityReview", staged, maxChars: getMaxChars("security") });
         break;
       }
       case "closeSecurityReview":
@@ -2255,11 +2382,28 @@
       el.innerHTML = `<div class="gx-jira-state"><p>Click refresh to load your issues.</p></div>`;
       return;
     }
-    if (!ui.jiraIssues.length) {
-      el.innerHTML = `<div class="gx-jira-state"><p>No open issues assigned to you.</p></div>`;
+    const query = ((/** @type {HTMLInputElement|null} */ (byId("jiraSearchInput")))?.value ?? "").trim().toLowerCase();
+    let issues = query
+      ? ui.jiraIssues.filter((i) =>
+          i.key.toLowerCase().includes(query) ||
+          i.summary.toLowerCase().includes(query) ||
+          i.status.toLowerCase().includes(query)
+        )
+      : [...ui.jiraIssues];
+    if (!issues.length) {
+      el.innerHTML = `<div class="gx-jira-state"><p>${query ? "No matching issues." : "No open issues assigned to you."}</p></div>`;
+      updateJiraSortHeaders();
       return;
     }
-    el.innerHTML = ui.jiraIssues.map((issue) => `
+    const { col, dir } = ui.jiraSort;
+    if (col) {
+      issues.sort((a, b) => {
+        const av = String(a[col] ?? "").toLowerCase();
+        const bv = String(b[col] ?? "").toLowerCase();
+        return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+    }
+    el.innerHTML = issues.map((issue) => `
       <div class="gx-jira-issue">
         <span class="gx-jira-key">${escapeHtml(issue.key)}</span>
         <span class="gx-jira-summary" title="${escapeHtml(issue.summary)}">${escapeHtml(issue.summary)}</span>
@@ -2268,6 +2412,18 @@
           data-jira-key="${escapeHtml(issue.key)}" data-jira-summary="${escapeHtml(issue.summary)}"
           title="Actions" aria-label="Issue actions" type="button">${icon("dots", "sm")}</button>
       </div>`).join("");
+    updateJiraSortHeaders();
+  }
+
+  function updateJiraSortHeaders() {
+    const { col, dir } = ui.jiraSort;
+    document.querySelectorAll(".gx-jira-col-hdr").forEach((btn) => {
+      const c = btn.getAttribute("data-col");
+      const ind = btn.querySelector(".gx-sort-ind");
+      const active = c === col;
+      btn.classList.toggle("active", active);
+      if (ind) ind.textContent = active ? (dir === "asc" ? " ↑" : " ↓") : "";
+    });
   }
 
   // ---------- Reports ----------
@@ -2496,6 +2652,7 @@
   // ---------- Boot ----------
   buildShell();
   applyTheme(ui.activeTheme);
+  updateJiraVisibility();
   switchTab("changes");
   render();
   post({ type: "ready" });

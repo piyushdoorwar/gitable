@@ -207,7 +207,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.runCommit(message.summary, message.description);
         break;
       case "generateCommitMessage":
-        await this.runGenerate();
+        await this.runGenerate(Number(message.maxChars) || undefined);
         break;
       case "saveProvider":
         await this.saveProvider(message.provider);
@@ -302,16 +302,16 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       case "summarizeCommit":
-        await this.handleSummarizeCommit(String(message.hash ?? ""), String(message.subject ?? ""));
+        await this.handleSummarizeCommit(String(message.hash ?? ""), String(message.subject ?? ""), Number(message.maxChars) || undefined);
         break;
       case "summarizeCommits":
-        await this.handleSummarizeCommits(this.parseSelectedCommits(message.commits));
+        await this.handleSummarizeCommits(this.parseSelectedCommits(message.commits), Number(message.maxChars) || undefined);
         break;
       case "securityReview":
-        await this.handleSecurityReview(!!message.staged);
+        await this.handleSecurityReview(!!message.staged, Number(message.maxChars) || undefined);
         break;
       case "securityReviewCommits":
-        await this.handleSecurityReviewCommits(this.parseSelectedCommits(message.commits));
+        await this.handleSecurityReviewCommits(this.parseSelectedCommits(message.commits), Number(message.maxChars) || undefined);
         break;
       case "getReports":
         this.view?.webview.postMessage({ type: "reports", entries: this.usage.getLast30Days() });
@@ -738,7 +738,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     );
   }
 
-  private async handleSummarizeCommit(hash: string, subject: string): Promise<void> {
+  private async handleSummarizeCommit(hash: string, subject: string, maxChars?: number): Promise<void> {
     if (!hash || !this.view) return;
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
@@ -754,7 +754,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       const rawDiff = await this.git.getCommitDiff(hash);
-      const { diff } = DiffLimiter.prepare(rawDiff);
+      const { diff } = DiffLimiter.prepare(rawDiff, maxChars);
       const { system, user } = buildCommitSummaryPrompt(subject, diff);
       const provider = AiProviderFactory.create(providerId);
       const text = await provider.generate(system, user, model, apiKey);
@@ -767,7 +767,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleSummarizeCommits(commits: SelectedCommit[]): Promise<void> {
+  private async handleSummarizeCommits(commits: SelectedCommit[], maxChars?: number): Promise<void> {
     if (!commits.length || !this.view) return;
     const label = this.selectedCommitLabel(commits);
     const post = (payload: object) => this.view!.webview.postMessage(payload);
@@ -783,7 +783,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         post({ type: "commitSummary", hash: label, error: "No model selected — go to Settings to pick one." });
         return;
       }
-      const prepared = await this.prepareSelectedCommitDiffs(commits);
+      const prepared = await this.prepareSelectedCommitDiffs(commits, maxChars);
       if (!prepared.diff.trim()) {
         post({ type: "commitSummary", hash: label, error: "No reviewable diff found for the selected commits." });
         return;
@@ -807,7 +807,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleSecurityReview(staged: boolean): Promise<void> {
+  private async handleSecurityReview(staged: boolean, maxChars?: number): Promise<void> {
     if (!this.view) return;
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
@@ -824,7 +824,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       }
       const diff = staged ? await this.git.getStagedDiff() : await this.git.getUnstagedDiff();
       const diffStat = staged ? await this.git.getStagedDiffStat() : undefined;
-      const { diff: limitedDiff } = DiffLimiter.prepare(diff);
+      const { diff: limitedDiff } = DiffLimiter.prepare(diff, maxChars);
       const { system, user } = buildSecurityReviewPrompt(limitedDiff, diffStat);
       const provider = AiProviderFactory.create(providerId);
       const text = await provider.generate(system, user, model, apiKey);
@@ -837,7 +837,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleSecurityReviewCommits(commits: SelectedCommit[]): Promise<void> {
+  private async handleSecurityReviewCommits(commits: SelectedCommit[], maxChars?: number): Promise<void> {
     if (!commits.length || !this.view) return;
     const scope = this.selectedCommitLabel(commits);
     const post = (payload: object) => this.view!.webview.postMessage(payload);
@@ -853,7 +853,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         post({ type: "securityReview", scope, error: "No model selected — go to Settings to pick one." });
         return;
       }
-      const prepared = await this.prepareSelectedCommitDiffs(commits);
+      const prepared = await this.prepareSelectedCommitDiffs(commits, maxChars);
       if (!prepared.diff.trim()) {
         post({ type: "securityReview", scope, error: "No reviewable diff found for the selected commits." });
         return;
@@ -891,7 +891,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       .filter((commit) => /^[a-f0-9]{7,40}$/i.test(commit.hash));
   }
 
-  private async prepareSelectedCommitDiffs(commits: SelectedCommit[]): Promise<{
+  private async prepareSelectedCommitDiffs(commits: SelectedCommit[], maxChars?: number): Promise<{
     diff: string;
     includedCount: number;
     ignoredFiles: string[];
@@ -906,7 +906,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const rawDiff = await this.git.getCommitDiff(commit.hash);
       const heading = `# Commit ${commit.hash.slice(0, 7)}${commit.subject ? `: ${commit.subject}` : ""}`;
       const chunk = `${heading}\n${rawDiff}`;
-      const candidate = DiffLimiter.prepare([...chunks, chunk].join("\n\n"));
+      const candidate = DiffLimiter.prepare([...chunks, chunk].join("\n\n"), maxChars);
 
       if (candidate.truncated && chunks.length > 0) {
         safeSubset = true;
@@ -923,7 +923,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    const prepared = DiffLimiter.prepare(chunks.join("\n\n"));
+    const prepared = DiffLimiter.prepare(chunks.join("\n\n"), maxChars);
     return {
       diff: prepared.diff,
       includedCount,
@@ -1102,7 +1102,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   // ---- AI operations ----
 
-  private async runGenerate(): Promise<void> {
+  private async runGenerate(maxChars?: number): Promise<void> {
     const provider = this.settings.getProvider();
     const apiKey = await this.secrets.getApiKey(provider);
     if (!apiKey) {
@@ -1135,7 +1135,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
 
     const diffStat = await this.git.getStagedDiffStat().catch(() => "");
-    const prepared = DiffLimiter.prepare(stagedDiff);
+    const prepared = DiffLimiter.prepare(stagedDiff, maxChars);
     if (!prepared.diff.trim()) {
       this.fail("All staged changes were filtered out as generated/noisy files.");
       await this.postState();
