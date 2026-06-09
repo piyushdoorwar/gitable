@@ -72,7 +72,7 @@ export class JiraService {
     const jql = query.trim()
       ? `${base} AND text ~ "${query.replace(/"/g, '\\"')}" ORDER BY updated DESC`
       : `${base} ORDER BY updated DESC`;
-    const url = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status,issuetype`;
+    const url = `${baseUrl}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status,issuetype`;
     const res = await fetch(url, { headers: this.buildHeaders(email, token) });
     if (!res.ok) {
       const text = await res.text().catch(() => "");

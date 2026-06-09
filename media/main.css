@@ -1877,12 +1877,16 @@ body.gx-theme-vscode {
   letter-spacing: 0.03em;
   color: var(--gx-pink);
   text-decoration: none;
+  outline: none;
+  border: none;
   opacity: 0.75;
   transition: opacity 0.12s;
 }
-.gx-ext-link:hover {
+.gx-ext-link:hover,
+.gx-ext-link:focus {
   opacity: 1;
   text-decoration: none;
+  outline: none;
 }
 
 /* Settings inner tabs (3-column) */
