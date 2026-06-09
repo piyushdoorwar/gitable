@@ -1967,7 +1967,7 @@ body.gx-theme-vscode {
 /* Settings inner tabs (3-column) */
 .gx-settings-subtabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 4px;
   margin: 0 0 14px;
   padding: 3px;
@@ -2022,9 +2022,9 @@ body.gx-theme-vscode {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 2px 8px 4px;
+  padding: 4px 8px 5px;
   border-bottom: 1px solid var(--gx-line);
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 
 .gx-jira-col-hdr {
@@ -2033,19 +2033,24 @@ body.gx-theme-vscode {
   padding: 0;
   cursor: pointer;
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--vscode-descriptionForeground);
+  opacity: 0.6;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   white-space: nowrap;
-  transition: color 0.1s;
+  transition: color 0.1s, opacity 0.1s;
   outline: none;
 }
-.gx-jira-col-hdr:hover,
+.gx-jira-col-hdr:hover {
+  opacity: 0.9;
+  color: var(--vscode-foreground);
+}
 .gx-jira-col-hdr.active {
+  opacity: 1;
   color: var(--vscode-foreground);
 }
 .gx-jira-col-hdr:first-child {
@@ -2064,8 +2069,12 @@ body.gx-theme-vscode {
   width: 24px;
 }
 .gx-sort-ind {
+  display: inline-block;
+  width: 10px;
+  text-align: center;
   color: var(--gx-pink);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1;
 }
 
 .gx-jira-issue {

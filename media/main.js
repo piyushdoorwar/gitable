@@ -176,9 +176,9 @@
   function readTheme() {
     try {
       const v = window.localStorage && window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (v === "light" || v === "vscode") return v;
+      if (v === "dark" || v === "light" || v === "vscode") return v;
     } catch (_) {}
-    return "dark";
+    return "vscode";
   }
 
   function applyTheme(theme) {
@@ -917,6 +917,15 @@
         openTagMenu(tagBadge.getAttribute("data-tag-name"), rect.left, rect.bottom + 4);
         return;
       }
+      const jiraDots = e.target.closest(".gx-jira-dots");
+      if (jiraDots) {
+        e.stopPropagation();
+        const key = jiraDots.getAttribute("data-jira-key") || "";
+        const summary = jiraDots.getAttribute("data-jira-summary") || "";
+        const rect = jiraDots.getBoundingClientRect();
+        if (key) openJiraMenu(key, summary, rect.right, rect.bottom + 4, true);
+        return;
+      }
       const target = e.target.closest("[data-action]");
       if (target && target.getAttribute("aria-disabled") === "true") {
         e.preventDefault();
@@ -924,7 +933,7 @@
       }
       if (target) {
         const act = target.getAttribute("data-action");
-        if (act === "openStashMenu" || act === "openJiraIssueMenu") {
+        if (act === "openStashMenu") {
           e.stopPropagation();
         }
         handleAction(act, target, e);
@@ -1260,7 +1269,8 @@
       case "openJiraIssueMenu": {
         const key = elm.getAttribute("data-jira-key") || "";
         const summary = elm.getAttribute("data-jira-summary") || "";
-        if (key) openJiraMenu(key, summary, event);
+        const rect = elm.getBoundingClientRect();
+        if (key) openJiraMenu(key, summary, rect.right, rect.bottom + 4, true);
         break;
       }
       case "toggleCommitSelection":
@@ -2328,7 +2338,7 @@
 
   // ---------- Jira ----------
 
-  function openJiraMenu(key, summary, event) {
+  function openJiraMenu(key, summary, x, y, alignRight) {
     closeAllMenus();
     contextJiraIssue = { key, summary };
     const menu = byId("jiraIssueMenu");
@@ -2336,10 +2346,9 @@
     menu.style.left = "0px";
     menu.style.top = "0px";
     const rect = menu.getBoundingClientRect();
-    const x = event ? event.clientX : 0;
-    const y = event ? event.clientY : 0;
     const margin = 6;
-    menu.style.left = `${Math.round(Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin)))}px`;
+    const anchorLeft = alignRight ? x - rect.width : x;
+    menu.style.left = `${Math.round(Math.max(margin, Math.min(anchorLeft, window.innerWidth - rect.width - margin)))}px`;
     menu.style.top = `${Math.round(Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin)))}px`;
   }
 
@@ -2422,7 +2431,7 @@
       const ind = btn.querySelector(".gx-sort-ind");
       const active = c === col;
       btn.classList.toggle("active", active);
-      if (ind) ind.textContent = active ? (dir === "asc" ? " ↑" : " ↓") : "";
+      if (ind) ind.textContent = active ? (dir === "asc" ? "↑" : "↓") : "";
     });
   }
 
