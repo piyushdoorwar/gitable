@@ -13,6 +13,11 @@
   --gx-radius: 8px;
   --gx-radius-sm: 6px;
   --gx-gap: 10px;
+
+  /* Theme-switchable surfaces (dark defaults) */
+  --gx-subtabs-bg: rgba(9, 36, 75, 0.16);
+  --gx-alt-card-bg: rgba(13, 47, 99, 0.12);
+  --gx-undo-bar-bg: rgba(9, 36, 75, 0.18);
 }
 
 * {
@@ -542,7 +547,7 @@ button[aria-disabled="true"],
   padding: 3px;
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
-  background: rgba(9, 36, 75, 0.16);
+  background: var(--gx-subtabs-bg);
 }
 .gx-change-subtab {
   min-width: 0;
@@ -1180,7 +1185,7 @@ textarea {
 }
 .gx-card-disabled {
   opacity: 0.62;
-  background: rgba(13, 47, 99, 0.12);
+  background: var(--gx-alt-card-bg);
 }
 .gx-card-disabled input,
 .gx-card-disabled textarea {
@@ -1334,7 +1339,7 @@ textarea {
   padding: 5px;
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
-  background: rgba(9, 36, 75, 0.18);
+  background: var(--gx-undo-bar-bg);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
 }
 .gx-history-selected {
@@ -1797,6 +1802,74 @@ textarea {
   font-weight: 600;
 }
 
+/* ── Theme overrides ──────────────────────────────────────────────────────── */
+
+body.gx-theme-light {
+  --gx-navy-card:   rgba(249, 139, 158, 0.07);
+  --gx-subtabs-bg:  rgba(249, 139, 158, 0.06);
+  --gx-alt-card-bg: rgba(249, 139, 158, 0.04);
+  --gx-undo-bar-bg: rgba(249, 139, 158, 0.08);
+  --gx-line:        rgba(249, 139, 158, 0.22);
+  background:
+    radial-gradient(120% 60% at 80% -10%, rgba(249, 139, 158, 0.06), transparent 60%),
+    var(--vscode-sideBar-background);
+}
+
+body.gx-theme-vscode {
+  --gx-navy-card:   rgba(128, 128, 128, 0.08);
+  --gx-subtabs-bg:  rgba(128, 128, 128, 0.06);
+  --gx-alt-card-bg: rgba(128, 128, 128, 0.05);
+  --gx-undo-bar-bg: rgba(128, 128, 128, 0.07);
+  --gx-line:        var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
+  background: var(--vscode-sideBar-background);
+}
+
+/* Theme picker in Configuration tab */
+.gx-theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+.gx-theme-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 6px;
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+  background: var(--gx-navy-card);
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.gx-theme-opt:hover {
+  color: var(--vscode-foreground);
+  border-color: var(--gx-pink-line);
+}
+.gx-theme-opt.active {
+  border-color: var(--gx-pink);
+  background: var(--gx-pink-soft);
+  color: var(--gx-pink);
+}
+.gx-theme-swatch {
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.gx-theme-swatch-dark {
+  background: linear-gradient(135deg, #09244b 0%, #1a1a2e 100%);
+}
+.gx-theme-swatch-light {
+  background: linear-gradient(135deg, #ffffff 0%, #fdf0f2 100%);
+}
+.gx-theme-swatch-vscode {
+  background: linear-gradient(135deg, #1e1e1e 50%, #f3f3f3 50%);
+}
+
 /* External link in label rows (API key / token generation) */
 .gx-ext-link {
   font-size: 10px;
@@ -1812,16 +1885,16 @@ textarea {
   text-decoration: none;
 }
 
-/* Settings inner tabs (2-column) */
+/* Settings inner tabs (3-column) */
 .gx-settings-subtabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   margin: 0 0 14px;
   padding: 3px;
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
-  background: rgba(9, 36, 75, 0.16);
+  background: var(--gx-subtabs-bg);
 }
 
 /* Jira panel */

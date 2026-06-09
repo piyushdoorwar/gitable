@@ -141,6 +141,29 @@
     { value: "claude",  label: "Claude", keyUrl: "https://platform.claude.com/settings/keys" }
   ];
 
+  const THEME_STORAGE_KEY = "gitable.theme.v1";
+
+  function readTheme() {
+    try {
+      const v = window.localStorage && window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (v === "light" || v === "vscode") return v;
+    } catch (_) {}
+    return "dark";
+  }
+
+  function applyTheme(theme) {
+    document.body.classList.remove("gx-theme-light", "gx-theme-vscode");
+    if (theme === "light") document.body.classList.add("gx-theme-light");
+    if (theme === "vscode") document.body.classList.add("gx-theme-vscode");
+    try { window.localStorage && window.localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (_) {}
+  }
+
+  function updateThemePicker() {
+    document.querySelectorAll(".gx-theme-opt").forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-theme") === ui.activeTheme);
+    });
+  }
+
   const COMMIT_PREFIX_STORAGE_KEY = "gitable.commitPrefix.v1";
 
   function readCommitPrefixState() {
@@ -187,6 +210,7 @@
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
     commitPrefix: readCommitPrefixState(),
+    activeTheme: readTheme(),
     activeSettingsTab: "ai",
     jiraIssues: /** @type {null | any[]} */ (null),
     jiraLoading: false,
@@ -610,6 +634,7 @@
         <div class="gx-settings-subtabs">
           <button id="settingsTabAi" class="gx-change-subtab active" data-action="switchSettingsTab" data-settings-tab="ai" type="button">AI Provider</button>
           <button id="settingsTabJira" class="gx-change-subtab" data-action="switchSettingsTab" data-settings-tab="jira" type="button">Jira</button>
+          <button id="settingsTabConfig" class="gx-change-subtab" data-action="switchSettingsTab" data-settings-tab="config" type="button">Config</button>
         </div>
         <div id="settingsPaneAi">
           <div class="gx-field">
@@ -641,6 +666,26 @@
             ${icon("lock")}
             <span>Only the selected Git diff is sent to your configured AI provider. API keys are stored
             using VS Code SecretStorage. Gitable does not send data to any server owned by this extension.</span>
+          </div>
+        </div>
+        <div id="settingsPaneConfig" class="hidden">
+          <div class="gx-field">
+            <label class="gx-label">Appearance</label>
+            <div class="gx-theme-picker">
+              <button class="gx-theme-opt" data-action="setTheme" data-theme="dark" type="button">
+                <span class="gx-theme-swatch gx-theme-swatch-dark"></span>
+                <span>Dark</span>
+              </button>
+              <button class="gx-theme-opt" data-action="setTheme" data-theme="light" type="button">
+                <span class="gx-theme-swatch gx-theme-swatch-light"></span>
+                <span>Light</span>
+              </button>
+              <button class="gx-theme-opt" data-action="setTheme" data-theme="vscode" type="button">
+                <span class="gx-theme-swatch gx-theme-swatch-vscode"></span>
+                <span>VS Code</span>
+              </button>
+            </div>
+            <p class="gx-hint" style="margin-top:10px">VS Code follows your active editor color theme. Changes apply immediately.</p>
           </div>
         </div>
         <div id="settingsPaneJira" class="hidden">
@@ -1043,8 +1088,18 @@
         ui.activeSettingsTab = stab;
         byId("settingsTabAi").classList.toggle("active", stab === "ai");
         byId("settingsTabJira").classList.toggle("active", stab === "jira");
+        byId("settingsTabConfig").classList.toggle("active", stab === "config");
         byId("settingsPaneAi").classList.toggle("hidden", stab !== "ai");
         byId("settingsPaneJira").classList.toggle("hidden", stab !== "jira");
+        byId("settingsPaneConfig").classList.toggle("hidden", stab !== "config");
+        if (stab === "config") updateThemePicker();
+        break;
+      }
+      case "setTheme": {
+        const theme = elm.getAttribute("data-theme") || "dark";
+        ui.activeTheme = theme;
+        applyTheme(theme);
+        updateThemePicker();
         break;
       }
       case "openReports":
@@ -2440,6 +2495,7 @@
 
   // ---------- Boot ----------
   buildShell();
+  applyTheme(ui.activeTheme);
   switchTab("changes");
   render();
   post({ type: "ready" });
