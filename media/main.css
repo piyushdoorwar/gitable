@@ -1797,6 +1797,21 @@ textarea {
   font-weight: 600;
 }
 
+/* External link in label rows (API key / token generation) */
+.gx-ext-link {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--gx-pink);
+  text-decoration: none;
+  opacity: 0.75;
+  transition: opacity 0.12s;
+}
+.gx-ext-link:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
 /* Settings inner tabs (2-column) */
 .gx-settings-subtabs {
   display: grid;

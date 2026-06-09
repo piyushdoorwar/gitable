@@ -136,9 +136,9 @@
   };
 
   const PROVIDERS = [
-    { value: "openai", label: "OpenAI" },
-    { value: "gemini", label: "Gemini" },
-    { value: "claude", label: "Claude" }
+    { value: "openai",  label: "OpenAI", keyUrl: "https://platform.openai.com/api-keys" },
+    { value: "gemini",  label: "Gemini", keyUrl: "https://aistudio.google.com/api-keys" },
+    { value: "claude",  label: "Claude", keyUrl: "https://platform.claude.com/settings/keys" }
   ];
 
   const COMMIT_PREFIX_STORAGE_KEY = "gitable.commitPrefix.v1";
@@ -617,7 +617,10 @@
             <div id="providerSlot"></div>
           </div>
           <div class="gx-field">
-            <label class="gx-label" for="apiKeyInput">API Key</label>
+            <label class="gx-label gx-label-row" for="apiKeyInput">
+              <span>API Key</span>
+              <a id="apiKeyLink" class="gx-ext-link" href="#" target="_blank" tabindex="-1">Generate ↗</a>
+            </label>
             <input id="apiKeyInput" type="password" placeholder="Paste your API key" autocomplete="off" spellcheck="false" />
           </div>
           <div class="gx-actions">
@@ -650,7 +653,10 @@
             <input id="jiraEmailInput" type="text" placeholder="you@company.com" autocomplete="off" spellcheck="false" />
           </div>
           <div class="gx-field">
-            <label class="gx-label" for="jiraTokenInput">API Token</label>
+            <label class="gx-label gx-label-row" for="jiraTokenInput">
+              <span>API Token</span>
+              <a class="gx-ext-link" href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" tabindex="-1">Generate ↗</a>
+            </label>
             <input id="jiraTokenInput" type="password" placeholder="Paste your Jira API token" autocomplete="off" spellcheck="false" />
           </div>
           <div class="gx-actions">
@@ -2110,6 +2116,9 @@
 
     const icons = s.providerIcons || {};
     const providerItems = PROVIDERS.map((p) => ({ value: p.value, label: p.label, icon: icons[p.value] }));
+    const activeProvider = PROVIDERS.find((p) => p.value === s.provider);
+    const keyLink = byId("apiKeyLink");
+    if (keyLink && activeProvider) keyLink.href = activeProvider.keyUrl;
     ui.dd.provider.update(providerItems, s.provider);
 
     // Models are only ever what the provider's API returned — never hardcoded.
