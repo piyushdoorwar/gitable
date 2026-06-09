@@ -6,6 +6,7 @@ import { parseGeneratedMessage, parseSecurityReview } from "../ai/AiProvider";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
 import { UsageStore } from "../analytics/UsageStore";
+import { JiraService } from "../jira/JiraService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
 import { RepoChanges, StashEntry } from "../git/models";
@@ -45,6 +46,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     private readonly secrets: SecretService,
     private readonly settings: SettingsService,
     private readonly usage: UsageStore,
+    private readonly jira: JiraService,
     private readonly logger: Logger
   ) {}
 
@@ -451,6 +453,19 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           await this.git.undoLastCommit();
           this.lastCommitSummary = "";
         }, "Last commit moved back to staged.");
+        break;
+      case "saveJiraConfig":
+        await this.handleSaveJiraConfig(
+          String(message.baseUrl ?? ""),
+          String(message.email ?? ""),
+          String(message.token ?? "")
+        );
+        break;
+      case "fetchJiraIssues":
+        await this.handleJiraFetch(String(message.query ?? ""));
+        break;
+      case "createBranchFromJira":
+        await this.handleCreateBranchFromJira(String(message.key ?? ""), String(message.summary ?? ""));
         break;
       default:
         break;
@@ -1258,6 +1273,59 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ---- Jira operations ----
+
+  private async handleSaveJiraConfig(baseUrl: string, email: string, token: string): Promise<void> {
+    if (!baseUrl.trim() || !email.trim() || !token.trim()) {
+      this.view?.webview.postMessage({ type: "jiraStatus", error: "Base URL, email, and API token are all required." });
+      return;
+    }
+    this.view?.webview.postMessage({ type: "jiraStatus", loading: true });
+    try {
+      await this.jira.saveConfig(baseUrl, email);
+      await this.jira.saveToken(token);
+      await this.jira.validate();
+      this.view?.webview.postMessage({ type: "jiraStatus", ok: true });
+      await this.postState();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.view?.webview.postMessage({ type: "jiraStatus", error: msg });
+    }
+  }
+
+  private async handleJiraFetch(query = ""): Promise<void> {
+    try {
+      const issues = await this.jira.getMyIssues(query);
+      this.view?.webview.postMessage({ type: "jiraIssues", issues });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.view?.webview.postMessage({ type: "jiraIssues", error: msg });
+    }
+  }
+
+  private async handleCreateBranchFromJira(key: string, summary: string): Promise<void> {
+    if (!key) return;
+    const slug = summary
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 40);
+    const suggested = slug ? `${key.toLowerCase()}-${slug}` : key.toLowerCase();
+    const name = await vscode.window.showInputBox({
+      title: `Create branch for ${key}`,
+      value: suggested,
+      prompt: "Edit the branch name if needed",
+      validateInput: (v) => {
+        const t = v.trim();
+        if (!t) return "Branch name cannot be empty.";
+        if (/\s/.test(t)) return "Branch name cannot contain spaces.";
+        return null;
+      }
+    });
+    if (!name) return;
+    await this.createBranchNamed(name.trim());
+  }
+
   /**
    * On first load, if the (persisted, SecretStorage) key exists for the current
    * provider, fetch its models so the dropdown is ready without re-entering the
@@ -1446,6 +1514,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const provider = this.settings.getProvider();
     const model = this.settings.getModel(provider);
     const hasApiKey = await this.secrets.hasApiKey(provider);
+    const jiraConfig = this.jira.getConfig();
+    const jiraHasToken = await this.jira.hasToken();
 
     let repositories: Array<{ name: string; root: string }> = [];
     let repositoryName = "No repository";
@@ -1510,6 +1580,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       busyText: this.busyText,
       isLoading: !!this.busyKind,
       hasConflicts: changes.conflicts.length > 0,
+      jiraConfig,
+      jiraHasToken,
       error: stateError,
       notice: this.pendingNotice
     };

@@ -66,7 +66,11 @@
     reports:
       '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.8321 9.5547C18.1384 9.09517 18.0142 8.4743 17.5547 8.16795C17.0952 7.8616 16.4743 7.98577 16.168 8.4453L13.3925 12.6085L10.0529 10.3542C9.421 9.92768 8.55941 10.1339 8.18917 10.8004L6.12584 14.5144C5.85763 14.9971 6.03157 15.6059 6.51436 15.8742C6.99714 16.1424 7.60594 15.9684 7.87416 15.4856L9.56672 12.439L12.8571 14.66C13.4546 15.0634 14.2662 14.9035 14.6661 14.3036L17.8321 9.5547Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M7 2C4.23858 2 2 4.23858 2 7V17C2 19.7614 4.23858 22 7 22H17C19.7614 22 22 19.7614 22 17V7C22 4.23858 19.7614 2 17 2H7ZM4 7C4 5.34315 5.34315 4 7 4H17C18.6569 4 20 5.34315 20 7V17C20 18.6569 18.6569 20 17 20H7C5.34315 20 4 18.6569 4 17V7Z" fill="currentColor"/></svg>',
     conflict:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    jira:
+      '<svg viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M29.762 1.004h-14.443c0 3.599 2.918 6.517 6.517 6.517h2.66v2.571c0.003 3.591 2.91 6.502 6.498 6.512v-14.343c0-0.685-0.55-1.241-1.232-1.251zM22.616 8.198h-14.443c0.001 3.599 2.918 6.516 6.517 6.516h2.66v2.572c0.003 3.598 2.919 6.513 6.517 6.516v-14.352c0-0.691-0.56-1.251-1.251-1.251zM15.464 15.391h-14.46c0.002 3.6 2.921 6.517 6.521 6.517h2.661v2.57c0 3.598 2.916 6.515 6.514 6.517v-14.348c0-0.694-0.562-1.256-1.256-1.256z"/></svg>',
+    dots:
+      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -183,6 +187,11 @@
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
     commitPrefix: readCommitPrefixState(),
+    activeSettingsTab: "ai",
+    jiraIssues: /** @type {null | any[]} */ (null),
+    jiraLoading: false,
+    jiraError: "",
+    jiraSearchTimer: /** @type {null | ReturnType<typeof setTimeout>} */ (null),
     dd: /** @type {Record<string, any>} */ ({}),
     state: {
       repositoryName: "",
@@ -212,6 +221,7 @@
   let contextFile = null;
   let contextCommit = null;
   let contextBranch = null;
+  let contextJiraIssue = /** @type {null | {key: string, summary: string}} */ (null);
 
   function post(message) {
     vscode.postMessage(message);
@@ -452,6 +462,7 @@
           <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
           <span class="gx-header-actions">
             <button class="gx-iconbtn gx-hdr-btn" data-action="openReports" title="Usage reports" aria-label="Usage reports" type="button">${icon("reports", "sm")}</button>
+            <button class="gx-iconbtn gx-hdr-btn" data-action="openJira" title="Jira issues" aria-label="Jira issues" type="button">${icon("jira", "sm")}</button>
             <button class="gx-iconbtn gx-hdr-btn" data-action="openSettings" title="Settings" aria-label="Settings" type="button">${icon("settings", "sm")}</button>
           </span>
         </div>
@@ -596,37 +607,73 @@
       </div>
 
       <div id="panel-settings" class="gx-panel hidden">
-        <div class="gx-field">
-          <label class="gx-label">AI Provider</label>
-          <div id="providerSlot"></div>
+        <div class="gx-settings-subtabs">
+          <button id="settingsTabAi" class="gx-change-subtab active" data-action="switchSettingsTab" data-settings-tab="ai" type="button">AI Provider</button>
+          <button id="settingsTabJira" class="gx-change-subtab" data-action="switchSettingsTab" data-settings-tab="jira" type="button">Jira</button>
         </div>
-        <div class="gx-field">
-          <label class="gx-label" for="apiKeyInput">API Key</label>
-          <input id="apiKeyInput" type="password" placeholder="Paste your API key" autocomplete="off" spellcheck="false" />
-        </div>
-        <div class="gx-actions">
-          <button id="saveValidateBtn" class="gx-btn gx-btn-primary" data-action="saveAndValidate" title="Save API key and validate" aria-label="Save API key and validate" type="button" disabled>${icon("lock")}<span>Save &amp; Validate</span></button>
-        </div>
-        <div id="modelHint" class="gx-hint">Save your API key to load the available models.</div>
-        <div id="modelSection" class="hidden gx-model-block">
+        <div id="settingsPaneAi">
           <div class="gx-field">
-            <label class="gx-label gx-label-row">
-              <span>Model</span>
-              <button class="gx-iconbtn gx-refresh-icon-btn" data-action="refreshModels" title="Refresh available models" aria-label="Refresh available models" type="button">${icon("refresh", "sm")}</button>
-            </label>
-            <div id="modelSlot"></div>
+            <label class="gx-label">AI Provider</label>
+            <div id="providerSlot"></div>
+          </div>
+          <div class="gx-field">
+            <label class="gx-label" for="apiKeyInput">API Key</label>
+            <input id="apiKeyInput" type="password" placeholder="Paste your API key" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="gx-actions">
+            <button id="saveValidateBtn" class="gx-btn gx-btn-primary" data-action="saveAndValidate" title="Save API key and validate" aria-label="Save API key and validate" type="button" disabled>${icon("lock")}<span>Save &amp; Validate</span></button>
+          </div>
+          <div id="modelHint" class="gx-hint">Save your API key to load the available models.</div>
+          <div id="modelSection" class="hidden gx-model-block">
+            <div class="gx-field">
+              <label class="gx-label gx-label-row">
+                <span>Model</span>
+                <button class="gx-iconbtn gx-refresh-icon-btn" data-action="refreshModels" title="Refresh available models" aria-label="Refresh available models" type="button">${icon("refresh", "sm")}</button>
+              </label>
+              <div id="modelSlot"></div>
+            </div>
+          </div>
+          <div id="settingsStatus" class="gx-status-line"></div>
+          <div class="gx-privacy">
+            ${icon("lock")}
+            <span>Only the selected Git diff is sent to your configured AI provider. API keys are stored
+            using VS Code SecretStorage. Gitable does not send data to any server owned by this extension.</span>
           </div>
         </div>
-        <div id="settingsStatus" class="gx-status-line"></div>
-        <div class="gx-privacy">
-          ${icon("lock")}
-          <span>Only the selected Git diff is sent to your configured AI provider. API keys are stored
-          using VS Code SecretStorage. Gitable does not send data to any server owned by this extension.</span>
+        <div id="settingsPaneJira" class="hidden">
+          <div class="gx-field">
+            <label class="gx-label" for="jiraBaseUrlInput">Jira Base URL</label>
+            <input id="jiraBaseUrlInput" type="text" placeholder="https://yourcompany.atlassian.net" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="gx-field">
+            <label class="gx-label" for="jiraEmailInput">Email</label>
+            <input id="jiraEmailInput" type="text" placeholder="you@company.com" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="gx-field">
+            <label class="gx-label" for="jiraTokenInput">API Token</label>
+            <input id="jiraTokenInput" type="password" placeholder="Paste your Jira API token" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="gx-actions">
+            <button id="saveJiraBtn" class="gx-btn gx-btn-primary" data-action="saveJiraConfig" type="button" disabled>${icon("lock")}<span>Save &amp; Validate</span></button>
+          </div>
+          <div id="jiraSettingsStatus" class="gx-status-line"></div>
+          <div class="gx-privacy">
+            ${icon("lock")}
+            <span>API token stored in VS Code SecretStorage. Base URL and email saved in extension state.</span>
+          </div>
         </div>
       </div>
 
       <div id="panel-reports" class="gx-panel hidden">
         <div id="reportsContent"></div>
+      </div>
+
+      <div id="panel-jira" class="gx-panel hidden">
+        <div class="gx-jira-search-row">
+          <input id="jiraSearchInput" type="text" placeholder="Search your issues…" autocomplete="off" spellcheck="false" />
+          <button class="gx-iconbtn" data-action="refreshJira" title="Refresh" aria-label="Refresh" type="button">${icon("refresh", "sm")}</button>
+        </div>
+        <div id="jiraContent"></div>
       </div>
 
       <div id="panel-summary" class="gx-ai-overlay hidden">
@@ -650,6 +697,10 @@
       <div id="branchContextMenu" class="gx-context-menu hidden" role="menu"></div>
       <div id="stashContextMenu" class="gx-context-menu hidden" role="menu"></div>
       <div id="tagContextMenu" class="gx-context-menu hidden" role="menu"></div>
+      <div id="jiraIssueMenu" class="gx-context-menu hidden" role="menu">
+        <button data-jira-action="usePrefix" role="menuitem" type="button">${icon("tag", "sm")}<span>Use as commit prefix</span></button>
+        <button data-jira-action="createBranch" role="menuitem" type="button">${icon("branch", "sm")}<span>Create branch</span></button>
+      </div>
     `;
     initTooltips();
 
@@ -665,6 +716,28 @@
     byId("apiKeyInput").addEventListener("input", () => {
       const hasText = /** @type {HTMLInputElement} */ (byId("apiKeyInput")).value.trim().length > 0;
       setDisabled(byId("saveValidateBtn"), !hasText && !ui.state.hasApiKey);
+    });
+
+    // Jira settings inputs: enable Save & Validate when all three fields have content
+    ["jiraBaseUrlInput", "jiraEmailInput", "jiraTokenInput"].forEach((id) => {
+      byId(id).addEventListener("input", () => {
+        const hasUrl = /** @type {HTMLInputElement} */ (byId("jiraBaseUrlInput")).value.trim().length > 0;
+        const hasEmail = /** @type {HTMLInputElement} */ (byId("jiraEmailInput")).value.trim().length > 0;
+        const hasToken = /** @type {HTMLInputElement} */ (byId("jiraTokenInput")).value.trim().length > 0 || ui.state.jiraHasToken;
+        setDisabled(byId("saveJiraBtn"), !(hasUrl && hasEmail && hasToken));
+      });
+    });
+
+    // Jira search: debounce 300ms
+    byId("jiraSearchInput").addEventListener("input", (e) => {
+      if (ui.jiraSearchTimer) clearTimeout(ui.jiraSearchTimer);
+      const query = e.target.value.trim();
+      ui.jiraSearchTimer = setTimeout(() => {
+        ui.jiraLoading = true;
+        ui.jiraError = "";
+        renderJira();
+        post({ type: "fetchJiraIssues", query });
+      }, 300);
     });
 
     // Branches tab: filter (client-side) + create-on-Enter
@@ -781,7 +854,15 @@
       handleTagMenuAction(item.getAttribute("data-tmenu-action"), item);
     });
 
-    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); closeStashMenu(); closeTagMenu(); }
+    const jiraMenu = byId("jiraIssueMenu");
+    jiraMenu.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-jira-action]");
+      if (!item) return;
+      e.stopPropagation();
+      handleJiraMenuAction(item.getAttribute("data-jira-action"));
+    });
+
+    function closeAllMenus() { closeFileMenu(); closeCommitMenu(); closeBranchMenu(); closeStashMenu(); closeTagMenu(); closeJiraMenu(); }
     document.addEventListener("click", closeAllMenus);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllMenus(); });
     window.addEventListener("resize", closeAllMenus);
@@ -812,7 +893,7 @@
     if (branchButton) {
       branchButton.classList.toggle("active", tab === "branches");
     }
-    ["changes", "history", "branches", "settings", "reports"].forEach((name) => {
+    ["changes", "history", "branches", "settings", "reports", "jira"].forEach((name) => {
       byId("panel-" + name).classList.toggle("hidden", name !== tab);
     });
   }
@@ -951,11 +1032,49 @@
       case "openSettings":
         switchTab("settings");
         break;
+      case "switchSettingsTab": {
+        const stab = elm.getAttribute("data-settings-tab") || "ai";
+        ui.activeSettingsTab = stab;
+        byId("settingsTabAi").classList.toggle("active", stab === "ai");
+        byId("settingsTabJira").classList.toggle("active", stab === "jira");
+        byId("settingsPaneAi").classList.toggle("hidden", stab !== "ai");
+        byId("settingsPaneJira").classList.toggle("hidden", stab !== "jira");
+        break;
+      }
       case "openReports":
         switchTab("reports");
         post({ type: "getReports" });
         renderReports(null);
         break;
+      case "openJira":
+        switchTab("jira");
+        if (ui.jiraIssues === null && !ui.jiraLoading) {
+          ui.jiraLoading = true;
+          renderJira();
+          post({ type: "fetchJiraIssues", query: "" });
+        }
+        break;
+      case "refreshJira":
+        ui.jiraLoading = true;
+        ui.jiraError = "";
+        renderJira();
+        post({ type: "fetchJiraIssues", query: (/** @type {HTMLInputElement} */ (byId("jiraSearchInput"))).value.trim() });
+        break;
+      case "saveJiraConfig": {
+        const baseUrl = (/** @type {HTMLInputElement} */ (byId("jiraBaseUrlInput"))).value.trim();
+        const email = (/** @type {HTMLInputElement} */ (byId("jiraEmailInput"))).value.trim();
+        const token = (/** @type {HTMLInputElement} */ (byId("jiraTokenInput"))).value.trim();
+        byId("jiraSettingsStatus").innerHTML = `<span class="gx-spin"></span><span>Validating…</span>`;
+        setDisabled(byId("saveJiraBtn"), true);
+        post({ type: "saveJiraConfig", baseUrl, email, token });
+        break;
+      }
+      case "openJiraIssueMenu": {
+        const key = elm.getAttribute("data-jira-key") || "";
+        const summary = elm.getAttribute("data-jira-summary") || "";
+        if (key) openJiraMenu(key, summary, event);
+        break;
+      }
       case "toggleCommitSelection":
         toggleCommitSelection(elm.getAttribute("data-hash"), !!(event && event.shiftKey));
         break;
@@ -1962,6 +2081,26 @@
   }
 
   function renderSettings(s) {
+    // Jira pane — populate inputs only when empty (don't clobber user typing)
+    const jiraConfig = s.jiraConfig || { baseUrl: "", email: "" };
+    const jiraUrlInput = /** @type {HTMLInputElement} */ (byId("jiraBaseUrlInput"));
+    const jiraEmailInput = /** @type {HTMLInputElement} */ (byId("jiraEmailInput"));
+    const jiraTokenInput = /** @type {HTMLInputElement} */ (byId("jiraTokenInput"));
+    if (jiraUrlInput && !jiraUrlInput.value) jiraUrlInput.value = jiraConfig.baseUrl;
+    if (jiraEmailInput && !jiraEmailInput.value) jiraEmailInput.value = jiraConfig.email;
+    if (jiraTokenInput) {
+      jiraTokenInput.placeholder = s.jiraHasToken
+        ? "•••••••••••• stored — paste to replace"
+        : "Paste your Jira API token";
+    }
+    const hasUrl = jiraUrlInput && jiraUrlInput.value.trim().length > 0;
+    const hasEmail = jiraEmailInput && jiraEmailInput.value.trim().length > 0;
+    const hasToken = (jiraTokenInput && jiraTokenInput.value.trim().length > 0) || s.jiraHasToken;
+    if (byId("saveJiraBtn")) setDisabled(byId("saveJiraBtn"), !(hasUrl && hasEmail && hasToken));
+    if (s.jiraHasToken && !byId("jiraSettingsStatus").innerHTML.trim()) {
+      byId("jiraSettingsStatus").innerHTML = `<span class="gx-badge ok">connected</span>`;
+    }
+
     const keyInput = /** @type {HTMLInputElement} */ (byId("apiKeyInput"));
     keyInput.placeholder = s.hasApiKey
       ? "•••••••••••• stored — paste to replace"
@@ -1994,6 +2133,77 @@
     byId("settingsStatus").innerHTML =
       `${provIcon}<span class="gx-strong">${escapeHtml(providerLabel)}</span> ${keyBadge}` +
       `<span>model: <span class="gx-strong">${escapeHtml(s.model || "—")}</span></span>`;
+  }
+
+  // ---------- Jira ----------
+
+  function openJiraMenu(key, summary, event) {
+    closeAllMenus();
+    contextJiraIssue = { key, summary };
+    const menu = byId("jiraIssueMenu");
+    menu.classList.remove("hidden");
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const x = event ? event.clientX : 0;
+    const y = event ? event.clientY : 0;
+    const margin = 6;
+    menu.style.left = `${Math.round(Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin)))}px`;
+    menu.style.top = `${Math.round(Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin)))}px`;
+  }
+
+  function closeJiraMenu() {
+    const menu = byId("jiraIssueMenu");
+    if (menu) menu.classList.add("hidden");
+    contextJiraIssue = null;
+  }
+
+  function handleJiraMenuAction(action) {
+    const issue = contextJiraIssue;
+    closeJiraMenu();
+    if (!issue) return;
+    if (action === "usePrefix") {
+      ui.commitPrefix = { enabled: true, value: issue.key };
+      persistCommitPrefix();
+      updatePrefixUi();
+      switchTab("changes");
+    } else if (action === "createBranch") {
+      post({ type: "createBranchFromJira", key: issue.key, summary: issue.summary });
+    }
+  }
+
+  function renderJira() {
+    const el = byId("jiraContent");
+    if (!el) return;
+    if (ui.jiraLoading) {
+      el.innerHTML = `<div class="gx-jira-state"><span class="gx-spin"></span><span>Loading issues…</span></div>`;
+      return;
+    }
+    if (ui.jiraError) {
+      const isUnconfigured = ui.jiraError.includes("not configured");
+      el.innerHTML = `<div class="gx-jira-state gx-jira-error">
+        <p>${escapeHtml(ui.jiraError)}</p>
+        ${isUnconfigured ? `<button class="gx-btn gx-btn-secondary" data-action="openSettings" type="button">Open Settings → Jira</button>` : ""}
+      </div>`;
+      return;
+    }
+    if (ui.jiraIssues === null) {
+      el.innerHTML = `<div class="gx-jira-state"><p>Click refresh to load your issues.</p></div>`;
+      return;
+    }
+    if (!ui.jiraIssues.length) {
+      el.innerHTML = `<div class="gx-jira-state"><p>No open issues assigned to you.</p></div>`;
+      return;
+    }
+    el.innerHTML = ui.jiraIssues.map((issue) => `
+      <div class="gx-jira-issue">
+        <span class="gx-jira-key">${escapeHtml(issue.key)}</span>
+        <span class="gx-jira-summary" title="${escapeHtml(issue.summary)}">${escapeHtml(issue.summary)}</span>
+        <span class="gx-jira-status">${escapeHtml(issue.status)}</span>
+        <button class="gx-iconbtn gx-jira-dots" data-action="openJiraIssueMenu"
+          data-jira-key="${escapeHtml(issue.key)}" data-jira-summary="${escapeHtml(issue.summary)}"
+          title="Actions" aria-label="Issue actions" type="button">${icon("dots", "sm")}</button>
+      </div>`).join("");
   }
 
   // ---------- Reports ----------
@@ -2176,6 +2386,35 @@
       case "reports":
         renderReports(Array.isArray(message.entries) ? message.entries : []);
         break;
+      case "jiraIssues":
+        ui.jiraLoading = false;
+        if (message.error) {
+          ui.jiraError = message.error;
+          ui.jiraIssues = null;
+        } else {
+          ui.jiraError = "";
+          ui.jiraIssues = Array.isArray(message.issues) ? message.issues : [];
+        }
+        renderJira();
+        break;
+      case "jiraStatus": {
+        const statusEl = byId("jiraSettingsStatus");
+        if (!statusEl) break;
+        if (message.loading) {
+          statusEl.innerHTML = `<span class="gx-spin"></span><span>Validating…</span>`;
+        } else if (message.ok) {
+          statusEl.innerHTML = `<span class="gx-badge ok">connected</span><span>Jira credentials saved.</span>`;
+          byId("jiraTokenInput").value = "";
+          byId("jiraTokenInput").placeholder = "•••••••••••• stored — paste to replace";
+        } else if (message.error) {
+          statusEl.innerHTML = `<span class="gx-badge missing">error</span><span>${escapeHtml(message.error)}</span>`;
+        }
+        const hasUrl = /** @type {HTMLInputElement} */ (byId("jiraBaseUrlInput")).value.trim().length > 0;
+        const hasEmail = /** @type {HTMLInputElement} */ (byId("jiraEmailInput")).value.trim().length > 0;
+        const hasToken = /** @type {HTMLInputElement} */ (byId("jiraTokenInput")).value.trim().length > 0 || ui.state.jiraHasToken;
+        setDisabled(byId("saveJiraBtn"), !(hasUrl && hasEmail && hasToken) || !!message.loading);
+        break;
+      }
       default:
         break;
     }
