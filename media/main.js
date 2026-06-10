@@ -9,6 +9,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>',
     search:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    externalLink:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
     branch:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="14"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M18 9.4c0 4-3.5 5.6-6 5.6"/></svg>',
     merge:
@@ -874,6 +876,8 @@
       <div id="jiraIssueMenu" class="gx-context-menu hidden" role="menu">
         <button data-jira-action="usePrefix" role="menuitem" type="button">${icon("tag", "sm")}<span>Use as commit prefix</span></button>
         <button data-jira-action="createBranch" role="menuitem" type="button">${icon("branch", "sm")}<span>Create branch</span></button>
+        <span class="gx-menu-sep"></span>
+        <button data-jira-action="openInJira" role="menuitem" type="button">${icon("externalLink", "sm")}<span>Open in Jira</span></button>
       </div>
     `;
     initTooltips();
@@ -2415,6 +2419,8 @@
       switchTab("changes");
     } else if (action === "createBranch") {
       post({ type: "createBranchFromJira", key: issue.key, summary: issue.summary });
+    } else if (action === "openInJira") {
+      post({ type: "openJiraIssue", key: issue.key });
     }
   }
 

@@ -476,6 +476,14 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "createBranchFromJira":
         await this.handleCreateBranchFromJira(String(message.key ?? ""), String(message.summary ?? ""));
         break;
+      case "openJiraIssue": {
+        const key = String(message.key ?? "");
+        const { baseUrl } = this.jira.getConfig();
+        if (key && baseUrl) {
+          await vscode.env.openExternal(vscode.Uri.parse(`${baseUrl}/browse/${key}`));
+        }
+        break;
+      }
       default:
         break;
     }
