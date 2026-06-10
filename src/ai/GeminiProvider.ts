@@ -8,6 +8,7 @@ import {
 } from "./AiProvider";
 import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -39,7 +40,7 @@ function isMainGeminiModel(id: string): boolean {
  */
 export class GeminiProvider implements AiProvider {
   async validateApiKey(apiKey: string): Promise<boolean> {
-    const response = await fetch(`${BASE_URL}/models`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/models`, {
       method: "GET",
       headers: { "x-goog-api-key": apiKey }
     });
@@ -47,7 +48,7 @@ export class GeminiProvider implements AiProvider {
   }
 
   async listModels(apiKey: string): Promise<string[]> {
-    const response = await fetch(`${BASE_URL}/models`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/models`, {
       method: "GET",
       headers: { "x-goog-api-key": apiKey }
     });
@@ -71,7 +72,7 @@ export class GeminiProvider implements AiProvider {
 
   async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
     const url = `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({

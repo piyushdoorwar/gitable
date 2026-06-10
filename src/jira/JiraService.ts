@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 export interface JiraConfig {
   baseUrl: string;
@@ -53,7 +54,7 @@ export class JiraService {
     if (!baseUrl || !email || !token) {
       throw new Error("Jira base URL, email, and API token are all required.");
     }
-    const res = await fetch(`${baseUrl}/rest/api/3/myself`, {
+    const res = await fetchWithTimeout(`${baseUrl}/rest/api/3/myself`, {
       headers: this.buildHeaders(email, token),
     });
     if (!res.ok) {
@@ -73,7 +74,7 @@ export class JiraService {
       ? `${base} AND text ~ "${query.replace(/"/g, '\\"')}" ORDER BY updated DESC`
       : `${base} ORDER BY updated DESC`;
     const url = `${baseUrl}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status,issuetype`;
-    const res = await fetch(url, { headers: this.buildHeaders(email, token) });
+    const res = await fetchWithTimeout(url, { headers: this.buildHeaders(email, token) });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`Jira returned ${res.status}${text ? `: ${text.slice(0, 120)}` : ""}`);

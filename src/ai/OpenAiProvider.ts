@@ -9,6 +9,7 @@ import {
 
 import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://api.openai.com/v1";
 
@@ -40,7 +41,7 @@ function isMainOpenAIModel(id: string): boolean {
  */
 export class OpenAiProvider implements AiProvider {
   async validateApiKey(apiKey: string): Promise<boolean> {
-    const response = await fetch(`${BASE_URL}/models`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/models`, {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` }
     });
@@ -48,7 +49,7 @@ export class OpenAiProvider implements AiProvider {
   }
 
   async listModels(apiKey: string): Promise<string[]> {
-    const response = await fetch(`${BASE_URL}/models`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/models`, {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` }
     });
@@ -68,7 +69,7 @@ export class OpenAiProvider implements AiProvider {
   }
 
   async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
-    const response = await fetch(`${BASE_URL}/chat/completions`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({

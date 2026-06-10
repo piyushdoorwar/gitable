@@ -8,6 +8,7 @@ import {
 } from "./AiProvider";
 import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -30,7 +31,7 @@ export class ClaudeProvider implements AiProvider {
   }
 
   async validateApiKey(apiKey: string): Promise<boolean> {
-    const response = await fetch(`${BASE_URL}/models`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/models`, {
       method: "GET",
       headers: this.headers(apiKey)
     });
@@ -38,7 +39,7 @@ export class ClaudeProvider implements AiProvider {
   }
 
   async listModels(apiKey: string): Promise<string[]> {
-    const response = await fetch(`${BASE_URL}/models`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/models`, {
       method: "GET",
       headers: this.headers(apiKey)
     });
@@ -58,7 +59,7 @@ export class ClaudeProvider implements AiProvider {
   }
 
   async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
-    const response = await fetch(`${BASE_URL}/messages`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/messages`, {
       method: "POST",
       headers: this.headers(apiKey),
       body: JSON.stringify({ model, system, max_tokens: 2048, temperature: 0.2, messages: [{ role: "user", content: user }] })
