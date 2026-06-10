@@ -662,33 +662,46 @@ button[aria-disabled="true"],
   to { transform: rotate(360deg); }
 }
 
-/* Amend toggle ------------------------------------------------------- */
-.gx-amend-row {
-  margin-top: 2px;
-  margin-bottom: 2px;
+/* Amend mode bar ----------------------------------------------------- */
+.gx-amend-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  margin-top: 6px;
+  border-radius: var(--gx-radius-sm);
+  background: rgba(122, 162, 255, 0.06);
+  border: 1px solid rgba(122, 162, 255, 0.22);
+  font-size: 11px;
 }
-.gx-amend-label {
+.gx-amend-bar-label {
+  flex: 1;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--vscode-descriptionForeground);
+  gap: 5px;
+  color: #7aa2ff;
+  font-weight: 600;
+}
+.gx-amend-bar-label svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.8;
+}
+.gx-amend-cancel {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  border-radius: var(--gx-radius-sm);
+  border: 1px solid rgba(122, 162, 255, 0.3);
+  background: transparent;
+  color: #7aa2ff;
   cursor: pointer;
-  user-select: none;
+  line-height: 1.6;
 }
-.gx-amend-checkbox {
-  width: 13px;
-  height: 13px;
-  accent-color: var(--gx-pink);
-  cursor: pointer;
-  margin: 0;
-}
-.gx-amend-label:has(.gx-amend-checkbox:checked) {
-  color: var(--gx-pink);
-}
-.gx-amend-label:has(.gx-amend-checkbox:disabled) {
-  opacity: 0.42;
-  cursor: not-allowed;
+.gx-amend-cancel:hover {
+  background: rgba(122, 162, 255, 0.1);
+  border-color: rgba(122, 162, 255, 0.5);
 }
 
 /* Undo commit bar ---------------------------------------------------- */

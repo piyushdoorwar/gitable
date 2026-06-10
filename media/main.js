@@ -265,6 +265,7 @@
   const ui = {
     activeTab: "changes",
     activeChangeTab: "working",
+    amendMode: false,
     selected: new Set(),
     selectedCommits: new Set(),
     historyAnchorHash: "",
@@ -666,11 +667,9 @@
             <label class="gx-label" for="commitDescription">Description</label>
             <textarea id="commitDescription" placeholder="Description (optional)"></textarea>
           </div>
-          <div id="amendRow" class="gx-amend-row hidden">
-            <label class="gx-amend-label">
-              <input id="amendToggle" type="checkbox" class="gx-amend-checkbox" />
-              <span id="amendLabel">Amend last commit</span>
-            </label>
+          <div id="amendBar" class="gx-amend-bar hidden">
+            <span class="gx-amend-bar-label">${icon("commit", "sm")}<span>Amending last commit</span></span>
+            <button class="gx-amend-cancel" data-action="cancelAmend" type="button">Cancel</button>
           </div>
           <div class="gx-actions">
             <button id="commitBtn" class="gx-btn gx-btn-primary" data-action="commit" title="Commit staged changes" aria-label="Commit staged changes" type="button">
@@ -1045,19 +1044,6 @@
     window.addEventListener("resize", closeAllMenus);
     window.addEventListener("scroll", closeAllMenus, true);
 
-    // Amend toggle — pre-fill commit fields with the last commit message.
-    byId("amendToggle").addEventListener("change", () => {
-      const checked = byId("amendToggle").checked;
-      if (checked) {
-        const lc = ui.state.lastCommit;
-        if (lc) {
-          /** @type {HTMLInputElement} */ (byId("commitSummary")).value = lc.summary || "";
-          /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = lc.description || "";
-        }
-      }
-      render();
-    });
-
     // Checkbox selection for bulk stage/unstage/discard actions.
     [byId("stagedList"), byId("unstagedList")].forEach((listEl) => {
       listEl.addEventListener("change", (e) => {
@@ -1134,6 +1120,12 @@
         switchChangeTab("working");
         post({ type: "unstageFile", filePath: elm.getAttribute("data-path") });
         break;
+      case "cancelAmend":
+        ui.amendMode = false;
+        /** @type {HTMLInputElement} */ (byId("commitSummary")).value = "";
+        /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = "";
+        render();
+        break;
       case "undoLastCommit":
         post({ type: "undoLastCommit" });
         break;
@@ -1159,7 +1151,7 @@
           return;
         }
         const summary = applyCommitPrefix(rawSummary);
-        const isAmend = /** @type {HTMLInputElement} */ (byId("amendToggle")).checked;
+        const isAmend = ui.amendMode;
         if (isAmend) {
           post({ type: "amend", summary, description });
         } else {
@@ -1562,7 +1554,7 @@
           /** @type {HTMLInputElement} */ (byId("commitSummary")).value = lc.summary || "";
           /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = lc.description || "";
         }
-        /** @type {HTMLInputElement} */ (byId("amendToggle")).checked = true;
+        ui.amendMode = true;
         render();
         byId("commitSummary").focus();
         break;
@@ -1839,13 +1831,9 @@
         : `<span class="gx-ic">${ICONS.sparkle}</span>`);
     setHint(genBtn, generateHint);
     setDisabled(genBtn, busy || !commitPanelActive || !hasStaged || hasConflicts);
-    const amendToggle = /** @type {HTMLInputElement} */ (byId("amendToggle"));
-    const isAmend = amendToggle.checked;
-    const canAmend = !!s.lastCommit;
-    byId("amendRow").classList.toggle("hidden", !commitPanelActive || rebase.inProgress);
-    amendToggle.disabled = busy || !canAmend || rebase.inProgress;
-    if (!canAmend && isAmend) amendToggle.checked = false;
-    byId("amendLabel").textContent = isAmend ? "Amending — uncheck to cancel" : "Amend last commit";
+    const isAmend = ui.amendMode && !!s.lastCommit && !rebase.inProgress;
+    if (!isAmend && ui.amendMode) ui.amendMode = false;
+    byId("amendBar").classList.toggle("hidden", !isAmend || !commitPanelActive);
 
     const commitBtn = byId("commitBtn");
     const branch = s.branchName ? " to " + escapeHtml(s.branchName) : "";
@@ -2681,7 +2669,7 @@
       case "clearCommitFields":
         /** @type {HTMLInputElement} */ (byId("commitSummary")).value = "";
         /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = "";
-        /** @type {HTMLInputElement} */ (byId("amendToggle")).checked = false;
+        ui.amendMode = false;
         break;
       case "switchTab":
         switchTab(message.tab);
