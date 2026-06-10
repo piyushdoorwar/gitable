@@ -1357,10 +1357,19 @@ textarea {
 }
 
 /* History ------------------------------------------------------------ */
+#panel-history {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gx-history-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
 .gx-history-actions {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1369,7 +1378,6 @@ textarea {
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
   background: var(--gx-undo-bar-bg);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
 }
 .gx-history-selected {
   flex: 0 0 auto;

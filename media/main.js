@@ -697,7 +697,9 @@
             <button id="historyClearBtn" class="gx-history-action gx-history-action-clear" data-action="clearCommitSelection" title="Clear selected commits" aria-label="Clear selected commits" type="button">${ICONS.minus}<span>Clear</span></button>
           </span>
         </div>
-        <ul id="commitList" class="gx-commits"></ul>
+        <div class="gx-history-scroll">
+          <ul id="commitList" class="gx-commits"></ul>
+        </div>
       </div>
 
       <div id="panel-branches" class="gx-panel hidden">
