@@ -198,6 +198,14 @@ export class VsCodeGitService implements GitService {
     );
   }
 
+  amend(summary: string, description?: string): Promise<void> {
+    return this.cli.amend(summary, description);
+  }
+
+  getLastCommitMessage(): Promise<{ summary: string; description: string } | null> {
+    return this.cli.getLastCommitMessage();
+  }
+
   getHistory(limit: number): Promise<CommitInfo[]> {
     return this.cli.getHistory(limit);
   }

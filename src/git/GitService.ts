@@ -50,6 +50,12 @@ export interface GitService {
   /** Creates a commit from a summary and optional description. */
   commit(summary: string, description?: string): Promise<void>;
 
+  /** Amends the most recent commit, replacing its message and including any currently staged changes. */
+  amend(summary: string, description?: string): Promise<void>;
+
+  /** Returns the subject and body of the most recent commit, or null if there are no commits. */
+  getLastCommitMessage(): Promise<{ summary: string; description: string } | null>;
+
   /** Recent commits on the current branch. */
   getHistory(limit: number): Promise<CommitInfo[]>;
 

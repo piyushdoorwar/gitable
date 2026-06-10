@@ -206,6 +206,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "commit":
         await this.runCommit(message.summary, message.description);
         break;
+      case "amend":
+        await this.runAmend(message.summary, message.description);
+        break;
       case "generateCommitMessage":
         await this.runGenerate(Number(message.maxChars) || undefined);
         break;
@@ -551,6 +554,24 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       vscode.window.showInformationMessage("Gitable: commit created.");
       this.view?.webview.postMessage({ type: "clearCommitFields" });
       this.view?.webview.postMessage({ type: "changesSubTab", tab: "working" });
+    } catch (error) {
+      this.fail(error);
+    }
+    await this.refresh();
+  }
+
+  private async runAmend(summary: string, description?: string): Promise<void> {
+    if (!summary || !summary.trim()) {
+      this.fail("Commit summary is required.");
+      await this.postState();
+      return;
+    }
+    try {
+      await this.git.amend(summary.trim(), description?.trim());
+      this.lastCommitSummary = summary.trim();
+      this.pendingNotice = "Commit amended.";
+      vscode.window.showInformationMessage("Gitable: commit amended.");
+      this.view?.webview.postMessage({ type: "clearCommitFields" });
     } catch (error) {
       this.fail(error);
     }
@@ -1617,6 +1638,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let behind = 0;
     let hasUpstream = false;
     let rebaseState: RebaseState = { inProgress: false };
+    let lastCommit: { summary: string; description: string } | null = null;
     let stateError = this.pendingError;
 
     try {
@@ -1634,6 +1656,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         behind = sync.behind;
         hasUpstream = sync.hasUpstream;
         rebaseState = await this.git.getRebaseState();
+        lastCommit = await this.git.getLastCommitMessage();
       }
     } catch (error) {
       if (!stateError) {
@@ -1667,6 +1690,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       pendingTagCount: this.pendingTagPushes.size,
       canUndoCommit: !!this.lastCommitSummary,
       lastCommitSummary: this.lastCommitSummary,
+      lastCommit,
       busyKind: this.busyKind,
       busyText: this.busyText,
       isLoading: !!this.busyKind,

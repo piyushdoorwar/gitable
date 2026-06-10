@@ -666,6 +666,12 @@
             <label class="gx-label" for="commitDescription">Description</label>
             <textarea id="commitDescription" placeholder="Description (optional)"></textarea>
           </div>
+          <div id="amendRow" class="gx-amend-row hidden">
+            <label class="gx-amend-label">
+              <input id="amendToggle" type="checkbox" class="gx-amend-checkbox" />
+              <span id="amendLabel">Amend last commit</span>
+            </label>
+          </div>
           <div class="gx-actions">
             <button id="commitBtn" class="gx-btn gx-btn-primary" data-action="commit" title="Commit staged changes" aria-label="Commit staged changes" type="button">
               ${icon("commit")}<span>Commit</span>
@@ -1039,6 +1045,19 @@
     window.addEventListener("resize", closeAllMenus);
     window.addEventListener("scroll", closeAllMenus, true);
 
+    // Amend toggle — pre-fill commit fields with the last commit message.
+    byId("amendToggle").addEventListener("change", () => {
+      const checked = byId("amendToggle").checked;
+      if (checked) {
+        const lc = ui.state.lastCommit;
+        if (lc) {
+          /** @type {HTMLInputElement} */ (byId("commitSummary")).value = lc.summary || "";
+          /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = lc.description || "";
+        }
+      }
+      render();
+    });
+
     // Checkbox selection for bulk stage/unstage/discard actions.
     [byId("stagedList"), byId("unstagedList")].forEach((listEl) => {
       listEl.addEventListener("change", (e) => {
@@ -1140,7 +1159,12 @@
           return;
         }
         const summary = applyCommitPrefix(rawSummary);
-        post({ type: "commit", summary, description });
+        const isAmend = /** @type {HTMLInputElement} */ (byId("amendToggle")).checked;
+        if (isAmend) {
+          post({ type: "amend", summary, description });
+        } else {
+          post({ type: "commit", summary, description });
+        }
         break;
       }
       case "enablePrefix":
@@ -1472,7 +1496,9 @@
   function openCommitMenu(hash, x, y) {
     if (!hash) return;
     closeFileMenu();
-    const commit = (ui.state.history || []).find((c) => c.hash === hash);
+    const history = ui.state.history || [];
+    const commit = history.find((c) => c.hash === hash);
+    const isHead = history.length > 0 && history[0].hash === hash;
     contextCommit = { hash, tags: (commit && commit.tags) || [] };
     const tags = contextCommit.tags;
     const tagItems = tags
@@ -1488,6 +1514,7 @@
       `<span class="gx-menu-sep"></span>` +
       `<button data-cmenu-action="createTag" role="menuitem" type="button">${icon("tag", "sm")}<span>Create tag…</span></button>` +
       `<span class="gx-menu-sep"></span>` +
+      (isHead ? `<button data-cmenu-action="amendCommit" role="menuitem" type="button">${icon("commit", "sm")}<span>Amend commit…</span></button><span class="gx-menu-sep"></span>` : "") +
       `<button data-cmenu-action="revertCommit" role="menuitem" type="button">${icon("revert", "sm")}<span>Revert commit</span></button>` +
       `<button data-cmenu-action="cherryPickCommit" role="menuitem" type="button">${icon("cherryPick", "sm")}<span>Cherry-pick commit</span></button>`;
     menu.classList.remove("hidden");
@@ -1527,6 +1554,19 @@
       case "cherryPickCommit":
         post({ type: "cherryPickCommit", hash: commit.hash });
         break;
+      case "amendCommit": {
+        const lc = ui.state.lastCommit;
+        switchTab("changes");
+        switchChangeTab("staged", false);
+        if (lc) {
+          /** @type {HTMLInputElement} */ (byId("commitSummary")).value = lc.summary || "";
+          /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = lc.description || "";
+        }
+        /** @type {HTMLInputElement} */ (byId("amendToggle")).checked = true;
+        render();
+        byId("commitSummary").focus();
+        break;
+      }
       default:
         break;
     }
@@ -1799,21 +1839,33 @@
         : `<span class="gx-ic">${ICONS.sparkle}</span>`);
     setHint(genBtn, generateHint);
     setDisabled(genBtn, busy || !commitPanelActive || !hasStaged || hasConflicts);
+    const amendToggle = /** @type {HTMLInputElement} */ (byId("amendToggle"));
+    const isAmend = amendToggle.checked;
+    const canAmend = !!s.lastCommit;
+    byId("amendRow").classList.toggle("hidden", !commitPanelActive || rebase.inProgress);
+    amendToggle.disabled = busy || !canAmend || rebase.inProgress;
+    if (!canAmend && isAmend) amendToggle.checked = false;
+    byId("amendLabel").textContent = isAmend ? "Amending — uncheck to cancel" : "Amend last commit";
+
     const commitBtn = byId("commitBtn");
-    commitBtn.innerHTML = `${icon("commit")}<span>Commit${
-      s.branchName ? " to " + escapeHtml(s.branchName) : ""
-    }</span>`;
+    const branch = s.branchName ? " to " + escapeHtml(s.branchName) : "";
+    commitBtn.innerHTML = isAmend
+      ? `${icon("commit")}<span>Amend commit</span>`
+      : `${icon("commit")}<span>Commit${branch}</span>`;
+    const canSubmit = isAmend ? !hasConflicts && !rebase.inProgress : hasStaged && !hasConflicts && !rebase.inProgress;
     setHint(
       commitBtn,
       hasConflicts
         ? `Resolve ${plural(conflicts.length, "conflict")} before committing`
         : !commitPanelActive
           ? "Open Staged to commit"
-        : hasStaged
-          ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
-          : "Stage files before committing"
+        : isAmend
+          ? `Amend last commit on ${s.branchName || "current branch"}`
+          : hasStaged
+            ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
+            : "Stage files before committing"
     );
-    setDisabled(commitBtn, busy || !commitPanelActive || !hasStaged || hasConflicts || rebase.inProgress);
+    setDisabled(commitBtn, busy || !commitPanelActive || !canSubmit);
     byId("commitCard").classList.toggle("hidden", !commitPanelActive || rebase.inProgress);
     setInputDisabled(byId("commitPrefix"), busy);
     setInputDisabled(byId("commitSummary"), busy);
@@ -2629,6 +2681,7 @@
       case "clearCommitFields":
         /** @type {HTMLInputElement} */ (byId("commitSummary")).value = "";
         /** @type {HTMLTextAreaElement} */ (byId("commitDescription")).value = "";
+        /** @type {HTMLInputElement} */ (byId("amendToggle")).checked = false;
         break;
       case "switchTab":
         switchTab(message.tab);

@@ -662,6 +662,35 @@ button[aria-disabled="true"],
   to { transform: rotate(360deg); }
 }
 
+/* Amend toggle ------------------------------------------------------- */
+.gx-amend-row {
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+.gx-amend-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  user-select: none;
+}
+.gx-amend-checkbox {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--gx-pink);
+  cursor: pointer;
+  margin: 0;
+}
+.gx-amend-label:has(.gx-amend-checkbox:checked) {
+  color: var(--gx-pink);
+}
+.gx-amend-label:has(.gx-amend-checkbox:disabled) {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 /* Undo commit bar ---------------------------------------------------- */
 .gx-undo-bar {
   display: flex;

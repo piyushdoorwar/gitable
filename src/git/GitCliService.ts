@@ -178,6 +178,30 @@ export class GitCliService implements GitService {
     await this.run(args, this.requireRoot());
   }
 
+  async amend(summary: string, description?: string): Promise<void> {
+    const args = ["commit", "--amend", "--no-edit", "-m", summary];
+    if (description && description.trim()) {
+      args.push("-m", description);
+    }
+    await this.run(args, this.requireRoot());
+  }
+
+  async getLastCommitMessage(): Promise<{ summary: string; description: string } | null> {
+    try {
+      const out = await this.run(["log", "-1", "--format=%B"], this.requireRoot());
+      const trimmed = out.trim();
+      if (!trimmed) return null;
+      const idx = trimmed.indexOf("\n");
+      if (idx === -1) return { summary: trimmed, description: "" };
+      return {
+        summary: trimmed.slice(0, idx).trim(),
+        description: trimmed.slice(idx).trim()
+      };
+    } catch {
+      return null;
+    }
+  }
+
   async getHistory(limit: number): Promise<CommitInfo[]> {
     const root = this.requireRoot();
     try {
