@@ -1,6 +1,10 @@
 (function () {
   const vscode = acquireVsCodeApi();
 
+  const SUMMARY_MESSAGES = ["Reading commits…", "Summarizing changes…", "Connecting the dots…", "Almost there…"];
+  const SECURITY_MESSAGES = ["Reviewing the code…", "Joining the dots…", "Matching against known vulnerabilities…", "Categorizing risks…", "Almost there…"];
+  const AI_PROGRESS_INTERVAL = 3000;
+
   /** Inline SVG icons (no emojis / unicode glyphs). */
   const ICONS = {
     chevron:
@@ -275,6 +279,8 @@
     commitStats: /** @type {Record<string, any>} */ ({}),
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
     activeSecurityReview: /** @type {null | {staged: boolean, loading?: boolean, findings?: any[], safe?: boolean, error?: string}} */ (null),
+    summaryProgress: { timer: /** @type {ReturnType<typeof setTimeout>|null} */ (null), idx: 0 },
+    securityProgress: { timer: /** @type {ReturnType<typeof setTimeout>|null} */ (null), idx: 0 },
     commitPrefix: readCommitPrefixState(),
     config: readConfig(),
     activeTheme: readTheme(),
@@ -316,6 +322,30 @@
 
   function post(message) {
     vscode.postMessage(message);
+  }
+
+  function startAiProgress(messages, progressState, renderFn) {
+    stopAiProgress(progressState);
+    progressState.idx = 0;
+    const tick = () => {
+      if (progressState.timer === null) return;
+      if (progressState.idx < messages.length - 1) {
+        progressState.idx++;
+        renderFn();
+        progressState.timer = setTimeout(tick, AI_PROGRESS_INTERVAL);
+      } else {
+        progressState.timer = null;
+      }
+    };
+    progressState.timer = setTimeout(tick, AI_PROGRESS_INTERVAL);
+    renderFn();
+  }
+
+  function stopAiProgress(progressState) {
+    if (progressState.timer !== null) {
+      clearTimeout(progressState.timer);
+      progressState.timer = null;
+    }
   }
   function byId(id) {
     return /** @type {HTMLElement} */ (document.getElementById(id));
@@ -1327,7 +1357,7 @@
         const label = selectedCommitLabel(commits);
         ui.activeSummary = { hash: label, subject: commitSubjectsLabel(commits), loading: true };
         byId("panel-summary").classList.remove("hidden");
-        renderSummaryPanel();
+        startAiProgress(SUMMARY_MESSAGES, ui.summaryProgress, renderSummaryPanel);
         post({ type: "summarizeCommits", commits, maxChars: getMaxChars("summary") });
         break;
       }
@@ -1336,7 +1366,7 @@
         if (!commits.length) return;
         ui.activeSecurityReview = { staged: false, scope: selectedCommitLabel(commits), loading: true };
         byId("panel-security").classList.remove("hidden");
-        renderSecurityPanel();
+        startAiProgress(SECURITY_MESSAGES, ui.securityProgress, renderSecurityPanel);
         post({ type: "securityReviewCommits", commits, maxChars: getMaxChars("security") });
         break;
       }
@@ -1394,11 +1424,12 @@
         if (!hash) break;
         ui.activeSummary = { hash, subject, loading: true };
         byId("panel-summary").classList.remove("hidden");
-        renderSummaryPanel();
+        startAiProgress(SUMMARY_MESSAGES, ui.summaryProgress, renderSummaryPanel);
         post({ type: "summarizeCommit", hash, subject, maxChars: getMaxChars("summary") });
         break;
       }
       case "closeSummary":
+        stopAiProgress(ui.summaryProgress);
         ui.activeSummary = null;
         byId("panel-summary").classList.add("hidden");
         break;
@@ -1406,11 +1437,12 @@
         const staged = elm.getAttribute("data-staged") === "1";
         ui.activeSecurityReview = { staged, loading: true };
         byId("panel-security").classList.remove("hidden");
-        renderSecurityPanel();
+        startAiProgress(SECURITY_MESSAGES, ui.securityProgress, renderSecurityPanel);
         post({ type: "securityReview", staged, maxChars: getMaxChars("security") });
         break;
       }
       case "closeSecurityReview":
+        stopAiProgress(ui.securityProgress);
         ui.activeSecurityReview = null;
         byId("panel-security").classList.add("hidden");
         break;
@@ -2212,11 +2244,12 @@
     const subjectEl = s.subject ? `<span class="gx-ai-subject">${escapeHtml(s.subject)}</span>` : "";
 
     if (s.loading) {
+      const progressText = SUMMARY_MESSAGES[ui.summaryProgress.idx] || SUMMARY_MESSAGES[0];
       el.innerHTML = `
         <div class="gx-ai-panel">
           <div class="gx-ai-panel-meta">${hashEl}${subjectEl}</div>
           <div class="gx-ai-panel-loading">
-            <span class="gx-spin"></span><span>Generating summary…</span>
+            <span class="gx-spin"></span><span>${escapeHtml(progressText)}</span>
           </div>
         </div>`;
       return;
@@ -2256,10 +2289,11 @@
     const scope = sr.scope || (sr.staged ? "Staged Changes" : "Working Tree Changes");
 
     if (sr.loading) {
+      const progressText = SECURITY_MESSAGES[ui.securityProgress.idx] || SECURITY_MESSAGES[0];
       container.innerHTML = `
         <div class="gx-ai-panel">
           <div class="gx-ai-panel-meta"><span class="gx-sec-scope">${escapeHtml(scope)}</span></div>
-          <div class="gx-ai-panel-loading">${icon("shieldAi", "sm")}<span>Scanning for security risks…</span></div>
+          <div class="gx-ai-panel-loading">${icon("shieldAi", "sm")}<span>${escapeHtml(progressText)}</span></div>
         </div>`;
       return;
     }
@@ -2683,6 +2717,7 @@
         if (ui.expandedCommits.has(message.hash)) renderHistory(ui.state);
         break;
       case "commitSummary":
+        stopAiProgress(ui.summaryProgress);
         if (ui.activeSummary && ui.activeSummary.hash === message.hash) {
           if (message.error) {
             ui.activeSummary = { ...ui.activeSummary, loading: false, error: message.error };
@@ -2693,6 +2728,7 @@
         }
         break;
       case "securityReview":
+        stopAiProgress(ui.securityProgress);
         if (ui.activeSecurityReview) {
           if (message.error) {
             ui.activeSecurityReview = { ...ui.activeSecurityReview, loading: false, error: message.error };

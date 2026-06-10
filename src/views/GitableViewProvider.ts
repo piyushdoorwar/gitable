@@ -1269,8 +1269,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.setBusy("generate", "Generating commit message…");
-    await this.postState();
+    const stopProgress = this.startProgressMessages(
+      ["Calculating diff…", "Drafting commit message…", "Connecting the dots…", "Almost there…"],
+      (msg) => { this.setBusy("generate", msg); void this.postState(); }
+    );
     try {
       const ai = AiProviderFactory.create(provider);
       const result = await ai.generateCommitMessage(
@@ -1296,9 +1298,27 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       this.fail(error);
     } finally {
+      stopProgress();
       this.clearBusy();
       await this.postState();
     }
+  }
+
+  private startProgressMessages(
+    messages: string[],
+    onUpdate: (msg: string) => void,
+    intervalMs = 3000
+  ): () => void {
+    onUpdate(messages[0]);
+    let idx = 1;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled || idx >= messages.length) return;
+      onUpdate(messages[idx++]);
+      setTimeout(tick, intervalMs);
+    };
+    setTimeout(tick, intervalMs);
+    return () => { cancelled = true; };
   }
 
   private async runValidate(provider: ProviderId): Promise<void> {
