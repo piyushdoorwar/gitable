@@ -1282,6 +1282,11 @@
       case "openJiraIssueMenu": {
         const key = elm.getAttribute("data-jira-key") || "";
         const summary = elm.getAttribute("data-jira-summary") || "";
+        const isOpen = elm.getAttribute("aria-expanded") === "true";
+        if (isOpen) {
+          closeJiraMenu();
+          break;
+        }
         const rect = elm.getBoundingClientRect();
         if (key) openJiraMenu(key, summary, rect.right, rect.bottom + 4, true, elm);
         break;
