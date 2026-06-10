@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitCliService } from "./GitCliService";
 import { GitService } from "./GitService";
-import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo, vscodeStatusToLetter } from "./models";
+import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
 
 // ---- Minimal typings for the built-in `vscode.git` extension API ----
 // We only declare the members Gitable uses, to avoid depending on the full
@@ -518,21 +518,6 @@ export class VsCodeGitService implements GitService {
     if (this.activeRoot) {
       this.cli.setActiveRoot(this.activeRoot);
     }
-  }
-
-  private toFileChange(change: GitApiChange, root: string, staged: boolean): FileChange {
-    const target = change.renameUri ?? change.uri;
-    const relativePath = path.relative(root, target.fsPath).split(path.sep).join("/");
-    const original = change.renameUri
-      ? path.relative(root, change.originalUri.fsPath).split(path.sep).join("/")
-      : undefined;
-    return {
-      path: relativePath,
-      displayPath: relativePath,
-      status: vscodeStatusToLetter(change.status),
-      staged,
-      originalPath: original
-    };
   }
 
   private getActiveRepository(): GitApiRepository | undefined {
