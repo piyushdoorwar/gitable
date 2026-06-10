@@ -2006,23 +2006,42 @@ body.gx-theme-vscode {
 }
 
 /* Jira panel */
+/* ── Jira panel ─────────────────────────────────────────── */
 #panel-jira {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 10px 12px;
   overflow: hidden;
 }
 
+/* 1. Search bar with icon */
 .gx-jira-search-row {
   display: flex;
   gap: 6px;
   align-items: center;
   flex: 0 0 auto;
 }
-.gx-jira-search-row input {
+.gx-jira-search-wrap {
   flex: 1;
   min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.gx-jira-search-icon {
+  position: absolute;
+  left: 7px;
+  display: flex;
+  align-items: center;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.gx-jira-search-icon .gx-ic svg { width: 12px; height: 12px; }
+.gx-jira-search-wrap input {
+  width: 100%;
+  padding-left: 26px !important;
 }
 
 .gx-jira-state {
@@ -2039,21 +2058,34 @@ body.gx-theme-vscode {
 .gx-jira-state p { margin: 0; }
 .gx-jira-error { color: var(--vscode-errorForeground, var(--gx-pink-strong)); }
 
+/* 7. Sticky header — wrapper holds header + scroll area together */
+.gx-jira-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#jiraListHeader {
+  flex: 0 0 auto;
+}
+
 #jiraContent {
   flex: 1 1 auto;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .gx-jira-list-header {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 8px 5px;
+  padding: 4px 10px 5px;
   border-bottom: 1px solid var(--gx-line);
-  margin-bottom: 1px;
+  background: var(--vscode-sideBar-background, transparent);
 }
 
 .gx-jira-col-hdr {
@@ -2066,7 +2098,7 @@ body.gx-theme-vscode {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--vscode-descriptionForeground);
-  opacity: 0.6;
+  opacity: 0.55;
   display: flex;
   align-items: center;
   gap: 0;
@@ -2084,7 +2116,7 @@ body.gx-theme-vscode {
 }
 .gx-jira-col-hdr:first-child {
   flex: 0 0 auto;
-  min-width: 62px;
+  min-width: 76px;
 }
 .gx-jira-col-hdr:nth-child(2) {
   flex: 1 1 auto;
@@ -2106,48 +2138,86 @@ body.gx-theme-vscode {
   line-height: 1;
 }
 
+/* 4. More row breathing room + 3. Left accent on hover */
 .gx-jira-issue {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 8px;
+  gap: 8px;
+  padding: 7px 10px 7px 12px;
   border-radius: var(--gx-radius-sm);
   background: transparent;
-  transition: background 0.1s;
+  border-left: 2px solid transparent;
+  transition: background 0.1s, border-color 0.1s;
 }
 .gx-jira-issue:hover {
   background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.04));
+  border-left-color: var(--gx-pink-line);
 }
 
+/* 2. Jira ID chip */
 .gx-jira-key {
   flex: 0 0 auto;
-  font-size: 10.5px;
+  min-width: 76px;
+}
+.gx-jira-key-chip {
+  display: inline-block;
+  font-size: 10px;
   font-weight: 700;
+  font-family: var(--vscode-editor-font-family, monospace);
+  letter-spacing: 0.02em;
   color: var(--gx-pink);
-  letter-spacing: 0.03em;
-  min-width: 62px;
+  background: rgba(249, 139, 158, 0.1);
+  border: 1px solid rgba(249, 139, 158, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px 2px;
+  white-space: nowrap;
 }
 
+/* 6. Description de-emphasised */
 .gx-jira-summary {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--vscode-foreground);
+  opacity: 0.82;
 }
 
+/* 5. Right-aligned status + colored badges */
 .gx-jira-status {
   flex: 0 0 auto;
   font-size: 10px;
   font-weight: 600;
-  color: var(--vscode-descriptionForeground);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--gx-line);
   border-radius: 999px;
-  padding: 1px 7px;
+  padding: 2px 8px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
+  /* default (To Do) */
+  color: var(--vscode-descriptionForeground);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.gx-jira-st-progress {
+  color: #7aa2ff;
+  background: rgba(122, 162, 255, 0.1);
+  border-color: rgba(122, 162, 255, 0.25);
+}
+.gx-jira-st-review {
+  color: #e7bd57;
+  background: rgba(231, 189, 87, 0.1);
+  border-color: rgba(231, 189, 87, 0.25);
+}
+.gx-jira-st-done {
+  color: #62d39a;
+  background: rgba(98, 211, 154, 0.1);
+  border-color: rgba(98, 211, 154, 0.25);
+}
+.gx-jira-st-blocked {
+  color: var(--gx-pink-strong);
+  background: rgba(249, 139, 158, 0.1);
+  border-color: rgba(249, 139, 158, 0.25);
 }
 
 .gx-jira-dots {

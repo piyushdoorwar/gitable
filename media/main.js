@@ -7,6 +7,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
     refresh:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>',
+    search:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
     branch:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="14"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M18 9.4c0 4-3.5 5.6-6 5.6"/></svg>',
     merge:
@@ -831,16 +833,21 @@
 
       <div id="panel-jira" class="gx-panel hidden">
         <div class="gx-jira-search-row">
-          <input id="jiraSearchInput" type="text" placeholder="Search your issues…" autocomplete="off" spellcheck="false" />
+          <div class="gx-jira-search-wrap">
+            <span class="gx-jira-search-icon">${icon("search", "sm")}</span>
+            <input id="jiraSearchInput" type="text" placeholder="Search your issues…" autocomplete="off" spellcheck="false" />
+          </div>
           <button class="gx-iconbtn" data-action="refreshJira" title="Refresh" aria-label="Refresh" type="button">${icon("refresh", "sm")}</button>
         </div>
-        <div id="jiraListHeader" class="gx-jira-list-header">
-          <button class="gx-jira-col-hdr" data-action="sortJira" data-col="key" type="button"><span>Jira ID</span><span class="gx-sort-ind"></span></button>
-          <button class="gx-jira-col-hdr" data-action="sortJira" data-col="summary" type="button"><span>Description</span><span class="gx-sort-ind"></span></button>
-          <button class="gx-jira-col-hdr" data-action="sortJira" data-col="status" type="button"><span>Status</span><span class="gx-sort-ind"></span></button>
-          <span></span>
+        <div class="gx-jira-table">
+          <div id="jiraListHeader" class="gx-jira-list-header">
+            <button class="gx-jira-col-hdr" data-action="sortJira" data-col="key" type="button"><span>Jira ID</span><span class="gx-sort-ind"></span></button>
+            <button class="gx-jira-col-hdr" data-action="sortJira" data-col="summary" type="button"><span>Description</span><span class="gx-sort-ind"></span></button>
+            <button class="gx-jira-col-hdr" data-action="sortJira" data-col="status" type="button"><span>Status</span><span class="gx-sort-ind"></span></button>
+            <span></span>
+          </div>
+          <div id="jiraContent"></div>
         </div>
-        <div id="jiraContent"></div>
       </div>
 
       <div id="panel-summary" class="gx-ai-overlay hidden">
@@ -2411,6 +2418,15 @@
     }
   }
 
+  function jiraStatusClass(status) {
+    const s = status.toLowerCase();
+    if (s.includes("progress") || s.includes("doing") || s.includes("active")) return "gx-jira-st-progress";
+    if (s.includes("review") || s.includes("testing") || s.includes("qa")) return "gx-jira-st-review";
+    if (s.includes("done") || s.includes("closed") || s.includes("resolved") || s.includes("complete")) return "gx-jira-st-done";
+    if (s.includes("blocked") || s.includes("hold")) return "gx-jira-st-blocked";
+    return "gx-jira-st-todo";
+  }
+
   function renderJira() {
     const el = byId("jiraContent");
     if (!el) return;
@@ -2453,9 +2469,9 @@
     }
     el.innerHTML = issues.map((issue) => `
       <div class="gx-jira-issue">
-        <span class="gx-jira-key">${escapeHtml(issue.key)}</span>
+        <span class="gx-jira-key"><span class="gx-jira-key-chip">${escapeHtml(issue.key)}</span></span>
         <span class="gx-jira-summary" title="${escapeHtml(issue.summary)}">${escapeHtml(issue.summary)}</span>
-        <span class="gx-jira-status">${escapeHtml(issue.status)}</span>
+        <span class="gx-jira-status ${jiraStatusClass(issue.status)}">${escapeHtml(issue.status)}</span>
         <button class="gx-iconbtn gx-jira-dots" data-action="openJiraIssueMenu"
           data-jira-key="${escapeHtml(issue.key)}" data-jira-summary="${escapeHtml(issue.summary)}"
           title="Actions" aria-label="Issue actions" aria-haspopup="menu" aria-expanded="false" type="button">${icon("dots", "sm")}</button>
