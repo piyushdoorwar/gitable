@@ -616,7 +616,6 @@
                 <span class="gx-mini-sep"></span>
                 <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
                 <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
-                <button id="stageAllBtn" class="gx-mini-action" data-action="stageAll" title="Stage all files" aria-label="Stage all files" type="button">${ICONS.stageAll}</button>
               </span>
             </div>
             <ul id="unstagedList" class="gx-files"></ul>
@@ -632,7 +631,6 @@
                 <button id="stashBtn" class="gx-mini-action" data-action="stashStaged" title="Stash staged changes (git stash push --staged)" aria-label="Stash staged changes" type="button">${ICONS.stash}</button>
                 <span class="gx-mini-sep"></span>
                 <button id="unstageSelectedBtn" class="gx-mini-action" data-action="unstageSelected" title="Unstage selected files" aria-label="Unstage selected files" type="button">${ICONS.minus}</button>
-                <button id="unstageAllBtn" class="gx-mini-action" data-action="unstageAll" title="Unstage all files" aria-label="Unstage all files" type="button">${ICONS.unstageAll}</button>
               </span>
             </div>
             <ul id="stagedList" class="gx-files"></ul>
@@ -1850,34 +1848,22 @@
     const selectedStaged = selectedPaths(stagedFiles, true).length;
     const selectedUnstaged = selectedPaths(unstagedFiles, false).length;
     const unstageSelected = byId("unstageSelectedBtn");
-    const unstageAll = byId("unstageAllBtn");
     const stageSelected = byId("stageSelectedBtn");
-    const stageAll = byId("stageAllBtn");
     const discardSelected = byId("discardSelectedBtn");
     setHint(
       unstageSelected,
-      selectedStaged ? `Unstage ${plural(selectedStaged, "selected file")}` : "Select staged files to unstage"
-    );
-    setHint(
-      unstageAll,
-      stagedFiles.length ? `Unstage all ${plural(stagedFiles.length, "file")}` : "No staged files to unstage"
+      selectedStaged ? `Unstage ${plural(selectedStaged, "selected file")}` : "Uncheck files above to keep them staged"
     );
     setHint(
       stageSelected,
-      selectedUnstaged ? `Stage ${plural(selectedUnstaged, "selected file")}` : "Select changed files to stage"
-    );
-    setHint(
-      stageAll,
-      unstagedFiles.length ? `Stage all ${plural(unstagedFiles.length, "file")}` : "No changed files to stage"
+      selectedUnstaged ? `Stage ${plural(selectedUnstaged, "selected file")}` : "Uncheck files above to exclude from staging"
     );
     setHint(
       discardSelected,
       selectedUnstaged ? `Discard ${plural(selectedUnstaged, "selected file")}` : "Select changed files to discard"
     );
     setDisabled(unstageSelected, busy || selectedStaged === 0);
-    setDisabled(unstageAll, busy || stagedFiles.length === 0);
     setDisabled(stageSelected, busy || selectedUnstaged === 0);
-    setDisabled(stageAll, busy || unstagedFiles.length === 0);
     discardSelected.classList.toggle("hidden", selectedUnstaged === 0);
     setDisabled(discardSelected, busy || selectedUnstaged === 0);
   }
@@ -2712,13 +2698,23 @@
     }
   });
 
+  // Keys seen in any previous state — used to avoid re-checking files the user
+  // explicitly unchecked. A file is auto-checked only on its first appearance.
+  const _seenFileKeys = new Set();
+
   function pruneSelection() {
-    const present = new Set();
-    (ui.state.changes.staged || []).forEach((f) => present.add(selectionKey(f.path, true)));
-    (ui.state.changes.unstaged || []).forEach((f) => present.add(selectionKey(f.path, false)));
-    Array.from(ui.selected).forEach((path) => {
-      if (!present.has(path)) ui.selected.delete(path);
+    const current = new Set();
+    (ui.state.changes.staged || []).forEach((f) => current.add(selectionKey(f.path, true)));
+    (ui.state.changes.unstaged || []).forEach((f) => current.add(selectionKey(f.path, false)));
+    // Remove selections for files that no longer exist
+    Array.from(ui.selected).forEach((key) => {
+      if (!current.has(key)) ui.selected.delete(key);
     });
+    // Auto-check files that are appearing for the first time
+    current.forEach((key) => {
+      if (!_seenFileKeys.has(key)) ui.selected.add(key);
+    });
+    current.forEach((key) => _seenFileKeys.add(key));
   }
 
   // ---------- Boot ----------
