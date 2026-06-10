@@ -133,18 +133,10 @@ export class VsCodeGitService implements GitService {
   }
 
   async getChanges(): Promise<RepoChanges> {
-    const repo = this.getActiveRepository();
-    if (!repo) {
-      return this.cli.getChanges();
-    }
-    const root = repo.rootUri.fsPath;
-    const staged = repo.state.indexChanges.map((change) => this.toFileChange(change, root, true));
-    const unstaged = repo.state.workingTreeChanges.map((change) => this.toFileChange(change, root, false));
-    const conflicts = repo.state.mergeChanges.map((change) => ({
-      ...this.toFileChange(change, root, false),
-      status: "X" as const
-    }));
-    return { staged, unstaged, conflicts };
+    // Always use CLI so the badge and file list reflect the actual on-disk state
+    // immediately after commits, discards, and other operations — the VS Code Git
+    // API's in-memory cache (indexChanges/workingTreeChanges) can lag behind.
+    return this.cli.getChanges();
   }
 
   getStagedDiff(): Promise<string> {
