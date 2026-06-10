@@ -16,14 +16,16 @@ selected Git diff is ever sent to the AI provider you choose.
 
 ## Features
 
-- 🗂️ **Changes tab** — unified file list where a checked checkbox means staged and unchecked means unstaged. Check or uncheck any file to stage/unstage it instantly; "Check all" / "Uncheck all" buttons act on everything at once. File status (added, modified, deleted, renamed, untracked) is shown on each row. Right-click any file to discard it.
-- ⚠️ **Conflict resolution** — after a merge or pull with conflicts, conflicted files appear in a dedicated section with "Open in merge editor" and "Mark as resolved" actions. Commit is blocked until all conflicts are cleared.
+- 🗂️ **Changes tab** — files are pre-checked by default; uncheck what you don't want to include. File status (added, modified, deleted, renamed, untracked) is shown on each row. Right-click any file to discard it.
+- ⚠️ **Conflict resolution** — after a merge, pull, or rebase with conflicts, conflicted files appear in a dedicated section with "Open in merge editor" and "Mark as resolved" actions. Commit is blocked until all conflicts are cleared.
 - 📦 **Stash** — stash only your staged files with one click, then pop/apply/drop stashes from the same panel.
 - 🔀 **Merge branch** — right-click any branch → "Merge into current"; conflict detection surfaces the error inline.
 - ♻️ **Rebase** — right-click any branch → "Rebase onto this"; conflict resolution flows through the existing merge-editor integration with dedicated **Continue Rebase** and **Abort Rebase** actions in the Changes tab. Multi-commit rebases cycle through each conflict automatically.
-- 📝 **Commit box** — summary and description inputs with a one-click commit.
+- ✏️ **Amend last commit** — right-click the top commit in History → "Amend commit…"; lands on Staged with the message pre-filled. Edit the message and/or stage extra files, then click **Amend commit**. Pure message edits work too.
+- 🔁 **Force push with lease** — a rejected push automatically offers **Force Push** using `--force-with-lease`, which refuses if someone else pushed in the meantime.
+- 📝 **Commit box** — summary and description inputs with a one-click commit. Undo last commit (soft reset) appears below the button after each commit.
 - ✨ **AI commit messages** — generate a commit message from your staged changes; review and edit before committing (never auto-commits).
-- 🕑 **History tab** — recent commits for the current branch with short hash, subject, author, and relative date.
+- 🕑 **History tab** — recent commits for the current branch with short hash, subject, author, and relative date. Select multiple commits for batch AI summary or security review.
 - ⚙️ **Settings tab** — pick a provider, securely store an API key, validate it, and choose a model.
 - 🔌 **Repository selector** — switch between open repositories; current branch is always visible.
 - 🛡️ **Diff safety** — generated/noisy files (lockfiles, `dist/`, `*.min.js`, …) are excluded and large diffs are truncated before being sent to AI.
@@ -82,11 +84,11 @@ appears in the Activity Bar — click it to open the panel.
 ## Roadmap
 
 - Inline commit/diff detail view when selecting a file or commit.
-- Branch switching and creation from the panel.
-- Push/pull/sync controls.
+- Checkout remote tracking branches from the panel.
+- Delete remote branches when deleting a local branch.
+- "Stash all" button (stash staged + unstaged + untracked in one click).
 - Per-repository provider/model overrides.
 - Configurable ignore patterns and diff size limit.
-- Amend last commit and undo last commit.
 
 ## Development
 

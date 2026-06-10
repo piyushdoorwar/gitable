@@ -85,16 +85,20 @@ tests/
 ### Webview message protocol
 
 **Webview → host:**
-- Git: `ready`, `refresh`, `stateRendered`, `selectRepo`, `stageFile`, `unstageFile`, `stageFiles`,
-  `unstageFiles`, `stageAll`, `unstageAll`, `discardFiles`, `commit`, `openDiff`,
-  `openCommitFile`, `toggleCommit`, `push`, `pull`, `fetchOrigin`, `createBranch`,
-  `switchBranch`, `checkoutBranchWithChanges`, `checkoutBranchKeepingChanges`,
-  `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`,
-  `setUpstream`, `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`, `mergeBranch`,
+- Git: `ready`, `refresh`, `stateRendered`, `selectRepo`,
+  `stageFile`, `unstageFile`, `stageFiles`, `unstageFiles`, `stageAll`, `unstageAll`,
+  `discardFiles`, `commit`, `amend`,
+  `openDiff`, `openFile`, `openCommitFile`, `copyFilePath`, `copyRelativePath`, `revealFile`,
+  `push`, `pull`, `fetchOrigin`,
+  `createBranch`, `switchBranch`, `checkoutBranchWithChanges`, `checkoutBranchKeepingChanges`,
+  `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`, `setUpstream`,
+  `mergeBranch`, `rebaseBranch`, `rebaseContinue`, `rebaseAbort`,
+  `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`,
   `openMergeEditor`, `markResolved`,
   `stashStaged`, `stashPop`, `stashApply`, `stashDrop`,
-  `createTag` `{hash}`, `deleteTag` `{name}`, `pushTags`,
-  `addToGitignore` `{filePath}`, `undoLastCommit`
+  `createTag {hash}`, `deleteTag {name}`, `pushTags`,
+  `addToGitignore {filePath}`, `undoLastCommit`,
+  `openJiraIssue {key}`
 - AI: `generateCommitMessage`, `summarizeCommit`, `summarizeCommits`,
   `securityReview`, `securityReviewCommits`,
   `saveAndValidate`, `saveProvider`, `saveModel`, `fetchModels`, `copySummaryText`
@@ -114,9 +118,13 @@ repositoryName, branchName, activeRoot, repositories,
 changes:{staged, unstaged, conflicts}, stashes,
 history, branches,
 ahead, behind, hasUpstream, syncAction, lastFetchedAt,
-pendingTagCount, canUndoCommit, lastCommitSummary, hasConflicts,
-provider, model, models, hasApiKey,
-busyKind, busyText, isLoading, error, notice
+pendingTagCount, canUndoCommit, lastCommitSummary,
+lastCommit:{summary, description} | null,
+rebaseState:{inProgress, branch?, onto?},
+hasConflicts,
+provider, model, models, hasApiKey, providerIcons,
+busyKind, busyText, isLoading, error, notice,
+jiraConfig:{baseUrl, email}, jiraHasToken
 ```
 
 ### AI result panels (overlays)
@@ -287,3 +295,9 @@ workspace, never committed to the repo.
   When `ahead > 0` the push also calls `pushAllTags()` and clears the set. When
   `ahead === 0` the button shows "Push tags" and posts `pushTags`. Pending tags are
   reset on any successful push and when a tag is deleted.
+- **Rebase with conflict resolution.** Right-click any non-current branch → "Rebase onto this". `GitableViewProvider` shows a modal confirmation, then calls `git rebase`. On conflict, `getRebaseState()` detects `.git/rebase-merge/head-name` and sets `rebaseState.inProgress: true` in state. The Changes tab shows a rebase bar with **Continue Rebase** and **Abort** buttons. `rebaseContinue()` uses `GIT_EDITOR=true` to suppress the editor. Multi-commit rebases cycle through each conflict automatically. The commit card and commit button are hidden during rebase.
+- **Amend last commit.** Right-click the HEAD commit in History → "Amend commit…". The handler switches to Changes → Staged, pre-fills the commit fields from `state.lastCommit` (fetched fresh via `git log -1 --format=%B` on every state build), and checks the amend toggle. The toggle label changes to "Amending — uncheck to cancel" when active. On submit the webview posts `amend` instead of `commit`; the host calls `git commit --amend`. Works with or without new staged files (pure message edit is valid). `clearCommitFields` also resets the toggle.
+- **Force push with lease.** A normal push that is rejected (error matches `/rejected|non-fast-forward|fetch first/i`) triggers a VS Code warning modal offering **Force Push**. If confirmed, `git push --force-with-lease` is used — this refuses if someone else has pushed to the remote since the last fetch, preventing accidental clobbers.
+- **Auto-select file checkboxes.** Files in the Working and Staged lists are checked by default when they first appear. A `_seenFileKeys` Set tracks which keys have been seen; only genuinely new keys are auto-checked. Files the user explicitly unchecks stay unchecked across re-renders. Moving a file between Working and Staged changes its key (`path:false` vs `path:true`), so it is auto-checked in its new section. The "Stage all" and "Unstage all" buttons were removed — "Stage selected" / "Unstage selected" cover all cases when everything is pre-checked.
+- **Jira integration.** Optional panel (toggled in Settings → Jira). Credentials (base URL, email, API token via SecretStorage) connect to Jira Cloud's REST API v3. Issues assigned to the current user and not Done are fetched (`maxResults=50`). Search is local-only (filters the cached 50 results). Status badges use keyword matching (`jiraStatusClass()`). Three-dot menu per issue: Copy key, Copy branch name, Open in Jira (via `vscode.env.openExternal`). Sort by any column cycles asc → desc → off. All Jira and AI network calls use `fetchWithTimeout` (45 s) which throws `RequestTimeoutError` on abort.
+- **History tab sticky header.** The history action bar (selected count + Summary/Security/Clear buttons) is a `flex: 0 0 auto` header; only the commit list below it scrolls. Same flex-column + scroll-wrapper pattern as the Changes panel (`#panel-history { display:flex; flex-direction:column; overflow:hidden }` + `.gx-history-scroll { flex:1 1 auto; overflow-y:auto }`).
