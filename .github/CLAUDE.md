@@ -224,11 +224,13 @@ workspace, never committed to the repo.
 
 ## Notable design decisions
 
-- **Hybrid Git access.** Local mutations go through CLI; reads, watches, and
-  ordinary push/pull prefer the built-in API for credential/UI integration, with
-  a transparent CLI fallback via `apiOrCli()`. Remote-aware publishing and
-  upstream tracking are CLI-backed because they need explicit `remote` and
-  tracking arguments (`push -u`, `branch --set-upstream-to`).
+- **Hybrid Git access.** Local mutations go through CLI; watches and ordinary
+  push/pull prefer the built-in API for credential/UI integration, with a
+  transparent CLI fallback via `apiOrCli()`. `getChanges()` always uses the CLI
+  so the badge and file list are always fresh — the VS Code Git API's in-memory
+  cache (`indexChanges`/`workingTreeChanges`) can lag after commits and discards.
+  Remote-aware publishing and upstream tracking are CLI-backed because they need
+  explicit `remote` and tracking arguments (`push -u`, `branch --set-upstream-to`).
 - **Full SHA in history.** `git log` uses `%H` (40-char). Display truncates to 7
   chars. All git operations (diff, revert, cherry-pick, AI summary) use the full hash.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from

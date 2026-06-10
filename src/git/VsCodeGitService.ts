@@ -182,8 +182,7 @@ export class VsCodeGitService implements GitService {
   commit(summary: string, description?: string): Promise<void> {
     const repo = this.getActiveRepository();
     const message = description?.trim() ? `${summary}\n\n${description}` : summary;
-    // Prefer the API so the Git extension's state (indexChanges) is updated
-    // immediately — this ensures the badge clears right after the commit.
+    // Prefer the API so the Git extension's SCM view updates immediately.
     return this.apiOrCli(
       repo ? () => repo.commit(message) : undefined,
       () => this.cli.commit(summary, description)
