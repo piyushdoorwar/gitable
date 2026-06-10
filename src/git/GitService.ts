@@ -83,6 +83,9 @@ export interface GitService {
   /** Pushes the current branch to its remote. */
   push(): Promise<void>;
 
+  /** Force-pushes the current branch using --force-with-lease (safe force push). */
+  pushForce(): Promise<void>;
+
   /** Local remote names such as origin/upstream. */
   getRemotes(): Promise<string[]>;
 

@@ -336,6 +336,10 @@ export class VsCodeGitService implements GitService {
     return this.apiOrCli(repo ? () => repo.push() : undefined, () => this.cli.push());
   }
 
+  pushForce(): Promise<void> {
+    return this.cli.pushForce();
+  }
+
   getRemotes(): Promise<string[]> {
     this.syncCliRoot();
     return this.cli.getRemotes();

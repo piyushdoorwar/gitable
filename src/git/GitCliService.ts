@@ -348,6 +348,10 @@ export class GitCliService implements GitService {
     await this.run(["push"], this.requireRoot());
   }
 
+  async pushForce(): Promise<void> {
+    await this.run(["push", "--force-with-lease"], this.requireRoot());
+  }
+
   async getRemotes(): Promise<string[]> {
     const output = await this.run(["remote"], this.requireRoot());
     return output

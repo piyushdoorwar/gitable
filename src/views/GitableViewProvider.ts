@@ -1142,7 +1142,24 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
 
     await this.runSyncOp("Pushing", true, async () => {
-      await this.git.push();
+      try {
+        await this.git.push();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/(rejected|non-fast-forward|fetch first)/i.test(msg)) {
+          const choice = await vscode.window.showWarningMessage(
+            `Push rejected — the remote has diverged (e.g. after a rebase). Force push with --force-with-lease?`,
+            { modal: true },
+            "Force Push"
+          );
+          if (choice !== "Force Push") {
+            throw new Error("Push cancelled.");
+          }
+          await this.git.pushForce();
+        } else {
+          throw err;
+        }
+      }
       if (this.pendingTagPushes.size > 0) {
         await this.git.pushAllTags();
         this.pendingTagPushes.clear();
