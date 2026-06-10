@@ -225,24 +225,23 @@ describe("VsCodeGitService", () => {
       expect(cliSpy).toHaveBeenCalled();
     });
 
-    // -- reads use the API state ---------------------------------------------
+    // -- reads use the CLI for fresh data (not the API in-memory cache) ------
 
-    it("getChanges reads staged changes from API indexChanges", async () => {
-      mockRepo.state.indexChanges = [
-        { uri: { fsPath: path.join(root, "staged.ts") }, originalUri: { fsPath: path.join(root, "staged.ts") }, status: 1 }
-      ];
+    it("getChanges returns staged changes via CLI", async () => {
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(path.join(root, "staged.ts"), "new file\n");
+      await git(["add", "staged.ts"], root);
       const changes = await service.getChanges();
       expect(changes.staged).toHaveLength(1);
       expect(changes.staged[0]).toMatchObject({ path: "staged.ts", status: "A", staged: true });
     });
 
-    it("getChanges reads unstaged changes from API workingTreeChanges", async () => {
-      mockRepo.state.workingTreeChanges = [
-        { uri: { fsPath: path.join(root, "modified.ts") }, originalUri: { fsPath: path.join(root, "modified.ts") }, status: 5 }
-      ];
+    it("getChanges returns unstaged changes via CLI", async () => {
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(path.join(root, "file.ts"), "modified content\n");
       const changes = await service.getChanges();
       expect(changes.unstaged).toHaveLength(1);
-      expect(changes.unstaged[0]).toMatchObject({ path: "modified.ts", status: "M", staged: false });
+      expect(changes.unstaged[0]).toMatchObject({ path: "file.ts", status: "M", staged: false });
     });
 
     it("getSyncInfo reads ahead/behind counts from API HEAD", async () => {
