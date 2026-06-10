@@ -38,6 +38,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private modelsPreloaded = false;
   private stateRenderSeq = 0;
   private readonly pendingStateRenders = new Map<number, () => void>();
+  private postStateVersion = 0;
   private readonly modelsCache: Partial<Record<ProviderId, string[]>> = {};
 
   constructor(
@@ -1635,13 +1636,20 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     if (!this.view) {
       return;
     }
+    const version = ++this.postStateVersion;
     const data = await this.buildState();
+    // A newer postState() call started after us — its result is fresher; bail out.
+    if (version !== this.postStateVersion) {
+      return;
+    }
     const renderId = waitForRender ? ++this.stateRenderSeq : undefined;
     const rendered = renderId ? this.waitForStateRender(renderId) : undefined;
     const delivered = await this.view.webview.postMessage({ type: "state", data, renderId });
     const changes = data.changes as { staged: unknown[]; unstaged: unknown[] } | undefined;
     const count = (changes?.staged?.length ?? 0) + (changes?.unstaged?.length ?? 0);
-    this.view.badge = count > 0 ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` } : undefined;
+    if (this.view) {
+      this.view.badge = count > 0 ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` } : undefined;
+    }
     this.pendingError = "";
     this.pendingNotice = "";
     if (rendered && delivered) {
