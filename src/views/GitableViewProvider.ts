@@ -9,7 +9,7 @@ import { UsageStore } from "../analytics/UsageStore";
 import { JiraService } from "../jira/JiraService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
-import { RepoChanges, StashEntry } from "../git/models";
+import { RebaseState, RepoChanges, StashEntry } from "../git/models";
 import { DiffLimiter } from "../utils/DiffLimiter";
 import { Logger } from "../utils/Logger";
 
@@ -331,6 +331,15 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       case "mergeBranch":
         await this.mergeBranch(String(message.name ?? ""));
+        break;
+      case "rebaseBranch":
+        await this.rebaseBranch(String(message.name ?? ""));
+        break;
+      case "rebaseContinue":
+        await this.rebaseContinue();
+        break;
+      case "rebaseAbort":
+        await this.rebaseAbort();
         break;
       case "setUpstream":
         await this.setUpstreamForBranch(String(message.name ?? ""));
@@ -1016,6 +1025,78 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async rebaseBranch(name: string): Promise<void> {
+    if (!name) return;
+    const summary = await this.git.getRepoSummary().catch(() => undefined);
+    const current = summary?.branch ?? "current branch";
+    const picked = await vscode.window.showWarningMessage(
+      `Rebase ${current} onto ${name}?`,
+      { modal: true, detail: "This rewrites commit history. The current branch's commits will be replayed on top of the target. Conflicts will need to be resolved one by one." },
+      "Rebase"
+    );
+    if (!picked) return;
+    this.setBusy("git", `Rebasing onto ${name}…`);
+    await this.postState();
+    try {
+      await this.git.rebase(name);
+      this.pendingNotice = `Rebased ${current} onto ${name}.`;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("CONFLICT") || msg.includes("conflict")) {
+        this.pendingError = `Rebase paused — resolve conflicts, stage all files, then click Continue Rebase.`;
+      } else {
+        this.fail(error);
+      }
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
+  }
+
+  private async rebaseContinue(): Promise<void> {
+    this.setBusy("git", "Continuing rebase…");
+    await this.postState();
+    try {
+      await this.git.rebaseContinue();
+      const rebaseState = await this.git.getRebaseState();
+      if (!rebaseState.inProgress) {
+        this.pendingNotice = "Rebase completed.";
+      } else {
+        this.pendingError = "More conflicts to resolve — stage all files, then continue.";
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("CONFLICT") || msg.includes("conflict")) {
+        this.pendingError = "More conflicts to resolve — stage all files, then continue.";
+      } else {
+        this.fail(error);
+      }
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
+  }
+
+  private async rebaseAbort(): Promise<void> {
+    const picked = await vscode.window.showWarningMessage(
+      "Abort rebase?",
+      { modal: true, detail: "This will stop the rebase and restore the branch to its state before the rebase started." },
+      "Abort Rebase"
+    );
+    if (!picked) return;
+    this.setBusy("git", "Aborting rebase…");
+    await this.postState();
+    try {
+      await this.git.rebaseAbort();
+      this.pendingNotice = "Rebase aborted. Branch restored.";
+    } catch (error) {
+      this.fail(error);
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
+  }
+
   private async pushCurrentBranch(): Promise<void> {
     const summary = await this.git.getRepoSummary().catch(() => undefined);
     const branch = summary?.branch ?? "";
@@ -1527,6 +1608,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let ahead = 0;
     let behind = 0;
     let hasUpstream = false;
+    let rebaseState: RebaseState = { inProgress: false };
     let stateError = this.pendingError;
 
     try {
@@ -1543,6 +1625,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         ahead = sync.ahead;
         behind = sync.behind;
         hasUpstream = sync.hasUpstream;
+        rebaseState = await this.git.getRebaseState();
       }
     } catch (error) {
       if (!stateError) {
@@ -1580,6 +1663,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       busyText: this.busyText,
       isLoading: !!this.busyKind,
       hasConflicts: changes.conflicts.length > 0,
+      rebaseState,
       jiraConfig,
       jiraHasToken,
       error: stateError,

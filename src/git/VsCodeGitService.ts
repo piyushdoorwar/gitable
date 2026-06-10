@@ -465,6 +465,26 @@ export class VsCodeGitService implements GitService {
     return this.cli.undoLastCommit();
   }
 
+  rebase(targetBranch: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.rebase(targetBranch);
+  }
+
+  rebaseContinue(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.rebaseContinue();
+  }
+
+  rebaseAbort(): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.rebaseAbort();
+  }
+
+  getRebaseState(): Promise<import("./models").RebaseState> {
+    this.syncCliRoot();
+    return this.cli.getRebaseState();
+  }
+
   // ---- internals ----
 
   /**

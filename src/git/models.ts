@@ -54,6 +54,15 @@ export interface StashEntry {
   date: string;     // "2 hours ago"
 }
 
+export interface RebaseState {
+  /** True when a rebase is in progress (rebase-merge or rebase-apply dir exists). */
+  inProgress: boolean;
+  /** Short branch name being rebased, e.g. "feature-x". */
+  branch?: string;
+  /** Short target ref the branch is being rebased onto, e.g. "main". */
+  onto?: string;
+}
+
 /**
  * Maps the numeric status from the VS Code Git API (`Status` enum) to a letter.
  * The enum values are stable and documented in the git extension's API typings:

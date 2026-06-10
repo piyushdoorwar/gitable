@@ -840,4 +840,127 @@ describe("GitCliService integration", () => {
       await expect(service.undoLastCommit()).rejects.toThrow();
     });
   });
+
+  describe("rebase", () => {
+    it("rebases current branch onto another branch (no conflicts)", async () => {
+      // Create a diverging branch from init
+      await git(["checkout", "-b", "feature"], root);
+      await writeFile(path.join(root, "feature.txt"), "feature\n");
+      await git(["add", "feature.txt"], root);
+      await git(["commit", "-m", "feat: add feature"], root);
+      await git(["checkout", "main"], root);
+
+      // Add an unrelated commit on main
+      await writeFile(path.join(root, "main-extra.txt"), "main extra\n");
+      await git(["add", "main-extra.txt"], root);
+      await git(["commit", "-m", "main: unrelated change"], root);
+
+      // Switch to feature and rebase onto main
+      await git(["checkout", "feature"], root);
+      service.setActiveRoot(root);
+      await service.rebase("main");
+
+      const history = await service.getHistory(5);
+      const subjects = history.map((c) => c.subject);
+      // feature commit should still exist and be on top of the main commit
+      expect(subjects[0]).toBe("feat: add feature");
+      expect(subjects[1]).toBe("main: unrelated change");
+    });
+
+    it("throws when rebase encounters conflicts", async () => {
+      // Both branches edit the same line in tracked.txt
+      await writeFile(path.join(root, "tracked.txt"), "main version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "main: edit tracked"], root);
+
+      await git(["checkout", "-b", "feature-conflict", "HEAD~1"], root);
+      await writeFile(path.join(root, "tracked.txt"), "branch version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "branch: conflicting edit"], root);
+
+      service.setActiveRoot(root);
+      await expect(service.rebase("main")).rejects.toThrow();
+    });
+
+    it("getRebaseState returns inProgress=false when no rebase is running", async () => {
+      const state = await service.getRebaseState();
+      expect(state.inProgress).toBe(false);
+    });
+
+    it("getRebaseState returns inProgress=true with branch info during a conflict rebase", async () => {
+      // Set up conflicting branches
+      await writeFile(path.join(root, "tracked.txt"), "main version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "main: edit tracked"], root);
+
+      await git(["checkout", "-b", "my-feature", "HEAD~1"], root);
+      await writeFile(path.join(root, "tracked.txt"), "feature version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "feat: conflicting"], root);
+
+      service.setActiveRoot(root);
+      // Start the rebase — it will fail with conflicts
+      await service.rebase("main").catch(() => {});
+
+      const state = await service.getRebaseState();
+      expect(state.inProgress).toBe(true);
+      expect(state.branch).toBe("my-feature");
+    });
+
+    it("rebaseAbort restores the branch after a conflicted rebase", async () => {
+      // Set up conflict
+      await writeFile(path.join(root, "tracked.txt"), "main version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "main: edit"], root);
+
+      await git(["checkout", "-b", "abort-test", "HEAD~1"], root);
+      await writeFile(path.join(root, "tracked.txt"), "branch version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "branch: conflicting"], root);
+
+      service.setActiveRoot(root);
+      await service.rebase("main").catch(() => {});
+
+      // Verify rebase is in progress
+      expect((await service.getRebaseState()).inProgress).toBe(true);
+
+      await service.rebaseAbort();
+
+      // After abort, rebase should no longer be in progress
+      expect((await service.getRebaseState()).inProgress).toBe(false);
+
+      // Branch should be back to its original tip commit
+      const history = await service.getHistory(5);
+      expect(history[0].subject).toBe("branch: conflicting");
+    });
+
+    it("rebaseContinue completes the rebase after resolving conflicts", async () => {
+      // Set up conflict
+      await writeFile(path.join(root, "tracked.txt"), "main version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "main: edit"], root);
+
+      await git(["checkout", "-b", "continue-test", "HEAD~1"], root);
+      await writeFile(path.join(root, "tracked.txt"), "branch version\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "branch: resolve me"], root);
+
+      service.setActiveRoot(root);
+      await service.rebase("main").catch(() => {});
+
+      expect((await service.getRebaseState()).inProgress).toBe(true);
+
+      // Resolve: write the final content and stage it
+      await writeFile(path.join(root, "tracked.txt"), "resolved\n");
+      await git(["add", "tracked.txt"], root);
+
+      await service.rebaseContinue();
+
+      expect((await service.getRebaseState()).inProgress).toBe(false);
+
+      const history = await service.getHistory(5);
+      expect(history[0].subject).toBe("branch: resolve me");
+      expect(history[1].subject).toBe("main: edit");
+    });
+  });
 });

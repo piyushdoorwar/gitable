@@ -20,6 +20,7 @@ selected Git diff is ever sent to the AI provider you choose.
 - ⚠️ **Conflict resolution** — after a merge or pull with conflicts, conflicted files appear in a dedicated section with "Open in merge editor" and "Mark as resolved" actions. Commit is blocked until all conflicts are cleared.
 - 📦 **Stash** — stash only your staged files with one click, then pop/apply/drop stashes from the same panel.
 - 🔀 **Merge branch** — right-click any branch → "Merge into current"; conflict detection surfaces the error inline.
+- ♻️ **Rebase** — right-click any branch → "Rebase onto this"; conflict resolution flows through the existing merge-editor integration with dedicated **Continue Rebase** and **Abort Rebase** actions in the Changes tab. Multi-commit rebases cycle through each conflict automatically.
 - 📝 **Commit box** — summary and description inputs with a one-click commit.
 - ✨ **AI commit messages** — generate a commit message from your staged changes; review and edit before committing (never auto-commits).
 - 🕑 **History tab** — recent commits for the current branch with short hash, subject, author, and relative date.

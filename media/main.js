@@ -11,6 +11,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="14"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M18 9.4c0 4-3.5 5.6-6 5.6"/></svg>',
     merge:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><line x1="6" y1="8.4" x2="6" y2="15.6"/><path d="M18 8.4c0 5.6-4.5 9.6-12 9.6"/></svg>',
+    rebase:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><line x1="18" y1="8.4" x2="18" y2="15.6"/><path d="M6 15.6C6 10 10 8.4 18 8.4"/></svg>',
     stash:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m-3.5-3.5L12 13l3.5-3.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></svg>',
     stashPop:
@@ -672,6 +674,13 @@
             <button class="gx-undo-btn" data-action="undoLastCommit" title="Undo last commit (git reset --soft HEAD~1)" aria-label="Undo last commit" type="button">Undo</button>
           </div>
         </div>
+        <div id="rebaseBar" class="gx-rebase-bar hidden">
+          <span class="gx-rebase-bar-label">${icon("rebase", "sm")}<span id="rebaseBarLabel">Rebasing</span></span>
+          <div class="gx-rebase-bar-actions">
+            <button id="rebaseContinueBtn" class="gx-btn gx-btn-primary" data-action="rebaseContinue" type="button">Continue Rebase</button>
+            <button id="rebaseAbortBtn" class="gx-btn gx-btn-secondary" data-action="rebaseAbort" type="button">Abort</button>
+          </div>
+        </div>
       </div>
 
       <div id="panel-history" class="gx-panel hidden">
@@ -1098,6 +1107,12 @@
       case "undoLastCommit":
         post({ type: "undoLastCommit" });
         break;
+      case "rebaseContinue":
+        post({ type: "rebaseContinue" });
+        break;
+      case "rebaseAbort":
+        post({ type: "rebaseAbort" });
+        break;
       case "discardOne":
         post({ type: "discardFiles", filePaths: [elm.getAttribute("data-path")], staged: elm.getAttribute("data-staged") === "1" });
         break;
@@ -1516,6 +1531,7 @@
       (!isCurrent
         ? `<span class="gx-menu-sep"></span>` +
           `<button data-bmenu-action="mergeBranch" role="menuitem" type="button">${icon("merge", "sm")}<span>Merge into current</span></button>` +
+          `<button data-bmenu-action="rebaseBranch" role="menuitem" type="button">${icon("rebase", "sm")}<span>Rebase onto this</span></button>` +
           `<span class="gx-menu-sep"></span>` +
           `<button data-bmenu-action="deleteBranch" role="menuitem" type="button" class="gx-menu-danger">${icon("trash", "sm")}<span>Delete…</span></button>`
         : "");
@@ -1552,6 +1568,9 @@
         break;
       case "mergeBranch":
         post({ type: "mergeBranch", name: branch.name });
+        break;
+      case "rebaseBranch":
+        post({ type: "rebaseBranch", name: branch.name });
         break;
       case "deleteBranch":
         post({ type: "deleteBranch", name: branch.name });
@@ -1710,18 +1729,32 @@
     // Conflicts section
     const conflicts = (s.changes && s.changes.conflicts) || [];
     const hasConflicts = conflicts.length > 0;
+    const rebase = s.rebaseState || { inProgress: false };
     const conflictsBanner = byId("conflictsBanner");
     const conflictsSection = byId("conflictsSection");
     if (hasConflicts) {
       conflictsBanner.classList.remove("hidden");
-      byId("conflictsBannerText").textContent =
-        `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all before committing`;
+      byId("conflictsBannerText").textContent = rebase.inProgress
+        ? `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all to continue rebase`
+        : `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all before committing`;
       conflictsSection.classList.remove("hidden");
       byId("conflictsCount").textContent = String(conflicts.length);
       byId("conflictsList").innerHTML = renderConflictList(conflicts);
     } else {
       conflictsBanner.classList.add("hidden");
       conflictsSection.classList.add("hidden");
+    }
+
+    // Rebase action bar (replaces commit button area when rebase is in progress)
+    const rebaseBar = byId("rebaseBar");
+    if (rebase.inProgress) {
+      rebaseBar.classList.remove("hidden");
+      const label = rebase.onto ? `onto ${rebase.onto}` : "";
+      byId("rebaseBarLabel").textContent = `Rebasing${label ? " " + label : ""}`;
+      setDisabled(byId("rebaseContinueBtn"), busy || hasConflicts);
+      setDisabled(byId("rebaseAbortBtn"), busy);
+    } else {
+      rebaseBar.classList.add("hidden");
     }
 
     // Stash section
@@ -1764,8 +1797,8 @@
           ? `Commit ${plural(stagedFiles.length, "staged file")} to ${s.branchName || "current branch"}`
           : "Stage files before committing"
     );
-    setDisabled(commitBtn, busy || !commitPanelActive || !hasStaged || hasConflicts);
-    byId("commitCard").classList.toggle("hidden", !commitPanelActive);
+    setDisabled(commitBtn, busy || !commitPanelActive || !hasStaged || hasConflicts || rebase.inProgress);
+    byId("commitCard").classList.toggle("hidden", !commitPanelActive || rebase.inProgress);
     setInputDisabled(byId("commitPrefix"), busy);
     setInputDisabled(byId("commitSummary"), busy);
     setInputDisabled(byId("commitDescription"), busy);

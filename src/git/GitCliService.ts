@@ -4,7 +4,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError } from "./GitService";
-import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
+import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
@@ -458,6 +458,84 @@ export class GitCliService implements GitService {
 
   async undoLastCommit(): Promise<void> {
     await this.run(["reset", "--soft", "HEAD~1"], this.requireRoot());
+  }
+
+  async rebase(targetBranch: string): Promise<void> {
+    await this.run(["rebase", targetBranch], this.requireRoot());
+  }
+
+  async rebaseContinue(): Promise<void> {
+    // GIT_EDITOR=true prevents git from opening an editor for the commit message.
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        "git",
+        ["rebase", "--continue"],
+        { cwd: this.requireRoot(), env: { ...process.env, GIT_EDITOR: "true" }, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+        (error, _stdout, stderr) => {
+          if (error) {
+            reject(new GitServiceError((stderr || error.message).toString().trim(), error));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  async rebaseAbort(): Promise<void> {
+    await this.run(["rebase", "--abort"], this.requireRoot());
+  }
+
+  async getRebaseState(): Promise<RebaseState> {
+    const root = this.requireRoot();
+    const gitDir = path.join(root, ".git");
+
+    // git worktrees store rebase state under .git/worktrees/<name>/rebase-merge
+    const candidates = [
+      path.join(gitDir, "rebase-merge"),
+      path.join(gitDir, "rebase-apply"),
+    ];
+
+    let stateDir: string | undefined;
+    for (const dir of candidates) {
+      try {
+        await readFile(path.join(dir, "head-name"));
+        stateDir = dir;
+        break;
+      } catch {
+        // not present
+      }
+    }
+
+    if (!stateDir) {
+      return { inProgress: false };
+    }
+
+    const readFileText = async (filePath: string): Promise<string> => {
+      try {
+        return (await readFile(filePath, "utf8")).trim();
+      } catch {
+        return "";
+      }
+    };
+
+    const headName = await readFileText(path.join(stateDir, "head-name"));
+    const onto = await readFileText(path.join(stateDir, "onto"));
+
+    // head-name is e.g. "refs/heads/feature-x" — strip the prefix
+    const branch = headName.replace(/^refs\/heads\//, "");
+
+    // "onto" is a commit SHA — resolve it to a short ref for display
+    let ontoLabel = onto.slice(0, 7);
+    try {
+      const name = (await this.run(["name-rev", "--name-only", "--no-undefined", onto], root)).trim();
+      // name-rev may return "main~0" style; strip suffix
+      ontoLabel = name.replace(/[~^]\d*$/, "");
+    } catch {
+      // keep the short SHA
+    }
+
+    return { inProgress: true, branch, onto: ontoLabel };
   }
 
   async getCommitStat(hash: string): Promise<CommitStat> {

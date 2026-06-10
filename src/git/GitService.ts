@@ -1,4 +1,4 @@
-import { CommitInfo, CommitStat, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
+import { CommitInfo, CommitStat, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
 /**
  * Error raised by Git operations. Carries a user-friendly message that can be
@@ -154,4 +154,16 @@ export interface GitService {
 
   /** Soft-resets HEAD~1, putting the last commit's changes back into the index. */
   undoLastCommit(): Promise<void>;
+
+  /** Rebases the current branch onto the given target branch. */
+  rebase(targetBranch: string): Promise<void>;
+
+  /** Continues an in-progress rebase after all conflicts are resolved and staged. */
+  rebaseContinue(): Promise<void>;
+
+  /** Aborts an in-progress rebase, restoring the branch to its pre-rebase state. */
+  rebaseAbort(): Promise<void>;
+
+  /** Returns the current rebase state — whether one is in progress and which branches are involved. */
+  getRebaseState(): Promise<RebaseState>;
 }
