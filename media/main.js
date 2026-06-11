@@ -2670,10 +2670,24 @@
         <span class="gx-rep-model-count">${c}</span>
       </div>`).join("");
 
-    const sparkBars = days.map((d) => {
-      const h = Math.max(2, Math.round((d.count / maxDay) * 36));
-      return `<span class="gx-spark-bar" style="height:${h}px" title="${escapeHtml(d.label)}: ${d.count}"></span>`;
-    }).join("");
+    // ── Last 5 days with data ──
+    const activeDays = days.filter((d) => d.count > 0).slice(-5);
+    const maxActive = Math.max(...activeDays.map((d) => d.count), 1);
+    const SVG_H = 44, SVG_W = 100, barW = 14, gap = (SVG_W - activeDays.length * barW) / (activeDays.length + 1);
+    const chartBars = activeDays.length ? `
+      <div class="gx-daychart">
+        <svg class="gx-daychart-svg" viewBox="0 0 ${SVG_W} ${SVG_H}" preserveAspectRatio="none">
+          ${activeDays.map((d, i) => {
+            const bh = Math.max(3, Math.round((d.count / maxActive) * (SVG_H - 14)));
+            const x = gap + i * (barW + gap);
+            const y = SVG_H - bh - 12;
+            return `
+              <rect class="gx-daychart-bar" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2"/>
+              <text class="gx-daychart-count-txt" x="${x + barW / 2}" y="${y - 2}" text-anchor="middle">${d.count}</text>
+              <text class="gx-daychart-label-txt" x="${x + barW / 2}" y="${SVG_H - 1}" text-anchor="middle">${escapeHtml(d.label)}</text>`;
+          }).join("")}
+        </svg>
+      </div>` : "";
 
     el.innerHTML = `
       <div class="gx-rep-header">
@@ -2686,7 +2700,7 @@
         <span class="gx-rep-total-label">AI call${total === 1 ? "" : "s"}</span>
       </div>
 
-      <div class="gx-rep-spark">${sparkBars}</div>
+      ${chartBars}
 
       <div class="gx-rep-section">
         <div class="gx-rep-section-title">BY TYPE</div>
