@@ -2096,7 +2096,7 @@ body.gx-theme-vscode {
 #panel-jira {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   padding: 10px 12px;
   overflow: hidden;
 }
@@ -2107,6 +2107,11 @@ body.gx-theme-vscode {
   gap: 6px;
   align-items: center;
   flex: 0 0 auto;
+  padding: 5px;
+  margin-bottom: 10px;
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+  background: var(--gx-undo-bar-bg);
 }
 .gx-jira-search-wrap {
   flex: 1;
@@ -2169,9 +2174,10 @@ body.gx-theme-vscode {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 10px 5px;
+  padding: 6px 10px 7px;
   border-bottom: 1px solid var(--gx-line);
-  background: var(--vscode-sideBar-background, transparent);
+  border-top: 1px solid var(--gx-line);
+  background: var(--gx-undo-bar-bg, var(--vscode-sideBar-background, transparent));
 }
 
 .gx-jira-col-hdr {
@@ -2179,12 +2185,12 @@ body.gx-theme-vscode {
   border: none;
   padding: 0;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--vscode-descriptionForeground);
-  opacity: 0.55;
+  opacity: 0.75;
   display: flex;
   align-items: center;
   gap: 0;
