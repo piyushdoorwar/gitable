@@ -2244,6 +2244,24 @@ body.gx-theme-vscode {
 .gx-jira-key {
   flex: 0 0 auto;
   min-width: 76px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.gx-jira-type-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.gx-jira-type-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.gx-jira-type-icon svg {
+  width: 12px;
+  height: 12px;
 }
 .gx-jira-key-chip {
   display: inline-block;
