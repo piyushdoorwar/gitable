@@ -21,10 +21,6 @@
         <a href="#features">Features</a>
         <a href="#workflow">Workflow</a>
         <a href="#privacy">Privacy</a>
-        <a class="icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
-          <img src="assets/icons/github.svg" alt="" />
-          <span>GitHub</span>
-        </a>
       </nav>
     </header>
 
@@ -34,17 +30,9 @@
           <p class="eyebrow">VS Code extension</p>
           <h1>Gitable</h1>
           <p class="lede">
-            A focused Git sidebar for VS Code with visual staging, AI commit messages,
-            branch actions, stashes, history, and security reviews using your own API key.
+            Git sidebar for VS Code. Stage, commit, and review with AI — your keys, your providers.
           </p>
           <div class="hero-modes" aria-label="Core workflows">
-            <div class="hero-mode">
-              <span class="hero-mode-icon" aria-hidden="true"><img src="assets/icons/files.svg" alt="" /></span>
-              <div class="hero-mode-text">
-                <strong>Stage with intent</strong>
-                <span>Move files between Working and Staged without leaving the panel</span>
-              </div>
-            </div>
             <div class="hero-mode">
               <span class="hero-mode-icon" aria-hidden="true"><img src="assets/icons/icon.svg" alt="" /></span>
               <div class="hero-mode-text">
@@ -52,11 +40,18 @@
                 <span>Ask OpenAI, Gemini, or Claude to draft a clean message</span>
               </div>
             </div>
+            <div class="hero-mode">
+              <span class="hero-mode-icon" aria-hidden="true"><img src="assets/icons/shield-ai.svg" alt="" /></span>
+              <div class="hero-mode-text">
+                <strong>Security review</strong>
+                <span>Scan staged changes for vulnerabilities before you merge</span>
+              </div>
+            </div>
           </div>
           <div class="actions">
-            <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=piyushdoorwar.gitable" rel="noreferrer">
+            <a class="button primary" href="vscode:extension/piyushdoorwar.gitable">
               <img src="assets/icons/vscode.svg" alt="" />
-              <span>Install for VS Code</span>
+              <span>Open in VS Code</span>
             </a>
             <a class="button secondary icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
               <img src="assets/icons/github.svg" alt="" />
@@ -104,17 +99,12 @@
               </ul>
               <div class="commit-card">
                 <label>
-                  <span>Prefix</span>
-                  <input value="GIT-142" aria-label="Commit prefix" />
-                </label>
-                <label>
                   <span>Summary</span>
                   <div class="summary-wrap">
                     <input value="GIT-142 add commit prefix support" aria-label="Commit summary" />
                     <button type="button" aria-label="Generate commit message"><img src="assets/icons/icon.svg" alt="" /></button>
                   </div>
                 </label>
-                <textarea aria-label="Commit description">Persist optional JIRA-style prefixes and prepend them to generated commit summaries.</textarea>
                 <button class="commit-btn" type="button">Commit to main</button>
               </div>
             </section>
@@ -264,17 +254,21 @@
       <section class="install-section" id="install">
         <div data-reveal>
           <p class="eyebrow">Install</p>
-          <h2>Put Gitable in your VS Code sidebar.</h2>
+          <h2>Add Gitable to VS Code.</h2>
           <p>Install the extension, pick your AI provider, save your API key, and start committing from the Gitable activity bar panel.</p>
         </div>
         <div class="install-actions" data-reveal style="--reveal-delay: 0.12s">
-          <a class="button primary large" href="https://marketplace.visualstudio.com/items?itemName=piyushdoorwar.gitable" rel="noreferrer">
+          <a class="button primary large" href="vscode:extension/piyushdoorwar.gitable">
             <img src="assets/icons/vscode.svg" alt="" />
-            <span>VS Code Marketplace</span>
+            <span>Open in VS Code</span>
+          </a>
+          <a class="button secondary large icon-link" href="https://marketplace.visualstudio.com/items?itemName=piyushdoorwar.gitable" rel="noreferrer">
+            <img src="assets/icons/vscode.svg" alt="" />
+            <span>Marketplace</span>
           </a>
           <a class="button secondary large icon-link" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
             <img src="assets/icons/github.svg" alt="" />
-            <span>View on GitHub</span>
+            <span>GitHub</span>
           </a>
         </div>
       </section>

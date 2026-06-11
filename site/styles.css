@@ -2,7 +2,7 @@
   color-scheme: dark;
   --bg: #0d1117;
   --panel: #121923;
-  --panel-2: #102f63;
+  --panel-2: #141e36;
   --panel-3: #0f1620;
   --line: rgba(249, 139, 158, 0.24);
   --line-strong: rgba(249, 139, 158, 0.42);
@@ -13,7 +13,7 @@
   --accent-bright: #ffb0bd;
   --accent-ink: #0d1117;
   --accent-glow: rgba(249, 139, 158, 0.16);
-  --button: rgba(16, 47, 99, 0.72);
+  --button: rgba(20, 30, 54, 0.72);
   --button-border: rgba(249, 139, 158, 0.34);
   --shadow: rgba(0, 0, 0, 0.42);
 }
@@ -204,6 +204,11 @@ nav a:hover {
   color: var(--soft);
 }
 
+.button.secondary img {
+  filter: brightness(0) invert(1);
+  opacity: 0.75;
+}
+
 .button.large {
   min-height: 52px;
   padding: 0 22px;
@@ -249,7 +254,7 @@ main {
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(16, 47, 99, 0.78);
+  background: rgba(20, 30, 54, 0.78);
 }
 
 .hero-mode-icon {
@@ -373,8 +378,8 @@ main {
   min-width: 0;
   padding: 14px;
   background:
-    radial-gradient(circle at 85% 0%, rgba(249, 139, 158, 0.08), transparent 18rem),
-    #161c27;
+    radial-gradient(circle at 85% 0%, rgba(249, 139, 158, 0.07), transparent 18rem),
+    #13192a;
 }
 
 .repo-row,
@@ -498,7 +503,7 @@ main {
   height: 22px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: rgba(16, 47, 99, 0.9);
+  background: rgba(20, 30, 54, 0.9);
 }
 
 .file-list {
@@ -515,9 +520,9 @@ main {
   min-width: 0;
   min-height: 32px;
   padding: 0 8px;
-  border: 1px solid rgba(249, 139, 158, 0.12);
+  border: 1px solid rgba(249, 139, 158, 0.1);
   border-radius: 6px;
-  background: rgba(16, 47, 99, 0.72);
+  background: rgba(20, 30, 54, 0.65);
   color: var(--soft);
   font-size: 12px;
 }
@@ -553,7 +558,7 @@ main {
   padding: 14px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: rgba(16, 47, 99, 0.74);
+  background: rgba(14, 22, 40, 0.9);
 }
 
 .commit-card label {
@@ -706,7 +711,7 @@ main {
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(16, 47, 99, 0.62);
+  background: rgba(20, 30, 54, 0.55);
   transition: border-color 0.2s, transform 0.2s;
 }
 
@@ -751,16 +756,16 @@ main {
 .provider-logos span {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border: 1px solid rgba(249, 139, 158, 0.22);
+  width: 34px;
+  height: 34px;
   border-radius: 8px;
-  background: rgba(13, 17, 23, 0.5);
+  background: var(--accent-glow);
 }
 
 .provider-logos img {
   width: 22px;
   height: 22px;
+  filter: brightness(0) saturate(100%) invert(72%) sepia(22%) saturate(600%) hue-rotate(298deg) brightness(1.05);
 }
 
 .workflow {
@@ -845,7 +850,7 @@ main {
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(16, 47, 99, 0.62);
+  background: rgba(20, 30, 54, 0.55);
 }
 
 .policy-content h2 {
