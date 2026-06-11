@@ -2242,27 +2242,27 @@ body.gx-theme-vscode {
 
 /* 2. Jira ID chip */
 .gx-jira-key {
-  flex: 0 0 auto;
-  min-width: 76px;
+  flex: 0 0 96px;
   display: flex;
   align-items: center;
   gap: 5px;
 }
-.gx-jira-type-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
 .gx-jira-type-icon {
-  flex: 0 0 auto;
+  flex: 0 0 16px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 .gx-jira-type-icon svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
 }
+.gx-jtype-bug         { color: #e5534b; }
+.gx-jtype-epic        { color: #8777d9; }
+.gx-jtype-story       { color: #36b37e; }
+.gx-jtype-task        { color: #4bade8; }
+.gx-jtype-improvement { color: #00b8d9; }
+.gx-jtype-default     { color: #8c9097; }
 .gx-jira-key-chip {
   display: inline-block;
   font-size: 10px;

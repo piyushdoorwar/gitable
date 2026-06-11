@@ -2499,15 +2499,15 @@
 
   function jiraTypeIcon(type) {
     const t = (type || "").toLowerCase();
-    let svg, color;
-    if (t.includes("bug"))                                     { svg = JIRA_TYPE_SVGS.bug;         color = "#e5534b"; }
-    else if (t.includes("epic"))                               { svg = JIRA_TYPE_SVGS.epic;        color = "#8777d9"; }
-    else if (t.includes("story"))                              { svg = JIRA_TYPE_SVGS.story;       color = "#36b37e"; }
-    else if (t.includes("subtask") || t.includes("sub-task")) { svg = JIRA_TYPE_SVGS.task;        color = "#4bade8"; }
-    else if (t.includes("task"))                               { svg = JIRA_TYPE_SVGS.task;        color = "#4bade8"; }
-    else if (t.includes("improvement") || t.includes("feature")) { svg = JIRA_TYPE_SVGS.improvement; color = "#00b8d9"; }
-    else { return `<span class="gx-jira-type-dot" style="background:#8c9097" title="${escapeHtml(type || "Issue")}"></span>`; }
-    return `<span class="gx-jira-type-icon" style="color:${color}" title="${escapeHtml(type || "Issue")}">${svg}</span>`;
+    let svg, cls;
+    if (t.includes("bug"))                                        { svg = JIRA_TYPE_SVGS.bug;         cls = "gx-jtype-bug"; }
+    else if (t.includes("epic"))                                  { svg = JIRA_TYPE_SVGS.epic;        cls = "gx-jtype-epic"; }
+    else if (t.includes("story"))                                 { svg = JIRA_TYPE_SVGS.story;       cls = "gx-jtype-story"; }
+    else if (t.includes("subtask") || t.includes("sub-task"))    { svg = JIRA_TYPE_SVGS.task;        cls = "gx-jtype-task"; }
+    else if (t.includes("task"))                                  { svg = JIRA_TYPE_SVGS.task;        cls = "gx-jtype-task"; }
+    else if (t.includes("improvement") || t.includes("feature")) { svg = JIRA_TYPE_SVGS.improvement; cls = "gx-jtype-improvement"; }
+    else                                                          { svg = JIRA_TYPE_SVGS.task;        cls = "gx-jtype-default"; }
+    return `<span class="gx-jira-type-icon ${cls}" title="${escapeHtml(type || "Issue")}">${svg}</span>`;
   }
 
   function jiraStatusClass(status) {
