@@ -67,7 +67,7 @@ export class GitCliService implements GitService {
 
   async getChanges(): Promise<RepoChanges> {
     const root = this.requireRoot();
-    const output = await this.run(["-c", "core.quotepath=false", "status", "--porcelain"], root);
+    const output = await this.run(["-c", "core.quotepath=false", "status", "--porcelain", "--untracked-files=all"], root);
     const staged: FileChange[] = [];
     const unstaged: FileChange[] = [];
     const conflicts: FileChange[] = [];
@@ -87,6 +87,11 @@ export class GitCliService implements GitService {
         filePath = unquoteGitPath(filePath.slice(arrow + 4));
       } else {
         filePath = unquoteGitPath(filePath);
+      }
+
+      // Git can report untracked directories as "dir/" — skip these directory-only entries.
+      if (filePath.endsWith("/")) {
+        continue;
       }
 
       // Merge conflict: U in either XY column, or both-added (AA), both-deleted (DD).
