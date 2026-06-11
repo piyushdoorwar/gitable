@@ -811,6 +811,13 @@ main {
   max-width: 720px;
 }
 
+.compat-note {
+  margin-top: 8px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .install-actions {
   display: flex;
   flex-wrap: wrap;
