@@ -6,6 +6,11 @@ import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError } from "./GitService";
 import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
+/** Strip surrounding double-quotes that git adds to paths containing spaces or special chars. */
+function unquoteGitPath(p: string): string {
+  return p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p;
+}
+
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
  *
@@ -78,8 +83,10 @@ export class GitCliService implements GitService {
 
       const arrow = filePath.indexOf(" -> ");
       if (arrow !== -1) {
-        originalPath = filePath.slice(0, arrow);
-        filePath = filePath.slice(arrow + 4);
+        originalPath = unquoteGitPath(filePath.slice(0, arrow));
+        filePath = unquoteGitPath(filePath.slice(arrow + 4));
+      } else {
+        filePath = unquoteGitPath(filePath);
       }
 
       // Merge conflict: U in either XY column, or both-added (AA), both-deleted (DD).
@@ -252,10 +259,11 @@ export class GitCliService implements GitService {
       const parts = line.split("\t");
       const letter = parts[0].trim().charAt(0).toUpperCase();
       // Renames/copies report "R100\told\tnew" — use the new path.
-      const filePath = (letter === "R" || letter === "C") && parts[2] ? parts[2] : parts[1];
-      if (!filePath) {
+      const rawPath = (letter === "R" || letter === "C") && parts[2] ? parts[2] : parts[1];
+      if (!rawPath) {
         continue;
       }
+      const filePath = unquoteGitPath(rawPath);
       files.push({
         path: filePath,
         displayPath: filePath,
