@@ -2429,30 +2429,9 @@ body.gx-theme-vscode {
   color: var(--vscode-descriptionForeground);
 }
 /* 5-day bar chart */
-.gx-daychart {
-  margin-bottom: 12px;
-  padding: 6px 4px 4px;
-  border: 1px solid var(--gx-line);
-  border-radius: var(--gx-radius-sm);
-  background: var(--gx-undo-bar-bg);
-}
-.gx-daychart-svg {
-  display: block;
-  width: 100%;
-  height: 56px;
-}
-.gx-daychart-bar {
-  fill: var(--gx-pink-soft);
-}
-.gx-daychart-count-txt {
-  font-size: 4.5px;
-  fill: var(--vscode-foreground);
-  opacity: 0.75;
-}
-.gx-daychart-label-txt {
-  font-size: 4.5px;
-  fill: var(--vscode-descriptionForeground);
-  opacity: 0.6;
+.gx-daychart-wrap {
+  position: relative;
+  height: 120px;
 }
 /* Sections */
 .gx-rep-section {

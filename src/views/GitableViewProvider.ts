@@ -1772,6 +1772,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "media", "main.js")
     );
+    const chartUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "media", "chart.umd.min.js")
+    );
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "media", "main.css")
     );
@@ -1793,6 +1796,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div id="app"></div>
+  <script nonce="${nonce}" src="${chartUri}"></script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

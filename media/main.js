@@ -2628,7 +2628,7 @@
     entries.forEach((e) => { if (e.model) modelCounts[e.model] = (modelCounts[e.model] || 0) + 1; });
     const topModels = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-    // ── Daily sparkline (last 30 days) ──
+    // ── Daily counts (last 30 days) ──
     const days = [];
     const now = Date.now();
     for (let i = 29; i >= 0; i--) {
@@ -2641,7 +2641,9 @@
       const slot = days.find((day) => day.key === key);
       if (slot) slot.count++;
     });
-    const maxDay = Math.max(...days.map((d) => d.count), 1);
+
+    // Last 5 days that have data
+    const activeDays = days.filter((d) => d.count > 0).slice(-5);
 
     function barRow(label, count, color) {
       const pct = Math.round((count / total) * 100);
@@ -2670,25 +2672,6 @@
         <span class="gx-rep-model-count">${c}</span>
       </div>`).join("");
 
-    // ── Last 5 days with data ──
-    const activeDays = days.filter((d) => d.count > 0).slice(-5);
-    const maxActive = Math.max(...activeDays.map((d) => d.count), 1);
-    const SVG_H = 44, SVG_W = 100, barW = 14, gap = (SVG_W - activeDays.length * barW) / (activeDays.length + 1);
-    const chartBars = activeDays.length ? `
-      <div class="gx-daychart">
-        <svg class="gx-daychart-svg" viewBox="0 0 ${SVG_W} ${SVG_H}" preserveAspectRatio="none">
-          ${activeDays.map((d, i) => {
-            const bh = Math.max(3, Math.round((d.count / maxActive) * (SVG_H - 14)));
-            const x = gap + i * (barW + gap);
-            const y = SVG_H - bh - 12;
-            return `
-              <rect class="gx-daychart-bar" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2"/>
-              <text class="gx-daychart-count-txt" x="${x + barW / 2}" y="${y - 2}" text-anchor="middle">${d.count}</text>
-              <text class="gx-daychart-label-txt" x="${x + barW / 2}" y="${SVG_H - 1}" text-anchor="middle">${escapeHtml(d.label)}</text>`;
-          }).join("")}
-        </svg>
-      </div>` : "";
-
     el.innerHTML = `
       <div class="gx-rep-header">
         <span class="gx-rep-title">Last 30 days</span>
@@ -2699,8 +2682,6 @@
         <span class="gx-rep-total-num">${total}</span>
         <span class="gx-rep-total-label">AI call${total === 1 ? "" : "s"}</span>
       </div>
-
-      ${chartBars}
 
       <div class="gx-rep-section">
         <div class="gx-rep-section-title">BY TYPE</div>
@@ -2717,7 +2698,63 @@
         <div class="gx-rep-section-title">TOP MODELS</div>
         ${modelRows}
       </div>` : ""}
+
+      ${activeDays.length ? `
+      <div class="gx-rep-section">
+        <div class="gx-rep-section-title">Last 5 active days</div>
+        <div class="gx-daychart-wrap"><canvas id="repDayChart"></canvas></div>
+      </div>` : ""}
     `;
+
+    // ── Chart.js bar chart ──
+    if (activeDays.length && typeof Chart !== "undefined") {
+      const canvas = /** @type {HTMLCanvasElement|null} */ (byId("repDayChart"));
+      if (canvas) {
+        new Chart(canvas, {
+          type: "bar",
+          data: {
+            labels: activeDays.map((d) => d.label),
+            datasets: [{
+              data: activeDays.map((d) => d.count),
+              backgroundColor: "rgba(249,139,158,0.75)",
+              hoverBackgroundColor: "rgba(249,139,158,1)",
+              borderRadius: 4,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => ` ${ctx.parsed.y} AI call${ctx.parsed.y === 1 ? "" : "s"}`,
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: "rgba(180,180,190,0.7)", font: { size: 10 } },
+                border: { display: false },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  color: "rgba(180,180,190,0.5)",
+                  font: { size: 9 },
+                  stepSize: 1,
+                  maxTicksLimit: 5,
+                },
+                grid: { color: "rgba(255,255,255,0.05)" },
+                border: { display: false },
+              }
+            }
+          }
+        });
+      }
+    }
   }
 
   // ---------- Messages from the extension host ----------
