@@ -2787,6 +2787,10 @@
     Array.from(ui.selected).forEach((key) => {
       if (!current.has(key)) ui.selected.delete(key);
     });
+    // Forget files that are no longer present so they auto-check if they reappear
+    Array.from(_seenFileKeys).forEach((key) => {
+      if (!current.has(key)) _seenFileKeys.delete(key);
+    });
     // Auto-check files that are appearing for the first time
     current.forEach((key) => {
       if (!_seenFileKeys.has(key)) ui.selected.add(key);
