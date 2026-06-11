@@ -1203,6 +1203,28 @@ button[aria-disabled="true"],
 .gx-label.gx-label-row > span {
   min-width: 0;
 }
+.gx-label.gx-label-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.gx-label.gx-label-no-margin {
+  margin: 0;
+}
+.gx-info-icon {
+  flex: 0 0 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.55;
+  cursor: help;
+  transition: opacity 0.15s;
+}
+.gx-info-icon:hover {
+  opacity: 1;
+  color: var(--gx-pink);
+}
 .gx-refresh-icon-btn {
   color: var(--vscode-descriptionForeground);
   opacity: 0.7;
@@ -2587,9 +2609,19 @@ body.gx-theme-vscode {
   font-weight: 600;
 }
 
+* {
+  scrollbar-color: var(--gx-pink-line) transparent;
+  scrollbar-width: thin;
+}
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-track:hover {
+  background: rgba(249, 139, 158, 0.06);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--gx-pink-line);
@@ -2597,4 +2629,7 @@ body.gx-theme-vscode {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gx-pink);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

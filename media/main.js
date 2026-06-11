@@ -82,7 +82,9 @@
     dots:
       '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
     folder:
-      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H16.5C16.9644 3 17.1966 3 17.3916 3.02567C18.7378 3.2029 19.7971 4.26222 19.9743 5.60842C20 5.80337 20 6.03558 20 6.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.94975C2 6.06722 2 5.62595 2.06935 5.25839C2.37464 3.64031 3.64031 2.37464 5.25839 2.06935C5.62595 2 6.06722 2 6.94975 2C7.33642 2 7.52976 2 7.71557 2.01738C8.51665 2.09229 9.27652 2.40704 9.89594 2.92051C10.0396 3.03961 10.1763 3.17633 10.4497 3.44975L11 4C11.8158 4.81578 12.2237 5.22367 12.7121 5.49543C12.9804 5.64471 13.2651 5.7626 13.5604 5.84678C14.0979 6 14.6747 6 15.8284 6H16.2021C18.8345 6 20.1506 6 21.0062 6.76946C21.0849 6.84024 21.1598 6.91514 21.2305 6.99383C22 7.84935 22 9.16554 22 11.7979V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V6.94975Z" stroke="currentColor" stroke-width="1.5"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H16.5C16.9644 3 17.1966 3 17.3916 3.02567C18.7378 3.2029 19.7971 4.26222 19.9743 5.60842C20 5.80337 20 6.03558 20 6.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.94975C2 6.06722 2 5.62595 2.06935 5.25839C2.37464 3.64031 3.64031 2.37464 5.25839 2.06935C5.62595 2 6.06722 2 6.94975 2C7.33642 2 7.52976 2 7.71557 2.01738C8.51665 2.09229 9.27652 2.40704 9.89594 2.92051C10.0396 3.03961 10.1763 3.17633 10.4497 3.44975L11 4C11.8158 4.81578 12.2237 5.22367 12.7121 5.49543C12.9804 5.64471 13.2651 5.7626 13.5604 5.84678C14.0979 6 14.6747 6 15.8284 6H16.2021C18.8345 6 20.1506 6 21.0062 6.76946C21.0849 6.84024 21.1598 6.91514 21.2305 6.99383C22 7.84935 22 9.16554 22 11.7979V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V6.94975Z" stroke="currentColor" stroke-width="1.5"/></svg>',
+    info:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="8.01"/><line x1="12" y1="12" x2="12" y2="16"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -796,7 +798,10 @@
         </div>
         <div id="settingsPaneConfig" class="hidden">
           <div class="gx-field">
-            <label class="gx-label">Appearance</label>
+            <label class="gx-label gx-label-info">
+              <span>Appearance</span>
+              <span class="gx-info-icon gx-ic sm" title="VS Code follows your active editor color theme.">${ICONS.info}</span>
+            </label>
             <div class="gx-theme-picker">
               <button class="gx-theme-opt" data-action="setTheme" data-theme="dark" type="button">
                 <span class="gx-theme-swatch gx-theme-swatch-dark"></span>
@@ -811,46 +816,51 @@
                 <span>VS Code</span>
               </button>
             </div>
-            <p class="gx-hint" style="margin-top:10px">VS Code follows your active editor color theme.</p>
           </div>
           <div class="gx-field">
             <div class="gx-config-toggle-row">
-              <span class="gx-label" style="margin:0">Jira Integration</span>
+              <span class="gx-label gx-label-info gx-label-no-margin">
+                <span>Jira Integration</span>
+                <span class="gx-info-icon gx-ic sm" title="Shows the Jira icon and settings tab when enabled.">${ICONS.info}</span>
+              </span>
               <button id="jiraToggleBtn" class="gx-toggle" data-action="toggleJira" type="button" aria-pressed="false">
                 <span class="gx-toggle-thumb"></span>
               </button>
             </div>
-            <p class="gx-hint" style="margin-top:6px">Shows the Jira icon and settings tab when enabled.</p>
           </div>
           <div class="gx-field">
-            <label class="gx-label">File View</label>
-            <p class="gx-hint" style="margin-bottom:8px">How files are displayed in the Changes and Staged tabs.</p>
+            <label class="gx-label gx-label-info">
+              <span>File View</span>
+              <span class="gx-info-icon gx-ic sm" title="How files are displayed in the Changes and Staged tabs.">${ICONS.info}</span>
+            </label>
             <div class="gx-file-view-picker">
               <button id="fileViewFlat" class="gx-file-view-btn" data-action="setFileView" data-view="flat" type="button">Flat</button>
               <button id="fileViewTree" class="gx-file-view-btn" data-action="setFileView" data-view="tree" type="button">Tree</button>
             </div>
           </div>
           <div class="gx-field">
-            <label class="gx-label">AI Token Budget</label>
-            <p class="gx-hint" style="margin-bottom:8px">Controls how much diff is sent per AI call. Low~10k · Mid~40k · High~80k chars.</p>
+            <label class="gx-label gx-label-info">
+              <span>AI Token Budget</span>
+              <span class="gx-info-icon gx-ic sm" title="Controls how much diff is sent per AI call. Low~10k · Mid~40k · High~80k chars.">${ICONS.info}</span>
+            </label>
             <div class="gx-budget-table">
               <span class="gx-budget-label">Commit message</span>
               <div class="gx-budget-btns" data-budget-feature="commit">
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="low" type="button">Low</button>
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="mid" type="button">Mid</button>
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="high" type="button">High</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="low" title="~10,000 chars of diff" type="button">Low</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="mid" title="~40,000 chars of diff" type="button">Mid</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="commit" data-preset="high" title="~80,000 chars of diff" type="button">High</button>
               </div>
               <span class="gx-budget-label">AI summary</span>
               <div class="gx-budget-btns" data-budget-feature="summary">
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="low" type="button">Low</button>
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="mid" type="button">Mid</button>
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="high" type="button">High</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="low" title="~10,000 chars of diff" type="button">Low</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="mid" title="~40,000 chars of diff" type="button">Mid</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="summary" data-preset="high" title="~80,000 chars of diff" type="button">High</button>
               </div>
               <span class="gx-budget-label">Security review</span>
               <div class="gx-budget-btns" data-budget-feature="security">
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="low" type="button">Low</button>
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="mid" type="button">Mid</button>
-                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="high" type="button">High</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="low" title="~10,000 chars of diff" type="button">Low</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="mid" title="~40,000 chars of diff" type="button">Mid</button>
+                <button class="gx-budget-btn" data-action="setTokenBudget" data-feature="security" data-preset="high" title="~80,000 chars of diff" type="button">High</button>
               </div>
             </div>
           </div>
