@@ -2431,7 +2431,7 @@ body.gx-theme-vscode {
 /* 5-day bar chart */
 .gx-daychart-wrap {
   position: relative;
-  height: 120px;
+  height: 300px;
 }
 /* Sections */
 .gx-rep-section {
