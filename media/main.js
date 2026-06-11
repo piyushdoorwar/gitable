@@ -737,7 +737,10 @@
 
       <div id="panel-branches" class="gx-panel hidden">
         <div class="gx-branch-scroll">
-          <input id="branchFilter" type="text" class="gx-branch-filter" placeholder="Filter branches" autocomplete="off" spellcheck="false" />
+          <div class="gx-branch-filter-wrap">
+            <span class="gx-branch-filter-icon">${icon("search", "sm")}</span>
+            <input id="branchFilter" type="text" class="gx-branch-filter" placeholder="Filter branches" autocomplete="off" spellcheck="false" />
+          </div>
           <ul id="branchList" class="gx-branch-list"></ul>
         </div>
         <div class="gx-newbranch">
