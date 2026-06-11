@@ -80,7 +80,9 @@
     jira:
       '<svg viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M29.762 1.004h-14.443c0 3.599 2.918 6.517 6.517 6.517h2.66v2.571c0.003 3.591 2.91 6.502 6.498 6.512v-14.343c0-0.685-0.55-1.241-1.232-1.251zM22.616 8.198h-14.443c0.001 3.599 2.918 6.516 6.517 6.516h2.66v2.572c0.003 3.598 2.919 6.513 6.517 6.516v-14.352c0-0.691-0.56-1.251-1.251-1.251zM15.464 15.391h-14.46c0.002 3.6 2.921 6.517 6.521 6.517h2.661v2.57c0 3.598 2.916 6.515 6.514 6.517v-14.348c0-0.694-0.562-1.256-1.256-1.256z"/></svg>',
     dots:
-      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+    folder:
+      '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H16.5C16.9644 3 17.1966 3 17.3916 3.02567C18.7378 3.2029 19.7971 4.26222 19.9743 5.60842C20 5.80337 20 6.03558 20 6.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.94975C2 6.06722 2 5.62595 2.06935 5.25839C2.37464 3.64031 3.64031 2.37464 5.25839 2.06935C5.62595 2 6.06722 2 6.94975 2C7.33642 2 7.52976 2 7.71557 2.01738C8.51665 2.09229 9.27652 2.40704 9.89594 2.92051C10.0396 3.03961 10.1763 3.17633 10.4497 3.44975L11 4C11.8158 4.81578 12.2237 5.22367 12.7121 5.49543C12.9804 5.64471 13.2651 5.7626 13.5604 5.84678C14.0979 6 14.6747 6 15.8284 6H16.2021C18.8345 6 20.1506 6 21.0062 6.76946C21.0849 6.84024 21.1598 6.91514 21.2305 6.99383C22 7.84935 22 9.16554 22 11.7979V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V6.94975Z" stroke="currentColor" stroke-width="1.5"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -163,6 +165,7 @@
         const p = JSON.parse(raw);
         return {
           jiraEnabled: !!p.jiraEnabled,
+          fileView: p.fileView === "tree" ? "tree" : "flat",
           budgets: {
             commit:   ["low","mid","high"].includes(p.budgets?.commit)   ? p.budgets.commit   : "mid",
             summary:  ["low","mid","high"].includes(p.budgets?.summary)  ? p.budgets.summary  : "mid",
@@ -171,7 +174,7 @@
         };
       }
     } catch (_) {}
-    return { jiraEnabled: false, budgets: { commit: "mid", summary: "mid", security: "mid" } };
+    return { jiraEnabled: false, fileView: "flat", budgets: { commit: "mid", summary: "mid", security: "mid" } };
   }
 
   function saveConfig(cfg) {
@@ -231,6 +234,9 @@
       const preset = btn.getAttribute("data-preset");
       btn.classList.toggle("active", cfg.budgets[feature] === preset);
     });
+    document.querySelectorAll(".gx-file-view-btn").forEach((btn) => {
+      btn.classList.toggle("active", cfg.fileView === btn.getAttribute("data-view"));
+    });
   }
 
   const COMMIT_PREFIX_STORAGE_KEY = "gitable.commitPrefix.v1";
@@ -275,6 +281,7 @@
     historyAnchorHash: "",
     branchFilter: "",
     expandedCommits: new Set(),
+    collapsedFolders: new Set(),
     commitFiles: /** @type {Record<string, any>} */ ({}),
     commitStats: /** @type {Record<string, any>} */ ({}),
     activeSummary: /** @type {null | {hash: string, subject: string, loading?: boolean, summary?: string, description?: string, error?: string}} */ (null),
@@ -816,6 +823,14 @@
             <p class="gx-hint" style="margin-top:6px">Shows the Jira icon and settings tab when enabled.</p>
           </div>
           <div class="gx-field">
+            <label class="gx-label">File View</label>
+            <p class="gx-hint" style="margin-bottom:8px">How files are displayed in the Changes and Staged tabs.</p>
+            <div class="gx-file-view-picker">
+              <button id="fileViewFlat" class="gx-file-view-btn" data-action="setFileView" data-view="flat" type="button">Flat</button>
+              <button id="fileViewTree" class="gx-file-view-btn" data-action="setFileView" data-view="tree" type="button">Tree</button>
+            </div>
+          </div>
+          <div class="gx-field">
             <label class="gx-label">AI Token Budget</label>
             <p class="gx-hint" style="margin-bottom:8px">Controls how much diff is sent per AI call. Low~10k · Mid~40k · High~80k chars.</p>
             <div class="gx-budget-table">
@@ -1082,11 +1097,31 @@
       listEl.addEventListener("change", (e) => {
         const box = e.target;
         if (!box.classList.contains("gx-check")) return;
+        const isStaged = box.getAttribute("data-staged") === "1";
+
+        if (box.classList.contains("gx-folder-check")) {
+          // Select/deselect all descendant files
+          const folderLi = box.closest(".gx-tree-folder");
+          if (folderLi) {
+            folderLi.querySelectorAll(".gx-check:not(.gx-folder-check)").forEach((fileBox) => {
+              const filePath = fileBox.getAttribute("data-path");
+              if (!filePath) return;
+              const key = selectionKey(filePath, isStaged);
+              if (box.checked) { ui.selected.add(key); fileBox.checked = true; }
+              else { ui.selected.delete(key); fileBox.checked = false; }
+            });
+          }
+          applyFolderIndeterminate(listEl, isStaged);
+          updateChangeActionButtons(ui.state);
+          return;
+        }
+
         const path = box.getAttribute("data-path");
         if (!path) return;
-        const key = selectionKey(path, box.getAttribute("data-staged") === "1");
+        const key = selectionKey(path, isStaged);
         if (box.checked) ui.selected.add(key);
         else ui.selected.delete(key);
+        applyFolderIndeterminate(listEl, isStaged);
         updateChangeActionButtons(ui.state);
       });
     });
@@ -1285,6 +1320,27 @@
           saveConfig(ui.config);
           updateConfigUi();
         }
+        break;
+      }
+      case "setFileView": {
+        const view = elm.getAttribute("data-view");
+        if (view === "flat" || view === "tree") {
+          ui.config.fileView = view;
+          saveConfig(ui.config);
+          updateConfigUi();
+          render();
+        }
+        break;
+      }
+      case "toggleFolder": {
+        const folderPath = elm.getAttribute("data-folder-path");
+        if (!folderPath) break;
+        if (ui.collapsedFolders.has(folderPath)) {
+          ui.collapsedFolders.delete(folderPath);
+        } else {
+          ui.collapsedFolders.add(folderPath);
+        }
+        render();
         break;
       }
       case "setTheme": {
@@ -1808,6 +1864,10 @@
     byId("unstagedList").innerHTML = renderFileList(unstagedFiles, false, partialPaths);
     byId("stagedCount").textContent = String(stagedFiles.length);
     byId("unstagedCount").textContent = String(unstagedFiles.length);
+    if (ui.config.fileView === "tree") {
+      applyFolderIndeterminate(byId("stagedList"), true);
+      applyFolderIndeterminate(byId("unstagedList"), false);
+    }
 
     // Conflicts section
     const conflicts = (s.changes && s.changes.conflicts) || [];
@@ -2112,16 +2172,110 @@
     return "Modified";
   }
 
+  // ---------- Tree view helpers ----------
+  function buildFileTree(files) {
+    const root = [];
+    const dirs = new Map();
+
+    function getOrCreateDir(dirPath) {
+      if (dirs.has(dirPath)) return dirs.get(dirPath);
+      const parts = dirPath.split("/");
+      const name = parts[parts.length - 1];
+      const parentPath = parts.slice(0, -1).join("/");
+      const node = { type: "folder", name, path: dirPath, children: [] };
+      dirs.set(dirPath, node);
+      if (parentPath) {
+        getOrCreateDir(parentPath).children.push(node);
+      } else {
+        root.push(node);
+      }
+      return node;
+    }
+
+    files.forEach((f) => {
+      const parts = f.path.split("/");
+      if (parts.length === 1) {
+        root.push({ type: "file", name: parts[0], file: f });
+      } else {
+        const dirPath = parts.slice(0, -1).join("/");
+        getOrCreateDir(dirPath).children.push({ type: "file", name: parts[parts.length - 1], file: f });
+      }
+    });
+
+    return root;
+  }
+
+  function getAllFilesInFolder(node) {
+    const files = [];
+    function walk(n) {
+      if (n.type === "file") files.push(n.file);
+      else (n.children || []).forEach(walk);
+    }
+    walk(node);
+    return files;
+  }
+
+  function renderFileTree(nodes, isStaged, partialPaths) {
+    return nodes.map((node) => {
+      if (node.type === "file") {
+        return renderFile(node.file, isStaged, partialPaths && partialPaths.has(node.file.path), true);
+      }
+      const collapsed = ui.collapsedFolders.has(node.path);
+      const folderFiles = getAllFilesInFolder(node);
+      const selectedCount = folderFiles.filter((f) => ui.selected.has(selectionKey(f.path, isStaged))).length;
+      const allSelected = folderFiles.length > 0 && selectedCount === folderFiles.length;
+      return `
+        <li class="gx-tree-folder" data-folder-path="${escapeHtml(node.path)}" data-staged="${isStaged ? 1 : 0}">
+          <div class="gx-tree-folder-row">
+            <input type="checkbox" class="gx-check gx-folder-check" data-folder-path="${escapeHtml(node.path)}" data-staged="${isStaged ? 1 : 0}" ${allSelected ? "checked" : ""} title="Select all in ${escapeHtml(node.name)}" aria-label="Select all in ${escapeHtml(node.name)}" />
+            <span class="gx-tree-chevron gx-ic sm${collapsed ? "" : " open"}" data-action="toggleFolder" data-folder-path="${escapeHtml(node.path)}" data-staged="${isStaged ? 1 : 0}">${ICONS.chevron}</span>
+            <span class="gx-tree-folder-icon gx-ic sm">${ICONS.folder}</span>
+            <span class="gx-tree-folder-name" data-action="toggleFolder" data-folder-path="${escapeHtml(node.path)}" data-staged="${isStaged ? 1 : 0}">${escapeHtml(node.name)}</span>
+          </div>
+          ${!collapsed ? `<ul class="gx-tree-children">${renderFileTree(node.children, isStaged, partialPaths)}</ul>` : ""}
+        </li>`;
+    }).join("");
+  }
+
+  function applyFolderIndeterminate(listEl, isStaged) {
+    listEl.querySelectorAll(".gx-tree-folder").forEach((folderLi) => {
+      const folderBox = folderLi.querySelector(":scope > .gx-tree-folder-row > .gx-folder-check");
+      if (!folderBox) return;
+      // Collapsed folders have no .gx-tree-children — leave their checkbox state as-is
+      if (!folderLi.querySelector(":scope > .gx-tree-children")) return;
+      const fileBoxes = folderLi.querySelectorAll(".gx-check:not(.gx-folder-check)");
+      const total = fileBoxes.length;
+      if (total === 0) return;
+      const checked = Array.from(fileBoxes).filter((b) => b.checked).length;
+      if (checked === total) {
+        folderBox.checked = true;
+        folderBox.indeterminate = false;
+      } else if (checked === 0) {
+        folderBox.checked = false;
+        folderBox.indeterminate = false;
+      } else {
+        folderBox.checked = false;
+        folderBox.indeterminate = true;
+      }
+    });
+  }
+  // ---------- End tree view helpers ----------
+
   function renderFileList(files, isStaged, partialPaths) {
     if (!files || !files.length) {
       return `<li class="gx-empty">No files</li>`;
     }
+    if (ui.config.fileView === "tree") {
+      const tree = buildFileTree(files);
+      return renderFileTree(tree, isStaged, partialPaths);
+    }
     return files.map((f) => renderFile(f, isStaged, partialPaths && partialPaths.has(f.path))).join("");
   }
 
-  function renderFile(f, isStaged, isPartial) {
+  function renderFile(f, isStaged, isPartial, treeMode) {
     const checked = ui.selected.has(selectionKey(f.path, isStaged)) ? "checked" : "";
-    const selectTitle = `Select ${f.displayPath || f.path}`;
+    const displayText = treeMode ? (f.path.split("/").pop() || f.path) : (f.displayPath || f.path);
+    const selectTitle = `Select ${displayText}`;
     const partialBadge = isPartial
       ? `<span class="gx-partial-badge" title="Partially staged: this file also has ${isStaged ? "working tree" : "staged"} changes">Partial</span>`
       : "";
@@ -2129,7 +2283,7 @@
       <li class="gx-file${isStaged ? " gx-file-staged" : ""}" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
         <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" title="${escapeHtml(selectTitle)}" aria-label="${escapeHtml(selectTitle)}" ${checked} />
         ${fileIcon(f.path)}
-        <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
+        <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(displayText)}</span>
         ${partialBadge}
         <span class="gx-right">
           ${statusGlyph(f.status)}
