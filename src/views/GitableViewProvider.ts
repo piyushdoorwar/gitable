@@ -1642,19 +1642,28 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     if (version !== this.postStateVersion) {
       return;
     }
+    this.updateBadge(data.changes);
     const renderId = waitForRender ? ++this.stateRenderSeq : undefined;
     const rendered = renderId ? this.waitForStateRender(renderId) : undefined;
     const delivered = await this.view.webview.postMessage({ type: "state", data, renderId });
-    const changes = data.changes as { staged: unknown[]; unstaged: unknown[] } | undefined;
-    const count = (changes?.staged?.length ?? 0) + (changes?.unstaged?.length ?? 0);
-    if (this.view) {
-      this.view.badge = count > 0 ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` } : undefined;
-    }
     this.pendingError = "";
     this.pendingNotice = "";
     if (rendered && delivered) {
       await rendered;
     }
+  }
+
+  private updateBadge(changes: unknown): void {
+    if (!this.view) {
+      return;
+    }
+    const repoChanges = changes as { staged?: unknown[]; unstaged?: unknown[] } | undefined;
+    const staged = Array.isArray(repoChanges?.staged) ? repoChanges.staged.length : 0;
+    const unstaged = Array.isArray(repoChanges?.unstaged) ? repoChanges.unstaged.length : 0;
+    const count = staged + unstaged;
+    this.view.badge = count > 0
+      ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` }
+      : undefined;
   }
 
   private async waitForStateRender(renderId: number): Promise<void> {
