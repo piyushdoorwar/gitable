@@ -23,9 +23,9 @@ export const Commands = {
 } as const;
 
 /** Supported AI providers. */
-export type ProviderId = "openai" | "gemini" | "claude";
+export type ProviderId = "openai" | "gemini" | "claude" | "nvidia";
 
-export const PROVIDER_IDS: ProviderId[] = ["openai", "gemini", "claude"];
+export const PROVIDER_IDS: ProviderId[] = ["openai", "gemini", "claude", "nvidia"];
 
 /** SecretStorage key for a provider's API key. Keys are never stored anywhere else. */
 export function secretKeyFor(provider: ProviderId): string {

@@ -152,7 +152,8 @@
   const PROVIDERS = [
     { value: "openai",  label: "OpenAI", keyUrl: "https://platform.openai.com/api-keys" },
     { value: "gemini",  label: "Gemini", keyUrl: "https://aistudio.google.com/api-keys" },
-    { value: "claude",  label: "Claude", keyUrl: "https://platform.claude.com/settings/keys" }
+    { value: "claude",  label: "Claude", keyUrl: "https://platform.claude.com/settings/keys" },
+    { value: "nvidia",  label: "NVIDIA", keyUrl: "https://build.nvidia.com/" }
   ];
 
   const CONFIG_STORAGE_KEY = "gitable.config.v1";
@@ -2753,7 +2754,7 @@
 
   const TYPE_LABELS = { commitMessage: "Commit msg", commitSummary: "AI Summary", security: "Security" };
   const TYPE_COLORS = { commitMessage: "var(--gx-pink)", commitSummary: "#7aa2ff", security: "#e7bd57" };
-  const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e" };
+  const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e", nvidia: "#76b900" };
 
   /**
    * @param {Array<{ts:number,provider:string,model:string,type:string}>|null} entries — null = loading

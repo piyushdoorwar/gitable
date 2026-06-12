@@ -1758,7 +1758,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       webview
         .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "media", "providers", file))
         .toString();
-    return { openai: uri("openai.svg"), gemini: uri("gemini.svg"), claude: uri("claude.svg") };
+    return { openai: uri("openai.svg"), gemini: uri("gemini.svg"), claude: uri("claude.svg"), nvidia: uri("nvidia.svg") };
   }
 
   private isProviderId(value: unknown): value is ProviderId {
