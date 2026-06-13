@@ -4,17 +4,17 @@
   --panel: #121923;
   --panel-2: #141e36;
   --panel-3: #0f1620;
-  --line: rgba(249, 139, 158, 0.24);
-  --line-strong: rgba(249, 139, 158, 0.42);
+  --line: rgba(31, 156, 240, 0.24);
+  --line-strong: rgba(31, 156, 240, 0.42);
   --muted: #a4aab3;
   --text: #f6f8fb;
   --soft: #d7dfea;
-  --accent: #f98b9e;
-  --accent-bright: #ffb0bd;
+  --accent: #1f9cf0;
+  --accent-bright: #5cb6f5;
   --accent-ink: #0d1117;
-  --accent-glow: rgba(249, 139, 158, 0.16);
+  --accent-glow: rgba(31, 156, 240, 0.16);
   --button: rgba(20, 30, 54, 0.72);
-  --button-border: rgba(249, 139, 158, 0.34);
+  --button-border: rgba(31, 156, 240, 0.34);
   --shadow: rgba(0, 0, 0, 0.42);
 }
 
@@ -33,7 +33,7 @@ body {
   min-width: 320px;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 88% 8%, rgba(249, 139, 158, 0.1), transparent 28rem),
+    radial-gradient(circle at 88% 8%, rgba(31, 156, 240, 0.1), transparent 28rem),
     linear-gradient(180deg, #101722 0%, var(--bg) 42rem);
   color: var(--text);
   font-family: Cantarell, Ubuntu, Inter, "Segoe UI", sans-serif;
@@ -50,7 +50,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(249, 139, 158, 0.72);
+  background: rgba(31, 156, 240, 0.72);
   border: 2px solid #15191f;
   border-radius: 999px;
 }
@@ -130,7 +130,7 @@ h3 {
   min-height: 64px;
   padding: 0 clamp(18px, 5vw, 64px);
   background: rgba(13, 17, 23, 0.92);
-  border-bottom: 1px solid rgba(249, 139, 158, 0.12);
+  border-bottom: 1px solid rgba(31, 156, 240, 0.12);
   backdrop-filter: blur(18px);
 }
 
@@ -309,7 +309,7 @@ main {
   max-width: 100%;
   justify-self: end;
   overflow: hidden;
-  border: 1px solid rgba(249, 139, 158, 0.22);
+  border: 1px solid rgba(31, 156, 240, 0.22);
   border-radius: 10px;
   background: #0e1117;
   box-shadow: 0 32px 90px var(--shadow);
@@ -323,7 +323,7 @@ main {
   height: 40px;
   padding: 0 14px;
   background: #0b111b;
-  border-bottom: 1px solid rgba(249, 139, 158, 0.12);
+  border-bottom: 1px solid rgba(31, 156, 240, 0.12);
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -360,7 +360,7 @@ main {
   gap: 18px;
   padding: 18px 0;
   background: #0b1017;
-  border-right: 1px solid rgba(249, 139, 158, 0.1);
+  border-right: 1px solid rgba(31, 156, 240, 0.1);
 }
 
 .activity img {
@@ -371,14 +371,14 @@ main {
 
 .activity img.active {
   opacity: 1;
-  filter: drop-shadow(0 0 12px rgba(249, 139, 158, 0.4));
+  filter: drop-shadow(0 0 12px rgba(31, 156, 240, 0.4));
 }
 
 .panel {
   min-width: 0;
   padding: 14px;
   background:
-    radial-gradient(circle at 85% 0%, rgba(249, 139, 158, 0.07), transparent 18rem),
+    radial-gradient(circle at 85% 0%, rgba(31, 156, 240, 0.07), transparent 18rem),
     #13192a;
 }
 
@@ -520,7 +520,7 @@ main {
   min-width: 0;
   min-height: 32px;
   padding: 0 8px;
-  border: 1px solid rgba(249, 139, 158, 0.1);
+  border: 1px solid rgba(31, 156, 240, 0.1);
   border-radius: 6px;
   background: rgba(20, 30, 54, 0.65);
   color: var(--soft);
@@ -579,7 +579,7 @@ main {
 .commit-card input,
 .commit-card textarea {
   width: 100%;
-  border: 1px solid rgba(249, 139, 158, 0.22);
+  border: 1px solid rgba(31, 156, 240, 0.22);
   border-radius: 6px;
   background: #111315;
   color: var(--soft);
@@ -609,7 +609,7 @@ main {
   place-items: center;
   width: 38px;
   border: 0;
-  border-left: 1px solid rgba(249, 139, 158, 0.22);
+  border-left: 1px solid rgba(31, 156, 240, 0.22);
   background: transparent;
 }
 
@@ -676,7 +676,7 @@ main {
 .band {
   padding: clamp(44px, 7vw, 76px) clamp(18px, 5vw, 64px);
   background:
-    radial-gradient(circle at 88% 12%, rgba(249, 139, 158, 0.06), transparent 24rem),
+    radial-gradient(circle at 88% 12%, rgba(31, 156, 240, 0.06), transparent 24rem),
     linear-gradient(180deg, #111820 0%, #0d1117 100%);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -684,7 +684,7 @@ main {
 
 .band--alt {
   background:
-    radial-gradient(circle at 16% 18%, rgba(249, 139, 158, 0.05), transparent 22rem),
+    radial-gradient(circle at 16% 18%, rgba(31, 156, 240, 0.05), transparent 22rem),
     #0d1117;
 }
 
@@ -790,7 +790,7 @@ main {
 .privacy-band {
   padding: clamp(44px, 7vw, 76px) clamp(18px, 5vw, 64px);
   background:
-    radial-gradient(circle at 15% 20%, rgba(249, 139, 158, 0.13), transparent 23rem),
+    radial-gradient(circle at 15% 20%, rgba(31, 156, 240, 0.13), transparent 23rem),
     var(--panel-3);
 }
 
@@ -829,7 +829,7 @@ main {
   min-height: calc(100vh - 136px);
   padding: clamp(44px, 7vw, 76px) clamp(18px, 5vw, 64px);
   background:
-    radial-gradient(circle at 14% 12%, rgba(249, 139, 158, 0.08), transparent 24rem),
+    radial-gradient(circle at 14% 12%, rgba(31, 156, 240, 0.08), transparent 24rem),
     linear-gradient(180deg, #111820 0%, #0d1117 100%);
 }
 

@@ -5,7 +5,7 @@
     <g
       transform="translate(11 12.5) scale(0.46) translate(-12 -12)"
       fill="none"
-      stroke="#F98B9E"
+      stroke="#1F9CF0"
       stroke-width="2"
       stroke-linecap="round"
       stroke-linejoin="round"
@@ -15,7 +15,7 @@
       <circle cx="6" cy="18" r="2.35"/>
     </g>
 
-    <g transform="translate(14.25 11.22) rotate(23)" fill="#F98B9E">
+    <g transform="translate(14.25 11.22) rotate(23)" fill="#1F9CF0">
       <circle cx="0" cy="-0.04" r="0.48"/>
       <path transform="rotate(-18) translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>
       <path transform="rotate(18) translate(0 -0.45)" d="M0,0 C0.85,-1.05 0.85,-2.1 0,-3 C-0.85,-2.1 -0.85,-1.05 0,0 Z"/>

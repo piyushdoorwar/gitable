@@ -156,7 +156,6 @@
   ];
 
   const CONFIG_STORAGE_KEY = "gitable.config.v1";
-  const THEME_STORAGE_KEY = "gitable.theme.v1";
 
   const TOKEN_PRESETS = { low: 10_000, mid: 40_000, high: 80_000 };
 
@@ -186,27 +185,6 @@
   function getMaxChars(feature) {
     const key = ui.config.budgets[feature] || "mid";
     return TOKEN_PRESETS[key] || TOKEN_PRESETS.mid;
-  }
-
-  function readTheme() {
-    try {
-      const v = window.localStorage && window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (v === "dark" || v === "light" || v === "vscode") return v;
-    } catch (_) {}
-    return "vscode";
-  }
-
-  function applyTheme(theme) {
-    document.body.classList.remove("gx-theme-light", "gx-theme-vscode");
-    if (theme === "light") document.body.classList.add("gx-theme-light");
-    if (theme === "vscode") document.body.classList.add("gx-theme-vscode");
-    try { window.localStorage && window.localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (_) {}
-  }
-
-  function updateThemePicker() {
-    document.querySelectorAll(".gx-theme-opt").forEach((btn) => {
-      btn.classList.toggle("active", btn.getAttribute("data-theme") === ui.activeTheme);
-    });
   }
 
   function updateJiraVisibility() {
@@ -292,7 +270,6 @@
     securityProgress: { timer: /** @type {ReturnType<typeof setTimeout>|null} */ (null), idx: 0 },
     commitPrefix: readCommitPrefixState(),
     config: readConfig(),
-    activeTheme: readTheme(),
     activeSettingsTab: "ai",
     jiraIssues: /** @type {null | any[]} */ (null),
     jiraLoading: false,
@@ -798,26 +775,6 @@
         </div>
         <div id="settingsPaneConfig" class="hidden">
           <div class="gx-field">
-            <label class="gx-label gx-label-info">
-              <span>Appearance</span>
-              <span class="gx-info-icon gx-ic sm" title="VS Code follows your active editor color theme.">${ICONS.info}</span>
-            </label>
-            <div class="gx-theme-picker">
-              <button class="gx-theme-opt" data-action="setTheme" data-theme="dark" type="button">
-                <span class="gx-theme-swatch gx-theme-swatch-dark"></span>
-                <span>Dark</span>
-              </button>
-              <button class="gx-theme-opt" data-action="setTheme" data-theme="light" type="button">
-                <span class="gx-theme-swatch gx-theme-swatch-light"></span>
-                <span>Light</span>
-              </button>
-              <button class="gx-theme-opt" data-action="setTheme" data-theme="vscode" type="button">
-                <span class="gx-theme-swatch gx-theme-swatch-vscode"></span>
-                <span>VS Code</span>
-              </button>
-            </div>
-          </div>
-          <div class="gx-field">
             <div class="gx-config-toggle-row">
               <span class="gx-label gx-label-info gx-label-no-margin">
                 <span>Jira Integration</span>
@@ -1312,7 +1269,7 @@
         byId("settingsPaneAi").classList.toggle("hidden", stab !== "ai");
         byId("settingsPaneJira").classList.toggle("hidden", stab !== "jira");
         byId("settingsPaneConfig").classList.toggle("hidden", stab !== "config");
-        if (stab === "config") { updateThemePicker(); updateConfigUi(); }
+        if (stab === "config") { updateConfigUi(); }
         break;
       }
       case "toggleJira": {
@@ -1351,13 +1308,6 @@
           ui.collapsedFolders.add(folderPath);
         }
         render();
-        break;
-      }
-      case "setTheme": {
-        const theme = elm.getAttribute("data-theme") || "dark";
-        ui.activeTheme = theme;
-        applyTheme(theme);
-        updateThemePicker();
         break;
       }
       case "openReports":
@@ -2752,7 +2702,7 @@
   // ---------- Reports ----------
 
   const TYPE_LABELS = { commitMessage: "Commit msg", commitSummary: "AI Summary", security: "Security" };
-  const TYPE_COLORS = { commitMessage: "var(--gx-pink)", commitSummary: "#7aa2ff", security: "#e7bd57" };
+  const TYPE_COLORS = { commitMessage: "var(--gx-accent)", commitSummary: "#7aa2ff", security: "#e7bd57" };
   const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e" };
 
   /**
@@ -2823,7 +2773,7 @@
     }
 
     const typeRows = Object.entries(TYPE_LABELS).filter(([k]) => typeCounts[k]).map(([k, label]) =>
-      barRow(label, typeCounts[k] || 0, TYPE_COLORS[k] || "var(--gx-pink)")
+      barRow(label, typeCounts[k] || 0, TYPE_COLORS[k] || "var(--gx-accent)")
     ).join("");
 
     const provRows = Object.entries(provCounts).sort((a, b) => b[1] - a[1]).map(([p, c]) =>
@@ -2880,8 +2830,8 @@
             labels: activeDays.map((d) => d.label),
             datasets: [{
               data: activeDays.map((d) => d.count),
-              backgroundColor: "rgba(249,139,158,0.75)",
-              hoverBackgroundColor: "rgba(249,139,158,1)",
+              backgroundColor: "rgba(31,156,240,0.75)",
+              hoverBackgroundColor: "rgba(31,156,240,1)",
               borderRadius: 4,
               borderSkipped: false,
             }]
@@ -3042,7 +2992,6 @@
 
   // ---------- Boot ----------
   buildShell();
-  applyTheme(ui.activeTheme);
   updateJiraVisibility();
   switchTab("changes");
   render();

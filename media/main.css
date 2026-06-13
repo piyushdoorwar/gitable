@@ -1,23 +1,22 @@
 :root {
   /* Brand palette (from the Gitable logo) */
-  --gx-navy: #09244b;
-  --gx-navy-2: #0d2f63;
-  --gx-pink: #f98b9e;
-  --gx-pink-strong: #f76d85;
-  --gx-pink-ink: #09244b;
-  --gx-pink-soft: rgba(249, 139, 158, 0.14);
-  --gx-pink-line: rgba(249, 139, 158, 0.32);
-  --gx-navy-card: rgba(13, 47, 99, 0.22);
-  --gx-line: rgba(249, 139, 158, 0.16);
+  --gx-accent: #1f9cf0;
+  --gx-accent-strong: #007acc;
+  --gx-accent-deep: #0065a9;
+  --gx-accent-ink: #082744;
+  --gx-accent-soft: rgba(31, 156, 240, 0.14);
+  --gx-accent-line: rgba(31, 156, 240, 0.32);
 
   --gx-radius: 8px;
   --gx-radius-sm: 6px;
   --gx-gap: 10px;
 
-  /* Theme-switchable surfaces (dark defaults) */
-  --gx-subtabs-bg: rgba(9, 36, 75, 0.16);
-  --gx-alt-card-bg: rgba(13, 47, 99, 0.12);
-  --gx-undo-bar-bg: rgba(9, 36, 75, 0.18);
+  /* Theme-switchable surfaces (follow VS Code; dark defaults, light overridden below) */
+  --gx-navy-card: rgba(128, 128, 128, 0.08);
+  --gx-subtabs-bg: rgba(128, 128, 128, 0.06);
+  --gx-alt-card-bg: rgba(128, 128, 128, 0.05);
+  --gx-undo-bar-bg: rgba(128, 128, 128, 0.07);
+  --gx-line: var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
 }
 
 * {
@@ -37,8 +36,7 @@ body {
   line-height: 1.45;
   color: var(--vscode-foreground);
   background:
-    radial-gradient(120% 60% at 80% -10%, rgba(249, 139, 158, 0.08), transparent 60%),
-    linear-gradient(180deg, rgba(9, 36, 75, 0.28), rgba(9, 36, 75, 0.06) 140px),
+    radial-gradient(120% 60% at 80% -10%, rgba(31, 156, 240, 0.08), transparent 60%),
     var(--vscode-sideBar-background);
   overflow: hidden;
 }
@@ -74,7 +72,7 @@ button[aria-disabled="true"],
   padding: 5px 8px;
   color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
   background: var(--vscode-editorHoverWidget-background, var(--vscode-input-background));
-  border: 1px solid var(--vscode-editorHoverWidget-border, var(--gx-pink-line));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--gx-accent-line));
   border-radius: 4px;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34);
   font-size: 11.5px;
@@ -160,7 +158,7 @@ button[aria-disabled="true"],
   white-space: nowrap;
 }
 .gx-repo-name .gx-ic {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 
 .gx-branch-row {
@@ -189,15 +187,15 @@ button[aria-disabled="true"],
 .gx-branch-btn:hover,
 .gx-branch-btn.active,
 .gx-sync-pill:hover:not(:disabled) {
-  border-color: var(--gx-pink-line);
-  background: var(--gx-pink-soft);
+  border-color: var(--gx-accent-line);
+  background: var(--gx-accent-soft);
 }
 .gx-sync-pill:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .gx-branch-btn > .gx-ic:first-child {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   flex-shrink: 0;
 }
 .gx-sync-pill > .gx-ic:first-child {
@@ -229,8 +227,8 @@ button[aria-disabled="true"],
   gap: 2px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
   padding: 1px 5px;
   border-radius: 8px;
   letter-spacing: 0.02em;
@@ -291,7 +289,7 @@ button[aria-disabled="true"],
   padding: 0 6px;
   font-size: 10.5px;
   font-weight: 600;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-stash-pop-btn svg {
   width: 12px;
@@ -415,14 +413,14 @@ button[aria-disabled="true"],
 }
 .gx-branch-item:hover {
   background: var(--gx-navy-card);
-  border-color: var(--gx-pink-line);
+  border-color: var(--gx-accent-line);
 }
 .gx-branch-item.current {
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 .gx-branch-ic {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-branch-name {
   flex: 1;
@@ -434,10 +432,10 @@ button[aria-disabled="true"],
 }
 .gx-branch-item.current .gx-branch-name {
   font-weight: 600;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-branch-check {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 
 .gx-branch {
@@ -448,9 +446,9 @@ button[aria-disabled="true"],
   padding: 3px 9px 3px 7px;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border: 1px solid var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border: 1px solid var(--gx-accent-line);
   border-radius: 999px;
 }
 
@@ -468,9 +466,9 @@ button[aria-disabled="true"],
 }
 .gx-iconbtn:hover,
 .gx-iconbtn.active {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 
 /* Tabs --------------------------------------------------------------- */
@@ -502,7 +500,7 @@ button[aria-disabled="true"],
   color: var(--vscode-foreground);
 }
 .gx-tab.active {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-tab.active::after {
   content: "";
@@ -512,7 +510,7 @@ button[aria-disabled="true"],
   bottom: -1px;
   height: 2px;
   border-radius: 2px;
-  background: var(--gx-pink);
+  background: var(--gx-accent);
 }
 
 /* Summary tab close button */
@@ -535,7 +533,7 @@ button[aria-disabled="true"],
   margin-left: 2px;
 }
 .gx-tab-close-btn:hover {
-  background: var(--gx-pink-soft);
+  background: var(--gx-accent-soft);
   color: var(--vscode-foreground);
 }
 
@@ -584,13 +582,13 @@ button[aria-disabled="true"],
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 .gx-change-subtab:hover {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
 }
 .gx-change-subtab.active {
-  color: var(--gx-pink);
-  background: rgba(249, 139, 158, 0.1);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: rgba(31, 156, 240, 0.1);
+  border-color: var(--gx-accent-line);
 }
 .gx-change-subtab .gx-count {
   min-width: 16px;
@@ -643,13 +641,13 @@ button[aria-disabled="true"],
 }
 .gx-notice.error {
   color: var(--vscode-inputValidation-errorForeground, #ffd7d7);
-  background: rgba(247, 109, 133, 0.14);
-  border-color: rgba(247, 109, 133, 0.5);
+  background: rgba(229, 83, 75, 0.14);
+  border-color: rgba(229, 83, 75, 0.5);
 }
 .gx-notice.info {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 
 .gx-spinner {
@@ -672,7 +670,7 @@ button[aria-disabled="true"],
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--gx-pink);
+  background: var(--gx-accent);
   animation: gx-pulse 0.9s ease-in-out infinite;
 }
 @keyframes gx-pulse {
@@ -686,8 +684,8 @@ button[aria-disabled="true"],
   height: 13px;
   flex: 0 0 auto;
   border-radius: 50%;
-  border: 2px solid var(--gx-pink-line);
-  border-top-color: var(--gx-pink);
+  border: 2px solid var(--gx-accent-line);
+  border-top-color: var(--gx-accent);
   animation: gx-rot 0.7s linear infinite;
 }
 @keyframes gx-rot {
@@ -744,8 +742,8 @@ button[aria-disabled="true"],
   padding: 6px 10px;
   margin-top: 6px;
   border-radius: var(--gx-radius-sm);
-  background: rgba(249, 139, 158, 0.08);
-  border: 1px solid var(--gx-pink-line);
+  background: rgba(31, 156, 240, 0.08);
+  border: 1px solid var(--gx-accent-line);
 }
 .gx-undo-msg {
   flex: 1;
@@ -762,15 +760,15 @@ button[aria-disabled="true"],
   font-size: 11px;
   font-family: inherit;
   border-radius: var(--gx-radius-sm);
-  border: 1px solid var(--gx-pink-line);
+  border: 1px solid var(--gx-accent-line);
   background: transparent;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   cursor: pointer;
   line-height: 1.6;
 }
 .gx-undo-btn:hover {
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-strong);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-strong);
 }
 
 .gx-rebase-bar {
@@ -836,8 +834,8 @@ button[aria-disabled="true"],
   padding: 0 5px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--gx-pink-ink);
-  background: var(--gx-pink);
+  color: var(--gx-accent-ink);
+  background: var(--gx-accent);
   border-radius: 999px;
 }
 .gx-section-head .spacer {
@@ -870,20 +868,20 @@ button[aria-disabled="true"],
   height: 14px;
 }
 .gx-mini-action:hover:not(:disabled):not([aria-disabled="true"]) {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 .gx-mini-action.gx-danger:hover:not(:disabled):not([aria-disabled="true"]) {
-  color: var(--vscode-errorForeground, var(--gx-pink-strong));
+  color: var(--vscode-errorForeground, var(--gx-accent-strong));
 }
 .gx-mini-action-ai {
-  color: var(--gx-pink-strong);
+  color: var(--gx-accent-strong);
 }
 .gx-mini-action-ai:hover:not(:disabled):not([aria-disabled="true"]) {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 .gx-mini-sep {
   width: 1px;
@@ -900,7 +898,7 @@ button[aria-disabled="true"],
   padding: 4px;
   color: var(--vscode-menu-foreground, var(--vscode-foreground));
   background: var(--vscode-menu-background, var(--vscode-input-background));
-  border: 1px solid var(--vscode-menu-border, var(--gx-pink-line));
+  border: 1px solid var(--vscode-menu-border, var(--gx-accent-line));
   border-radius: 6px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
   animation: gx-menu-in 0.09s ease-out;
@@ -921,10 +919,10 @@ button[aria-disabled="true"],
 }
 .gx-context-menu button:hover {
   color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
-  background: var(--vscode-menu-selectionBackground, var(--gx-pink-soft));
+  background: var(--vscode-menu-selectionBackground, var(--gx-accent-soft));
 }
 .gx-context-menu button.gx-menu-danger:hover {
-  color: var(--vscode-errorForeground, var(--gx-pink-strong));
+  color: var(--vscode-errorForeground, var(--gx-accent-strong));
 }
 .gx-menu-sep {
   display: block;
@@ -971,7 +969,7 @@ button[aria-disabled="true"],
   height: 16px;
   flex: 0 0 auto;
   margin: 0;
-  border: 1.5px solid var(--gx-pink-line);
+  border: 1.5px solid var(--gx-accent-line);
   border-radius: 5px;
   background: transparent;
   position: relative;
@@ -979,12 +977,12 @@ button[aria-disabled="true"],
   transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 .gx-check:hover {
-  border-color: var(--gx-pink);
+  border-color: var(--gx-accent);
   transform: scale(1.04);
 }
 .gx-check:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--gx-pink-line);
+  box-shadow: 0 0 0 2px var(--gx-accent-line);
 }
 .gx-check::after {
   content: "";
@@ -993,22 +991,22 @@ button[aria-disabled="true"],
   top: 50%;
   width: 8px;
   height: 4px;
-  border: solid var(--gx-pink-ink);
+  border: solid var(--gx-accent-ink);
   border-width: 0 0 2px 2px;
   opacity: 0;
   transform: translate(-50%, -60%) rotate(-45deg) scale(0.75);
   transition: opacity 0.12s ease, transform 0.14s ease;
 }
 .gx-check:checked {
-  background: var(--gx-pink);
-  border-color: var(--gx-pink);
+  background: var(--gx-accent);
+  border-color: var(--gx-accent);
 }
 .gx-check:checked::after {
   opacity: 1;
   transform: translate(-50%, -60%) rotate(-45deg) scale(1);
 }
 .gx-check-pending {
-  box-shadow: 0 0 0 2px rgba(255, 128, 171, 0.12);
+  box-shadow: 0 0 0 2px rgba(31, 156, 240, 0.12);
 }
 /* File-type icon (left), coloured by extension */
 .gx-ftype {
@@ -1070,7 +1068,7 @@ button[aria-disabled="true"],
   cursor: pointer;
 }
 .gx-path:hover {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 
 /* Right side: file status marker. Conflict rows can layer action buttons here. */
@@ -1100,7 +1098,7 @@ button[aria-disabled="true"],
 }
 .gx-stat-M { color: #e7bd57; }
 .gx-stat-A { color: #62d39a; }
-.gx-stat-D { color: var(--gx-pink-strong); }
+.gx-stat-D { color: var(--gx-accent-strong); }
 .gx-stat-R { color: #7aa2ff; }
 .gx-stat-X { color: var(--vscode-editorWarning-foreground, #e8b500); }
 
@@ -1114,14 +1112,14 @@ button[aria-disabled="true"],
   z-index: 2;
 }
 .gx-row-action:hover {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 .gx-row-discard:hover {
-  color: var(--gx-pink) !important;
-  background: var(--gx-pink-soft) !important;
-  border-color: var(--gx-pink-line) !important;
+  color: var(--gx-accent) !important;
+  background: var(--gx-accent-soft) !important;
+  border-color: var(--gx-accent-line) !important;
 }
 .gx-empty {
   padding: 8px 6px;
@@ -1154,20 +1152,20 @@ button[aria-disabled="true"],
   transform: translateY(0.5px);
 }
 .gx-btn-primary {
-  color: var(--gx-pink-ink);
-  background: var(--gx-pink);
+  color: var(--gx-accent-ink);
+  background: var(--gx-accent);
 }
 .gx-btn-primary:hover {
-  background: var(--gx-pink-strong);
+  background: var(--gx-accent-strong);
 }
 .gx-btn-ghost {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   background: transparent;
-  border-color: var(--gx-pink-line);
+  border-color: var(--gx-accent-line);
 }
 .gx-btn-ghost:hover {
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent);
 }
 .gx-btn-soft {
   color: var(--vscode-foreground);
@@ -1175,8 +1173,8 @@ button[aria-disabled="true"],
   border-color: var(--gx-line);
 }
 .gx-btn-soft:hover {
-  border-color: var(--gx-pink-line);
-  color: var(--gx-pink);
+  border-color: var(--gx-accent-line);
+  color: var(--gx-accent);
 }
 .gx-btn-block {
   width: 100%;
@@ -1223,7 +1221,7 @@ button[aria-disabled="true"],
 }
 .gx-info-icon:hover {
   opacity: 1;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-refresh-icon-btn {
   color: var(--vscode-descriptionForeground);
@@ -1254,8 +1252,8 @@ textarea::placeholder {
 input:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--gx-pink);
-  box-shadow: 0 0 0 2px var(--gx-pink-soft);
+  border-color: var(--gx-accent);
+  box-shadow: 0 0 0 2px var(--gx-accent-soft);
 }
 textarea {
   resize: vertical;
@@ -1280,11 +1278,11 @@ textarea {
   padding: 0 9px 0 0;
   background: transparent;
   border: none;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   border-radius: 0 var(--gx-radius-sm) var(--gx-radius-sm) 0;
 }
 .gx-input-action:hover {
-  color: var(--gx-pink-strong);
+  color: var(--gx-accent-strong);
 }
 .gx-input-action .gx-ic,
 .gx-input-action .gx-ic svg {
@@ -1298,7 +1296,7 @@ textarea {
 .gx-vsep {
   width: 1px;
   height: 18px;
-  background: var(--gx-pink-line);
+  background: var(--gx-accent-line);
 }
 
 /* Commit card -------------------------------------------------------- */
@@ -1360,11 +1358,11 @@ textarea {
   transition: border-color 0.12s, box-shadow 0.12s;
 }
 .gx-select-btn:hover {
-  border-color: var(--gx-pink-line);
+  border-color: var(--gx-accent-line);
 }
 .gx-select.open .gx-select-btn {
-  border-color: var(--gx-pink);
-  box-shadow: 0 0 0 2px var(--gx-pink-soft);
+  border-color: var(--gx-accent);
+  box-shadow: 0 0 0 2px var(--gx-accent-soft);
 }
 .gx-select-label {
   flex: 1;
@@ -1377,7 +1375,7 @@ textarea {
   color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
 }
 .gx-chevron {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   transition: transform 0.15s;
 }
 .gx-select.open .gx-chevron {
@@ -1397,7 +1395,7 @@ textarea {
   overflow-y: auto;
   padding: 4px;
   background: var(--vscode-dropdown-background, var(--vscode-input-background));
-  border: 1px solid var(--gx-pink-line);
+  border: 1px solid var(--gx-accent-line);
   border-radius: var(--gx-radius-sm);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   display: none;
@@ -1421,11 +1419,11 @@ textarea {
   text-overflow: ellipsis;
 }
 .gx-option:hover {
-  background: var(--gx-pink-soft);
-  color: var(--gx-pink);
+  background: var(--gx-accent-soft);
+  color: var(--gx-accent);
 }
 .gx-option.selected {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   font-weight: 600;
 }
 
@@ -1451,7 +1449,7 @@ textarea {
   font-size: 11.5px;
   color: var(--vscode-descriptionForeground);
   background: var(--gx-navy-card);
-  border: 1px dashed var(--gx-pink-line);
+  border: 1px dashed var(--gx-accent-line);
   border-radius: var(--gx-radius-sm);
 }
 
@@ -1487,9 +1485,9 @@ textarea {
   height: 26px;
   padding: 0 8px;
   border-radius: 4px;
-  color: var(--gx-pink);
-  background: rgba(249, 139, 158, 0.08);
-  border: 1px solid var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: rgba(31, 156, 240, 0.08);
+  border: 1px solid var(--gx-accent-line);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1521,15 +1519,15 @@ textarea {
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, opacity 0.12s ease;
 }
 .gx-history-action-primary {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-history-action-clear {
   color: var(--vscode-descriptionForeground);
 }
 .gx-history-action:hover:not([aria-disabled="true"]) {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent-line);
 }
 .gx-history-action[aria-disabled="true"] {
   opacity: 0.42;
@@ -1554,8 +1552,8 @@ textarea {
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 .gx-commit.selected {
-  border-color: var(--gx-pink-line);
-  background: rgba(249, 139, 158, 0.08);
+  border-color: var(--gx-accent-line);
+  background: rgba(31, 156, 240, 0.08);
 }
 .gx-commit-head {
   display: grid;
@@ -1569,7 +1567,7 @@ textarea {
   margin-top: 1px;
 }
 .gx-commit-head:hover {
-  background: var(--gx-pink-soft);
+  background: var(--gx-accent-soft);
 }
 .gx-commit-col-left {
   display: flex;
@@ -1593,10 +1591,10 @@ textarea {
 }
 .gx-commit.expanded .gx-commit-caret {
   transform: rotate(0deg);
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-commit .rail {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-commit .body {
   min-width: 0;
@@ -1728,7 +1726,7 @@ textarea {
   background: transparent;
   border: 0;
   border-radius: 3px;
-  color: var(--gx-pink-strong);
+  color: var(--gx-accent-strong);
   opacity: 0.72;
   transition: opacity 0.12s, background 0.12s;
   cursor: pointer;
@@ -1737,7 +1735,7 @@ textarea {
   opacity: 1;
 }
 .gx-ai-sum:hover {
-  background: var(--gx-pink-soft);
+  background: var(--gx-accent-soft);
   opacity: 1;
 }
 .gx-ai-sum svg {
@@ -1775,8 +1773,8 @@ textarea {
 .gx-ai-panel-error {
   padding: 10px 12px;
   border-radius: 6px;
-  background: rgba(249, 139, 158, 0.1);
-  color: var(--gx-pink-strong);
+  background: rgba(31, 156, 240, 0.1);
+  color: var(--gx-accent-strong);
   font-size: 12.5px;
   line-height: 1.5;
 }
@@ -1837,7 +1835,7 @@ textarea {
   font-weight: 600;
 }
 .gx-ds-del {
-  color: var(--gx-pink-strong);
+  color: var(--gx-accent-strong);
   font-weight: 600;
 }
 .gx-commit-title {
@@ -1868,8 +1866,8 @@ textarea {
   min-height: 17px;
   padding: 1px 6px 1px 5px;
   border-radius: 999px;
-  color: var(--vscode-badge-foreground, var(--gx-pink-ink));
-  background: var(--vscode-badge-background, rgba(249, 139, 158, 0.34));
+  color: var(--vscode-badge-foreground, var(--gx-accent-ink));
+  background: var(--vscode-badge-background, rgba(31, 156, 240, 0.34));
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1.35;
@@ -1886,12 +1884,12 @@ textarea {
   transition: background 0.1s, border-color 0.1s;
 }
 .gx-tag-btn:hover {
-  background: rgba(249, 139, 158, 0.55);
-  border-color: rgba(249, 139, 158, 0.5);
+  background: rgba(31, 156, 240, 0.55);
+  border-color: rgba(31, 156, 240, 0.5);
 }
 .gx-tag-btn:focus-visible {
   outline: none;
-  border-color: var(--gx-pink);
+  border-color: var(--gx-accent);
 }
 .gx-commit-meta {
   display: flex;
@@ -1904,7 +1902,7 @@ textarea {
 }
 .gx-hash {
   font-family: var(--vscode-editor-font-family, monospace);
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 
 /* Settings status + privacy ----------------------------------------- */
@@ -1926,13 +1924,13 @@ textarea {
   border-radius: 999px;
 }
 .gx-badge.ok {
-  color: var(--gx-pink-ink);
-  background: var(--gx-pink);
+  color: var(--gx-accent-ink);
+  background: var(--gx-accent);
 }
 .gx-badge.missing {
-  color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  border: 1px solid var(--gx-pink-line);
+  color: var(--gx-accent);
+  background: var(--gx-accent-soft);
+  border: 1px solid var(--gx-accent-line);
 }
 .gx-strong {
   color: var(--vscode-foreground);
@@ -1941,24 +1939,20 @@ textarea {
 
 /* ── Theme overrides ──────────────────────────────────────────────────────── */
 
-body.gx-theme-light {
-  --gx-navy-card:   rgba(249, 139, 158, 0.07);
-  --gx-subtabs-bg:  rgba(249, 139, 158, 0.06);
-  --gx-alt-card-bg: rgba(249, 139, 158, 0.04);
-  --gx-undo-bar-bg: rgba(249, 139, 158, 0.08);
-  --gx-line:        rgba(249, 139, 158, 0.22);
-  background:
-    radial-gradient(120% 60% at 80% -10%, rgba(249, 139, 158, 0.06), transparent 60%),
-    var(--vscode-sideBar-background);
-}
-
-body.gx-theme-vscode {
-  --gx-navy-card:   rgba(128, 128, 128, 0.08);
-  --gx-subtabs-bg:  rgba(128, 128, 128, 0.06);
-  --gx-alt-card-bg: rgba(128, 128, 128, 0.05);
-  --gx-undo-bar-bg: rgba(128, 128, 128, 0.07);
-  --gx-line:        var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
-  background: var(--vscode-sideBar-background);
+/* Light adjustments — VS Code adds the `vscode-light` body class automatically.
+   The bright accent is only ~3:1 on white, so on light themes we drop to the
+   deeper VS Code blue (legible as link/active text) and use white ink on fills. */
+body.vscode-light {
+  --gx-accent:        #007acc;
+  --gx-accent-strong: #0065a9;
+  --gx-accent-ink:    #ffffff;
+  --gx-accent-soft:   rgba(0, 122, 204, 0.12);
+  --gx-accent-line:   rgba(0, 122, 204, 0.3);
+  --gx-navy-card:   rgba(0, 0, 0, 0.05);
+  --gx-subtabs-bg:  rgba(0, 0, 0, 0.04);
+  --gx-alt-card-bg: rgba(0, 0, 0, 0.03);
+  --gx-undo-bar-bg: rgba(0, 0, 0, 0.05);
+  --gx-line:        var(--vscode-widget-border, rgba(0, 0, 0, 0.12));
 }
 
 /* Toggle switch */
@@ -1979,8 +1973,8 @@ body.gx-theme-vscode {
   flex-shrink: 0;
 }
 .gx-toggle.on {
-  background: var(--gx-pink);
-  border-color: var(--gx-pink);
+  background: var(--gx-accent);
+  border-color: var(--gx-accent);
 }
 .gx-toggle-thumb {
   position: absolute;
@@ -1995,7 +1989,7 @@ body.gx-theme-vscode {
 }
 .gx-toggle.on .gx-toggle-thumb {
   left: 18px;
-  background: var(--gx-pink-ink);
+  background: #ffffff;
 }
 
 /* Token budget table */
@@ -2027,13 +2021,13 @@ body.gx-theme-vscode {
   transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 .gx-budget-btn:hover {
-  color: var(--gx-pink);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  border-color: var(--gx-accent-line);
 }
 .gx-budget-btn.active {
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink);
-  color: var(--gx-pink);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent);
+  color: var(--gx-accent);
 }
 
 /* File view picker (Flat / Tree toggle) */
@@ -2054,13 +2048,13 @@ body.gx-theme-vscode {
   transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 .gx-file-view-btn:hover {
-  color: var(--gx-pink);
-  border-color: var(--gx-pink-line);
+  color: var(--gx-accent);
+  border-color: var(--gx-accent-line);
 }
 .gx-file-view-btn.active {
-  background: var(--gx-pink-soft);
-  border-color: var(--gx-pink);
-  color: var(--gx-pink);
+  background: var(--gx-accent-soft);
+  border-color: var(--gx-accent);
+  color: var(--gx-accent);
 }
 
 /* Tree view — folder rows */
@@ -2097,7 +2091,7 @@ body.gx-theme-vscode {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
 }
 .gx-tree-folder-name {
   flex: 1;
@@ -2118,58 +2112,12 @@ body.gx-theme-vscode {
   padding: 0 0 0 18px;
 }
 
-/* Theme picker in Configuration tab */
-.gx-theme-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 4px;
-}
-.gx-theme-opt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  padding: 10px 6px;
-  border: 1px solid var(--gx-line);
-  border-radius: var(--gx-radius-sm);
-  background: var(--gx-navy-card);
-  color: var(--vscode-descriptionForeground);
-  font-size: 11px;
-  font-weight: 600;
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
-}
-.gx-theme-opt:hover {
-  color: var(--vscode-foreground);
-  border-color: var(--gx-pink-line);
-}
-.gx-theme-opt.active {
-  border-color: var(--gx-pink);
-  background: var(--gx-pink-soft);
-  color: var(--gx-pink);
-}
-.gx-theme-swatch {
-  width: 100%;
-  height: 28px;
-  border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-.gx-theme-swatch-dark {
-  background: linear-gradient(135deg, #09244b 0%, #1a1a2e 100%);
-}
-.gx-theme-swatch-light {
-  background: linear-gradient(135deg, #ffffff 0%, #fdf0f2 100%);
-}
-.gx-theme-swatch-vscode {
-  background: linear-gradient(135deg, #1e1e1e 50%, #f3f3f3 50%);
-}
-
 /* External link in label rows (API key / token generation) */
 .gx-ext-link {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.03em;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   text-decoration: none;
   outline: none;
   border: none;
@@ -2251,7 +2199,7 @@ body.gx-theme-vscode {
   text-align: center;
 }
 .gx-jira-state p { margin: 0; }
-.gx-jira-error { color: var(--vscode-errorForeground, var(--gx-pink-strong)); }
+.gx-jira-error { color: var(--vscode-errorForeground, var(--gx-accent-strong)); }
 
 /* 7. Sticky header — wrapper holds header + scroll area together */
 .gx-jira-table {
@@ -2329,7 +2277,7 @@ body.gx-theme-vscode {
   display: inline-block;
   width: 10px;
   text-align: center;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   font-size: 10px;
   line-height: 1;
 }
@@ -2347,7 +2295,7 @@ body.gx-theme-vscode {
 }
 .gx-jira-issue:hover {
   background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.04));
-  border-left-color: var(--gx-pink-line);
+  border-left-color: var(--gx-accent-line);
 }
 
 /* 2. Jira ID chip */
@@ -2379,9 +2327,9 @@ body.gx-theme-vscode {
   font-weight: 700;
   font-family: var(--vscode-editor-font-family, monospace);
   letter-spacing: 0.02em;
-  color: var(--gx-pink);
-  background: rgba(249, 139, 158, 0.1);
-  border: 1px solid rgba(249, 139, 158, 0.2);
+  color: var(--gx-accent);
+  background: rgba(31, 156, 240, 0.1);
+  border: 1px solid rgba(31, 156, 240, 0.2);
   border-radius: 4px;
   padding: 1px 5px 2px;
   white-space: nowrap;
@@ -2429,9 +2377,9 @@ body.gx-theme-vscode {
   border-color: rgba(98, 211, 154, 0.25);
 }
 .gx-jira-st-blocked {
-  color: var(--gx-pink-strong);
-  background: rgba(249, 139, 158, 0.1);
-  border-color: rgba(249, 139, 158, 0.25);
+  color: var(--gx-accent-strong);
+  background: rgba(31, 156, 240, 0.1);
+  border-color: rgba(31, 156, 240, 0.25);
 }
 
 .gx-jira-dots {
@@ -2457,11 +2405,11 @@ body.gx-theme-vscode {
   color: var(--vscode-descriptionForeground);
   background: var(--gx-navy-card);
   border: 1px solid var(--gx-line);
-  border-left: 3px solid var(--gx-pink);
+  border-left: 3px solid var(--gx-accent);
   border-radius: var(--gx-radius-sm);
 }
 .gx-privacy .gx-ic {
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   margin-top: 1px;
 }
 
@@ -2525,7 +2473,7 @@ body.gx-theme-vscode {
 .gx-rep-total-num {
   font-size: 28px;
   font-weight: 700;
-  color: var(--gx-pink);
+  color: var(--gx-accent);
   line-height: 1;
 }
 .gx-rep-total-label {
@@ -2610,7 +2558,7 @@ body.gx-theme-vscode {
 }
 
 * {
-  scrollbar-color: var(--gx-pink-line) transparent;
+  scrollbar-color: var(--gx-accent-line) transparent;
   scrollbar-width: thin;
 }
 ::-webkit-scrollbar {
@@ -2621,14 +2569,14 @@ body.gx-theme-vscode {
   background: transparent;
 }
 ::-webkit-scrollbar-track:hover {
-  background: rgba(249, 139, 158, 0.06);
+  background: rgba(31, 156, 240, 0.06);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--gx-pink-line);
+  background: var(--gx-accent-line);
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gx-pink);
+  background: var(--gx-accent);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
