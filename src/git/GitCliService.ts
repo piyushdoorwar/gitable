@@ -382,7 +382,27 @@ export class GitCliService implements GitService {
   }
 
   async pull(): Promise<void> {
-    await this.run(["pull"], this.requireRoot());
+    const root = this.requireRoot();
+    // A bare `git pull` aborts with "Need to specify how to reconcile divergent
+    // branches" when the local branch is both ahead and behind its upstream and
+    // the user has not configured pull.rebase/pull.ff. Pass the strategy
+    // explicitly so pulling works regardless of ambient config: honor an
+    // explicit pull.rebase, otherwise default to a merge. --autostash carries a
+    // dirty working tree (staged or unstaged) across the operation.
+    const strategy = (await this.isPullRebaseConfigured(root)) ? "--rebase" : "--no-rebase";
+    await this.run(["pull", strategy, "--autostash"], root);
+  }
+
+  /** Reads the effective pull.rebase config; true for rebase, false (the default) for merge. */
+  private async isPullRebaseConfigured(root: string): Promise<boolean> {
+    try {
+      // pull.rebase may be true/false/interactive/merges — anything other than
+      // "false" selects a rebase. Unset config makes git exit non-zero.
+      const value = (await this.run(["config", "--get", "pull.rebase"], root)).trim().toLowerCase();
+      return value !== "" && value !== "false";
+    } catch {
+      return false;
+    }
   }
 
   async fetchOrigin(): Promise<void> {
