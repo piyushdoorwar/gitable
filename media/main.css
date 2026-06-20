@@ -583,6 +583,12 @@ button[aria-disabled="true"],
   font-weight: 600;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
+.gx-change-subtab > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .gx-change-subtab:hover {
   color: var(--gx-accent);
   background: var(--gx-accent-soft);
@@ -597,6 +603,7 @@ button[aria-disabled="true"],
   height: 15px;
   padding: 0 5px;
   font-size: 9.5px;
+  flex-shrink: 0;
 }
 .gx-change-pane {
   animation: gx-pane-in 0.12s ease-out;
@@ -2582,4 +2589,26 @@ body.vscode-light {
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Responsive — the webview viewport IS the sidebar panel width, so these
+   media queries fire as the user narrows the panel. Spacing tightens
+   progressively instead of letting content overflow. */
+@media (max-width: 260px) {
+  .gx-header { padding: 10px 8px 8px; }
+  .gx-panel,
+  .gx-card,
+  .gx-sec-safe { padding: 10px 8px; }
+  .gx-branch-row { gap: 6px; }
+  .gx-branch-btn,
+  .gx-sync-pill { padding: 4px 7px; gap: 4px; }
+  .gx-change-subtabs { gap: 3px; }
+  .gx-change-subtab { padding: 0 4px; gap: 3px; }
+}
+@media (max-width: 210px) {
+  .gx-header { padding: 8px 6px 6px; }
+  .gx-panel,
+  .gx-card,
+  .gx-sec-safe { padding: 8px 6px; }
+  .gx-change-subtab { font-size: 11px; }
 }
