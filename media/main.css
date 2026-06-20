@@ -82,6 +82,8 @@ button[aria-disabled="true"],
   transform: translateY(2px);
   transition: opacity 0.08s ease, transform 0.08s ease;
   white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .gx-tooltip.show {
   opacity: 1;

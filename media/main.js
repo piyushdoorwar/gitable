@@ -407,6 +407,17 @@
   function tooltipText(elm) {
     return elm.getAttribute("data-tooltip") || elm.getAttribute("aria-label") || elm.getAttribute("title") || "";
   }
+  // The webview ships its own custom tooltip (see initTooltips). Any native
+  // `title` attribute would render a SECOND, OS-drawn tooltip on top of it —
+  // a double tooltip that appears on some Electron/GTK builds but not others.
+  // Move every `title` into `data-tooltip` (which tooltipText prefers) and drop
+  // the native attribute so only the custom tooltip ever shows.
+  function dedupeNativeTitles(root) {
+    (root || document.body).querySelectorAll("[title]").forEach((elm) => {
+      if (!elm.dataset.tooltip) elm.dataset.tooltip = elm.getAttribute("title");
+      elm.removeAttribute("title");
+    });
+  }
   function tooltipCandidate(node) {
     return node && node.closest ? node.closest("[data-tooltip], [aria-label], [title]") : null;
   }
@@ -517,9 +528,10 @@
       label.textContent = current ? current.label : placeholder;
       label.classList.toggle("placeholder", !current);
       iconSlot.innerHTML = current ? optIcon(current) : "";
-      button.title = current ? `Selected: ${current.label}` : placeholder;
-      button.setAttribute("aria-label", button.title);
-      button.dataset.tooltip = button.title;
+      const tip = current ? `Selected: ${current.label}` : placeholder;
+      button.setAttribute("aria-label", tip);
+      button.dataset.tooltip = tip;
+      button.removeAttribute("title");
     }
     function paintList() {
       list.innerHTML = "";
@@ -1782,7 +1794,7 @@
 
   function setHint(elm, text) {
     if (!elm) return;
-    elm.title = text;
+    elm.removeAttribute("title");
     elm.setAttribute("aria-label", text);
     elm.dataset.tooltip = text;
   }
@@ -1930,6 +1942,7 @@
     renderSecurityPanel();
     byId("panel-summary").classList.toggle("hidden", !ui.activeSummary);
     byId("panel-security").classList.toggle("hidden", !ui.activeSecurityReview);
+    dedupeNativeTitles();
   }
 
   function updateChangeActionButtons(s) {
