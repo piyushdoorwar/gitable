@@ -1,5 +1,8 @@
 import { CommitInfo, CommitStat, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
+/** How a divergent pull reconciles local and remote commits. */
+export type PullStrategy = "merge" | "rebase";
+
 /**
  * Error raised by Git operations. Carries a user-friendly message that can be
  * shown directly in the webview or a notification.
@@ -95,8 +98,10 @@ export interface GitService {
   /** Sets upstream tracking for a local branch to remote/remoteBranch. */
   setUpstream(remote: string, localBranch: string, remoteBranch: string): Promise<void>;
 
-  /** Pulls the current branch from its remote. */
-  pull(): Promise<void>;
+  /** Pulls the current branch from its remote.
+   *  `strategy` forces a merge or rebase reconciliation; omit it for a plain
+   *  fast-forward pull (used when the branch is only behind, not diverged). */
+  pull(strategy?: PullStrategy): Promise<void>;
 
   /** Fetches from origin without merging. */
   fetchOrigin(): Promise<void>;

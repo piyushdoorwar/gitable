@@ -9,6 +9,7 @@ import { UsageStore } from "../analytics/UsageStore";
 import { JiraService } from "../jira/JiraService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
+import { PullStrategy } from "../git/GitService";
 import { RebaseState, RepoChanges, StashEntry } from "../git/models";
 import { DiffLimiter } from "../utils/DiffLimiter";
 import { Logger } from "../utils/Logger";
@@ -1557,11 +1558,31 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async pullWithLocalChangesCheck(): Promise<void> {
+    // When the branch has both local and remote commits (diverged), git cannot
+    // fast-forward and needs an explicit reconciliation. Ask the user rather
+    // than silently rewriting history; a rebase pull leaves the in-progress
+    // state our Continue/Abort bar already handles.
+    const sync = await this.git.getSyncInfo().catch(() => ({ ahead: 0, behind: 0, hasUpstream: false }));
+    let strategy: PullStrategy | undefined;
+    if (sync.hasUpstream && sync.ahead > 0 && sync.behind > 0) {
+      const choice = await vscode.window.showWarningMessage(
+        "Your branch has diverged from origin.",
+        {
+          modal: true,
+          detail: `You have ${sync.ahead} local commit${sync.ahead > 1 ? "s" : ""} and origin has ${sync.behind} new commit${sync.behind > 1 ? "s" : ""}. Merge keeps history as-is (adds a merge commit); rebase replays your commits on top of origin.`,
+        },
+        "Merge",
+        "Rebase"
+      );
+      if (!choice) return;
+      strategy = choice === "Rebase" ? "rebase" : "merge";
+    }
+
     const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [], conflicts: [] } as RepoChanges));
     const hasLocalChanges = changes.staged.length > 0 || changes.unstaged.length > 0;
 
     if (!hasLocalChanges) {
-      await this.runSyncOp("Pulling", true, () => this.git.pull());
+      await this.runSyncOp("Pulling", true, () => this.git.pull(strategy));
       return;
     }
 
@@ -1578,7 +1599,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     await this.runSyncOp("Pulling", true, async () => {
       await this.git.stashAll();
       try {
-        await this.git.pull();
+        await this.git.pull(strategy);
       } catch (err) {
         // Pull failed — restore changes so nothing is lost
         await this.git.stashPop("stash@{0}").catch(() => {});

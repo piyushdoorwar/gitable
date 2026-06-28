@@ -2,7 +2,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitCliService } from "./GitCliService";
-import { GitService } from "./GitService";
+import { GitService, PullStrategy } from "./GitService";
 import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
 
 // ---- Minimal typings for the built-in `vscode.git` extension API ----
@@ -32,7 +32,7 @@ interface GitApiRepository {
   add(resources: vscode.Uri[]): Promise<void>;
   commit(message: string, opts?: { all?: boolean }): Promise<void>;
   push(): Promise<void>;
-  pull(): Promise<void>;
+  pull(strategy?: PullStrategy): Promise<void>;
   checkout(treeish: string): Promise<void>;
   createBranch(name: string, checkout: boolean): Promise<void>;
 }
@@ -346,7 +346,13 @@ export class VsCodeGitService implements GitService {
     return this.cli.setUpstream(remote, localBranch, remoteBranch);
   }
 
-  pull(): Promise<void> {
+  pull(strategy?: PullStrategy): Promise<void> {
+    // An explicit strategy (the divergent merge/rebase choice) must go through
+    // the CLI — the Git API's repo.pull() gives no way to force --rebase/--no-rebase.
+    if (strategy) {
+      this.syncCliRoot();
+      return this.cli.pull(strategy);
+    }
     const repo = this.getActiveRepository();
     return this.apiOrCli(repo ? () => repo.pull() : undefined, () => this.cli.pull());
   }

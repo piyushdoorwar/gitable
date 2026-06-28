@@ -133,14 +133,14 @@ describe("GitCliService integration", () => {
     expect((await git(["stash", "list"], root)).trim()).toBe("");
   });
 
-  it("pulls divergent branches with a dirty working tree (no pull.rebase config)", async () => {
-    // Bare repo acting as origin.
+  /** Sets up `root` diverged from origin: origin has "upstream commit", local
+   *  has "local commit", and the upstream commit has been fetched. */
+  async function setupDivergent(): Promise<{ remote: string; upstream: string }> {
     const remote = await mkdtemp(path.join(os.tmpdir(), "gitable-remote-"));
     await git(["init", "--bare", "-b", "main"], remote);
     await git(["remote", "add", "origin", remote], root);
     await git(["push", "-u", "origin", "main"], root);
 
-    // A second clone pushes an upstream commit.
     const upstream = await mkdtemp(path.join(os.tmpdir(), "gitable-upstream-"));
     await git(["clone", remote, upstream], path.dirname(upstream));
     await git(["config", "user.email", "gitable@example.com"], upstream);
@@ -150,22 +150,42 @@ describe("GitCliService integration", () => {
     await git(["commit", "-m", "upstream commit"], upstream);
     await git(["push", "origin", "main"], upstream);
 
-    // Local makes its own commit (diverging) plus an uncommitted working change.
     await writeFile(path.join(root, "local.txt"), "local\n");
     await git(["add", "local.txt"], root);
     await git(["commit", "-m", "local commit"], root);
     await git(["fetch", "origin"], root);
-    await writeFile(path.join(root, "tracked.txt"), "base\ndirty working edit\n");
+    return { remote, upstream };
+  }
 
-    // A bare `git pull` would abort here ("Need to specify how to reconcile
-    // divergent branches"); pull() must reconcile and preserve the dirty edit.
-    await service.pull();
+  it("reconciles divergent branches with an explicit merge strategy", async () => {
+    // A bare `git pull` would abort ("Need to specify how to reconcile divergent
+    // branches"); pull("merge") passes --no-rebase so it always succeeds.
+    const { remote, upstream } = await setupDivergent();
+
+    await service.pull("merge");
 
     expect(await fileExists(path.join(root, "upstream.txt"))).toBe(true);
-    expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\ndirty working edit\n");
     const log = await git(["log", "--oneline"], root);
     expect(log).toContain("local commit");
     expect(log).toContain("upstream commit");
+    // Merge keeps both lines of history → a merge commit is created.
+    expect(log).toMatch(/Merge/);
+
+    await rm(remote, { recursive: true, force: true });
+    await rm(upstream, { recursive: true, force: true });
+  });
+
+  it("reconciles divergent branches with an explicit rebase strategy", async () => {
+    const { remote, upstream } = await setupDivergent();
+
+    await service.pull("rebase");
+
+    expect(await fileExists(path.join(root, "upstream.txt"))).toBe(true);
+    const log = await git(["log", "--oneline"], root);
+    expect(log).toContain("local commit");
+    expect(log).toContain("upstream commit");
+    // Rebase replays the local commit on top of origin → no merge commit.
+    expect(log).not.toMatch(/Merge/);
 
     await rm(remote, { recursive: true, force: true });
     await rm(upstream, { recursive: true, force: true });

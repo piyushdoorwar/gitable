@@ -169,16 +169,13 @@ button[aria-disabled="true"],
   gap: 8px;
 }
 
-/* Branch pill + Sync pill — side by side, equal 50% width */
+/* Branch button grows; Pull + Push are compact icon buttons beside it. */
 .gx-branch-btn,
-.gx-sync-pill {
-  flex: 1 1 0;
-  min-width: 0;
+.gx-sync-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 30px;
-  padding: 4px 9px;
   font-size: 12px;
   color: var(--vscode-foreground);
   background: var(--vscode-input-background);
@@ -186,13 +183,22 @@ button[aria-disabled="true"],
   border-radius: var(--gx-radius-sm);
   transition: border-color 0.12s, background 0.12s;
 }
+.gx-branch-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 9px;
+}
+.gx-sync-btn {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+}
 .gx-branch-btn:hover,
 .gx-branch-btn.active,
-.gx-sync-pill:hover:not(:disabled) {
+.gx-sync-btn:hover:not(:disabled) {
   border-color: var(--gx-accent-line);
   background: var(--gx-accent-soft);
 }
-.gx-sync-pill:disabled {
+.gx-sync-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -200,7 +206,7 @@ button[aria-disabled="true"],
   color: var(--gx-accent);
   flex-shrink: 0;
 }
-.gx-sync-pill > .gx-ic:first-child {
+.gx-sync-btn > .gx-ic:first-child {
   color: var(--vscode-descriptionForeground);
   flex-shrink: 0;
 }
@@ -213,16 +219,7 @@ button[aria-disabled="true"],
   text-align: left;
   font-weight: 600;
 }
-.gx-sync-pill-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-  font-weight: 500;
-}
-.gx-sync-pill-badge {
+.gx-sync-btn-badge {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -230,9 +227,6 @@ button[aria-disabled="true"],
   font-size: 10px;
   font-weight: 700;
   color: var(--gx-accent);
-  background: var(--gx-accent-soft);
-  padding: 1px 5px;
-  border-radius: 8px;
   letter-spacing: 0.02em;
   line-height: 1;
 }
@@ -2600,8 +2594,8 @@ body.vscode-light {
   .gx-card,
   .gx-sec-safe { padding: 10px 8px; }
   .gx-branch-row { gap: 6px; }
-  .gx-branch-btn,
-  .gx-sync-pill { padding: 4px 7px; gap: 4px; }
+  .gx-branch-btn { padding: 4px 7px; gap: 4px; }
+  .gx-sync-btn { padding: 4px 6px; gap: 4px; }
   .gx-change-subtabs { gap: 3px; }
   .gx-change-subtab { padding: 0 4px; gap: 3px; }
 }

@@ -597,10 +597,13 @@
           <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
             ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>
           </button>
-          <button id="syncBtn" class="gx-sync-pill" data-action="syncAction" type="button" disabled>
-            <span id="syncIcon" class="gx-ic sm"></span>
-            <span id="syncLabel" class="gx-sync-pill-label">Fetch origin</span>
-            <span id="syncBadge" class="gx-sync-pill-badge hidden"></span>
+          <button id="pullBtn" class="gx-sync-btn" data-action="pullSync" title="Fetch origin" aria-label="Fetch origin" type="button" disabled>
+            <span id="pullIcon" class="gx-ic sm"></span>
+            <span id="pullBadge" class="gx-sync-btn-badge hidden"></span>
+          </button>
+          <button id="pushBtn" class="gx-sync-btn" data-action="pushSync" title="Push origin" aria-label="Push origin" type="button" disabled>
+            <span id="pushIcon" class="gx-ic sm"></span>
+            <span id="pushBadge" class="gx-sync-btn-badge hidden"></span>
           </button>
         </div>
       </div>
@@ -1228,19 +1231,24 @@
       case "refreshModels":
         post({ type: "fetchModels", provider: ui.dd.provider.getValue() });
         break;
-      case "syncAction": {
+      case "pullSync": {
         const s = ui.state;
         if (s.syncAction) break;
-        if (!s.hasUpstream) {
-          post({ type: "push" });
-        } else if (s.behind > 0) {
+        // Behind → pull (host prompts merge/rebase if also diverged); otherwise fetch.
+        if (s.hasUpstream && s.behind > 0) {
           post({ type: "pull" });
-        } else if (s.ahead > 0) {
-          post({ type: "push" }); // push also pushes pending tags via pushAllTags
-        } else if (s.pendingTagCount > 0) {
-          post({ type: "pushTags" });
         } else {
           post({ type: "fetchOrigin" });
+        }
+        break;
+      }
+      case "pushSync": {
+        const s = ui.state;
+        if (s.syncAction) break;
+        if (!s.hasUpstream || s.ahead > 0) {
+          post({ type: "push" }); // publish when no upstream; push also pushes pending tags
+        } else if (s.pendingTagCount > 0) {
+          post({ type: "pushTags" });
         }
         break;
       }
@@ -2033,63 +2041,77 @@
   const BADGE_DOWN = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3C12.5523 3 13 3.44772 13 4V17.5858L18.2929 12.2929C18.6834 11.9024 19.3166 11.9024 19.7071 12.2929C20.0976 12.6834 20.0976 13.3166 19.7071 13.7071L12.7071 20.7071C12.3166 21.0976 11.6834 21.0976 11.2929 20.7071L4.29289 13.7071C3.90237 13.3166 3.90237 12.6834 4.29289 12.2929C4.68342 11.9024 5.31658 11.9024 5.70711 12.2929L11 17.5858V4C11 3.44772 11.4477 3 12 3Z" fill="currentColor"/></svg>`;
   const BADGE_TAG = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
 
+  // Split Pull (incoming) and Push (outgoing) buttons. Ahead and behind are
+  // independent dimensions, so a diverged branch lights up BOTH simultaneously —
+  // something the old single combo button could not represent.
   function updateSync(s) {
-    const btn = byId("syncBtn");
-    const iconEl = byId("syncIcon");
-    const labelEl = byId("syncLabel");
-    const badgeEl = byId("syncBadge");
+    const pullBtn = byId("pullBtn");
+    const pullIcon = byId("pullIcon");
+    const pullBadge = byId("pullBadge");
+    const pushBtn = byId("pushBtn");
+    const pushIcon = byId("pushIcon");
+    const pushBadge = byId("pushBadge");
     const pendingTags = s.pendingTagCount || 0;
-
     const syncAction = s.syncAction || "";
+    const fetchedText = timeAgo(s.lastFetchedAt || 0);
 
+    const setBadge = (el, html) => {
+      if (html) { el.innerHTML = html; el.classList.remove("hidden"); }
+      else { el.innerHTML = ""; el.classList.add("hidden"); }
+    };
+
+    // Busy: show the spinner on whichever button owns the running operation.
     if (syncAction) {
-      iconEl.innerHTML = `<span class="gx-spin"></span>`;
-      labelEl.textContent = syncAction;
-      btn.title = "Hang on…";
-      badgeEl.classList.add("hidden");
-      setDisabled(btn, true);
+      const action = syncAction.toLowerCase();
+      const onPush = action.includes("push") || action.includes("publish");
+      const spin = `<span class="gx-spin"></span>`;
+      pullIcon.innerHTML = onPush ? ICONS.pull : spin;
+      pushIcon.innerHTML = onPush ? spin : ICONS.push;
+      pullBtn.title = pushBtn.title = "Hang on…";
+      setBadge(pullBadge, "");
+      setBadge(pushBadge, "");
+      setDisabled(pullBtn, true);
+      setDisabled(pushBtn, true);
       return;
     }
 
-    setDisabled(btn, !!s.isLoading || !s.branchName);
+    const blocked = !!s.isLoading || !s.branchName;
 
-    const fetchedText = timeAgo(s.lastFetchedAt || 0);
-
-    if (!s.branchName) {
-      iconEl.innerHTML = ICONS.refresh;
-      labelEl.textContent = "Fetch origin";
-      btn.title = fetchedText;
-      badgeEl.classList.add("hidden");
-    } else if (!s.hasUpstream) {
-      iconEl.innerHTML = ICONS.push;
-      labelEl.textContent = "Publish branch";
-      btn.title = "No upstream set";
-      badgeEl.classList.add("hidden");
-    } else if (s.behind > 0) {
-      iconEl.innerHTML = ICONS.pull;
-      labelEl.textContent = "Pull origin";
-      btn.title = fetchedText;
-      badgeEl.innerHTML = `${s.behind}${BADGE_DOWN}`;
-      badgeEl.classList.remove("hidden");
-    } else if (s.ahead > 0) {
-      iconEl.innerHTML = ICONS.push;
-      labelEl.textContent = "Push origin";
-      btn.title = pendingTags > 0 ? `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} + ${pendingTags} tag${pendingTags > 1 ? "s" : ""}` : fetchedText;
-      badgeEl.innerHTML = pendingTags > 0
-        ? `${s.ahead}${BADGE_UP}<span class="gx-badge-sep">·</span>${pendingTags}${BADGE_TAG}`
-        : `${s.ahead}${BADGE_UP}`;
-      badgeEl.classList.remove("hidden");
-    } else if (pendingTags > 0) {
-      iconEl.innerHTML = ICONS.push;
-      labelEl.textContent = "Push tags";
-      btn.title = `Push ${pendingTags} unpushed tag${pendingTags > 1 ? "s" : ""} to origin`;
-      badgeEl.innerHTML = `${pendingTags}${BADGE_TAG}`;
-      badgeEl.classList.remove("hidden");
+    // ---- Pull / incoming button -------------------------------------------
+    if (s.hasUpstream && s.behind > 0) {
+      pullIcon.innerHTML = ICONS.pull;
+      pullBtn.title = `Pull ${s.behind} commit${s.behind > 1 ? "s" : ""} from origin`;
+      setBadge(pullBadge, `${s.behind}${BADGE_DOWN}`);
     } else {
-      iconEl.innerHTML = ICONS.refresh;
-      labelEl.textContent = "Fetch origin";
-      btn.title = fetchedText;
-      badgeEl.classList.add("hidden");
+      // Up to date or no upstream — the incoming button fetches.
+      pullIcon.innerHTML = ICONS.refresh;
+      pullBtn.title = fetchedText || "Fetch origin";
+      setBadge(pullBadge, "");
+    }
+    setDisabled(pullBtn, blocked);
+
+    // ---- Push / outgoing button -------------------------------------------
+    pushIcon.innerHTML = ICONS.push;
+    if (!s.hasUpstream) {
+      pushBtn.title = "Publish branch to origin";
+      setBadge(pushBadge, "");
+      setDisabled(pushBtn, blocked);
+    } else if (s.ahead > 0) {
+      pushBtn.title = pendingTags > 0
+        ? `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} + ${pendingTags} tag${pendingTags > 1 ? "s" : ""}`
+        : `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} to origin`;
+      setBadge(pushBadge, pendingTags > 0
+        ? `${s.ahead}${BADGE_UP}<span class="gx-badge-sep">·</span>${pendingTags}${BADGE_TAG}`
+        : `${s.ahead}${BADGE_UP}`);
+      setDisabled(pushBtn, blocked);
+    } else if (pendingTags > 0) {
+      pushBtn.title = `Push ${pendingTags} unpushed tag${pendingTags > 1 ? "s" : ""} to origin`;
+      setBadge(pushBadge, `${pendingTags}${BADGE_TAG}`);
+      setDisabled(pushBtn, blocked);
+    } else {
+      pushBtn.title = "Nothing to push";
+      setBadge(pushBadge, "");
+      setDisabled(pushBtn, true);
     }
   }
 

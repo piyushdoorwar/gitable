@@ -3,7 +3,7 @@ import { readFile, writeFile } from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
-import { GitService, GitServiceError } from "./GitService";
+import { GitService, GitServiceError, PullStrategy } from "./GitService";
 import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
 /** Strip surrounding double-quotes that git adds to paths containing spaces or special chars. */
@@ -381,28 +381,18 @@ export class GitCliService implements GitService {
     await this.run(["branch", "--set-upstream-to", `${remote}/${remoteBranch}`, localBranch], this.requireRoot());
   }
 
-  async pull(): Promise<void> {
+  async pull(strategy?: PullStrategy): Promise<void> {
     const root = this.requireRoot();
     // A bare `git pull` aborts with "Need to specify how to reconcile divergent
     // branches" when the local branch is both ahead and behind its upstream and
-    // the user has not configured pull.rebase/pull.ff. Pass the strategy
-    // explicitly so pulling works regardless of ambient config: honor an
-    // explicit pull.rebase, otherwise default to a merge. --autostash carries a
-    // dirty working tree (staged or unstaged) across the operation.
-    const strategy = (await this.isPullRebaseConfigured(root)) ? "--rebase" : "--no-rebase";
-    await this.run(["pull", strategy, "--autostash"], root);
-  }
-
-  /** Reads the effective pull.rebase config; true for rebase, false (the default) for merge. */
-  private async isPullRebaseConfigured(root: string): Promise<boolean> {
-    try {
-      // pull.rebase may be true/false/interactive/merges — anything other than
-      // "false" selects a rebase. Unset config makes git exit non-zero.
-      const value = (await this.run(["config", "--get", "pull.rebase"], root)).trim().toLowerCase();
-      return value !== "" && value !== "false";
-    } catch {
-      return false;
-    }
+    // the user has not configured pull.rebase/pull.ff. The caller passes an
+    // explicit strategy for the divergent case (chosen by the user); a plain
+    // fast-forward pull (branch only behind) needs no flag. We do NOT use
+    // --autostash here — the provider wraps dirty trees in an explicit
+    // stash → pull → restore so there is a single conflict surface, and a
+    // rebase pull leaves .git/rebase-merge for the Continue/Abort flow to catch.
+    const flag = strategy === "rebase" ? ["--rebase"] : strategy === "merge" ? ["--no-rebase"] : [];
+    await this.run(["pull", ...flag], root);
   }
 
   async fetchOrigin(): Promise<void> {

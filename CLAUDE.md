@@ -135,18 +135,27 @@ z-index: 20` over the `#app` container (which has `position: relative`). The mai
 tab bar always has only Changes and History — overlays stack on top when the user
 triggers an AI action.
 
-### Sync combo button
+### Split Pull / Push buttons
 
-The pull/push icon buttons are replaced by a single full-width **sync combo
-button** (`#syncBtn`) that changes label/icon/badge based on state:
+The branch row holds three items: the branch button (grows to fill), then two
+compact icon buttons — **Pull/incoming** (`#pullBtn`, action `pullSync`) and
+**Push/outgoing** (`#pushBtn`, action `pushSync`). Ahead and behind are
+independent dimensions, so a diverged branch lights up **both** buttons at once
+— something the old single combo button could not represent. `updateSync(s)`
+drives both:
 
-| State | Label | Badge |
+| State | Pull button | Push button |
 |---|---|---|
-| `syncAction` set | e.g. "Fetching origin" + spinning icon + "Hang on…" | — |
-| No upstream | "Publish branch" | — |
-| `behind > 0` | "Pull origin" | `N↓` |
-| `ahead > 0` | "Push origin" | `N↑` |
-| Clean | "Fetch origin" | — |
+| `syncAction` set | spinner if the op is incoming, else pull icon | spinner if push/publish, else push icon (both disabled) |
+| No upstream | refresh icon, "Fetch origin" | push icon, "Publish branch to origin" |
+| `behind > 0` | pull icon + `N↓` badge | (per ahead/tags below) |
+| `ahead > 0` | (per behind above) | push icon + `N↑` (· `M🏷` if pending tags) |
+| Pending tags only | — | push icon + `M🏷` |
+| Up to date | refresh icon, "Fetch origin" | disabled, "Nothing to push" |
+
+The webview click handlers (`pullSync` / `pushSync`) translate to host messages:
+`pullSync` posts `pull` when behind+has-upstream, else `fetchOrigin`; `pushSync`
+posts `push` (publish when no upstream), or `pushTags` when only tags are pending.
 
 On panel visibility change the provider calls `silentFetchAndRefresh()` which
 fetches from origin and sets `syncAction = "Refreshing repository"` while doing
@@ -157,6 +166,19 @@ Pull/push/fetch each use `runSyncOp(label, globalBusy, fn)`:
 - When `globalBusy=true` (pull/push) also sets `busyKind` to disable the commit UI.
 - Clears both after completion.
 - Sync operations do not show info/error notification popups — feedback is inline.
+
+**Divergence-aware pull.** `pullWithLocalChangesCheck()` reads `getSyncInfo()`
+first. When the branch is diverged (`ahead > 0 && behind > 0`) it shows a modal
+**Merge / Rebase / Cancel** prompt and passes the chosen `PullStrategy` to
+`git.pull(strategy)` — no silent strategy from ambient `pull.rebase` config. A
+plain fast-forward pull (only behind) passes no strategy. `GitCliService.pull`
+runs `git pull` with `--rebase`, `--no-rebase`, or no flag accordingly — **no
+`--autostash`**: local working-tree changes are carried by the provider's
+explicit stash → pull → restore wrapper so there is a single conflict surface. A
+rebase pull that conflicts leaves `.git/rebase-merge`, which the existing
+`rebaseState` Continue/Abort bar picks up automatically. `VsCodeGitService.pull`
+routes any explicit strategy to the CLI (the Git API's `repo.pull()` cannot force
+rebase/merge); a strategy-less pull still prefers the API.
 
 If the branch has no upstream, `push` routes through `pushCurrentBranch()`:
 - With multiple remotes, the user picks a remote.
@@ -174,8 +196,8 @@ remote and remote branch, then runs `git branch --set-upstream-to`.
 - One class/concern per file, named after the class.
 - User-facing errors surface in both a VS Code notification **and** `state.error`;
   internals go to the `Logger` output channel.
-- Sync operations (fetch/pull/push) surface feedback inline in the sync button
-  rather than info notifications.
+- Sync operations (fetch/pull/push) surface feedback inline in the Pull/Push
+  buttons rather than info notifications.
 - No secrets outside SecretStorage; no network calls from the webview (tight CSP).
 
 ## Security & privacy
@@ -279,7 +301,7 @@ workspace, never committed to the repo.
   `--index` so previously staged files return checked. The Stashes subtab lists
   all stash entries with Pop / Apply / Drop actions.
 - **Remote publishing and upstream tracking.** When the current branch has no
-  upstream, the sync button's Publish flow chooses a remote (or uses the only
+  upstream, the Push button's Publish flow chooses a remote (or uses the only
   configured remote) and runs `push -u`. The current-branch context menu also
   exposes **Set upstream…** for branches that already exist remotely but are not
   tracking yet.
@@ -293,10 +315,10 @@ workspace, never committed to the repo.
   tab are interactive (`gx-tag-btn`): clicking opens a mini `tagContextMenu` with
   "Delete tag…" (triggers a modal confirmation with "Local only" / "Local + origin").
   Unpushed tags are tracked in-memory in `GitableViewProvider.pendingTagPushes` (a
-  `Set<string>`). The sync button badge shows pending tags alongside commits (`N↑ · M🏷`).
+  `Set<string>`). The Push button badge shows pending tags alongside commits (`N↑ · M🏷`).
   When `ahead > 0` the push also calls `pushAllTags()` and clears the set. When
-  `ahead === 0` the button shows "Push tags" and posts `pushTags`. Pending tags are
-  reset on any successful push and when a tag is deleted.
+  `ahead === 0` the Push button badge shows `M🏷` and `pushSync` posts `pushTags`.
+  Pending tags are reset on any successful push and when a tag is deleted.
 - **Rebase with conflict resolution.** Right-click any non-current branch → "Rebase onto this". `GitableViewProvider` shows a modal confirmation, then calls `git rebase`. On conflict, `getRebaseState()` detects `.git/rebase-merge/head-name` and sets `rebaseState.inProgress: true` in state. The Changes tab shows a rebase bar with **Continue Rebase** and **Abort** buttons. `rebaseContinue()` uses `GIT_EDITOR=true` to suppress the editor. Multi-commit rebases cycle through each conflict automatically. The commit card and commit button are hidden during rebase.
 - **Amend last commit.** Right-click the HEAD commit in History → "Amend commit…". The handler switches to Changes → Staged, pre-fills the commit fields from `state.lastCommit` (fetched fresh via `git log -1 --format=%B` on every state build), and checks the amend toggle. The toggle label changes to "Amending — uncheck to cancel" when active. On submit the webview posts `amend` instead of `commit`; the host calls `git commit --amend`. Works with or without new staged files (pure message edit is valid). `clearCommitFields` also resets the toggle.
 - **Force push with lease.** A normal push that is rejected (error matches `/rejected|non-fast-forward|fetch first/i`) triggers a VS Code warning modal offering **Force Push**. If confirmed, `git push --force-with-lease` is used — this refuses if someone else has pushed to the remote since the last fetch, preventing accidental clobbers.
