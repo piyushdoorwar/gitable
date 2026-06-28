@@ -250,10 +250,23 @@ describe("VsCodeGitService", () => {
       expect(sync).toEqual({ ahead: 3, behind: 1, hasUpstream: true });
     });
 
-    it("getSyncInfo returns hasUpstream false when HEAD has no upstream", async () => {
+    it("getSyncInfo defers to the CLI when HEAD has no upstream", async () => {
       mockRepo.state.HEAD = { name: "main" };
+      const cliSpy = vi.spyOn(cli, "getSyncInfo").mockResolvedValue({ ahead: 0, behind: 0, hasUpstream: false });
       const sync = await service.getSyncInfo();
+      expect(cliSpy).toHaveBeenCalled();
       expect(sync).toEqual({ ahead: 0, behind: 0, hasUpstream: false });
+    });
+
+    it("getSyncInfo defers to the CLI when the API reports ahead but omits upstream", async () => {
+      // The Git API can leave `upstream` undefined for a tracking branch while
+      // still surfacing ahead/behind. Trusting it would wrongly show "Publish";
+      // the CLI's @{upstream} check is authoritative.
+      mockRepo.state.HEAD = { name: "main", ahead: 1, behind: 0 };
+      const cliSpy = vi.spyOn(cli, "getSyncInfo").mockResolvedValue({ ahead: 1, behind: 0, hasUpstream: true });
+      const sync = await service.getSyncInfo();
+      expect(cliSpy).toHaveBeenCalled();
+      expect(sync).toEqual({ ahead: 1, behind: 0, hasUpstream: true });
     });
 
     it("getRepoSummary reads name and branch from API repository state", async () => {

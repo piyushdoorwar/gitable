@@ -282,13 +282,23 @@ export class VsCodeGitService implements GitService {
   async getSyncInfo(): Promise<SyncInfo> {
     const repo = this.getActiveRepository();
     if (!repo) {
+      this.syncCliRoot();
       return this.cli.getSyncInfo();
     }
     const head = repo.state.HEAD;
+    // The Git API can leave `upstream` unpopulated even for a tracking branch
+    // (timing, or a missing local remote-tracking ref), which would make us show
+    // "Publish branch" for a branch that already exists on origin. The CLI's
+    // `@{upstream}` resolution is authoritative, so defer to it whenever the API
+    // does not report an upstream.
+    if (!head?.upstream) {
+      this.syncCliRoot();
+      return this.cli.getSyncInfo();
+    }
     return {
-      ahead: head?.ahead ?? 0,
-      behind: head?.behind ?? 0,
-      hasUpstream: !!head?.upstream
+      ahead: head.ahead ?? 0,
+      behind: head.behind ?? 0,
+      hasUpstream: true
     };
   }
 
