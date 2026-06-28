@@ -287,16 +287,20 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       }
       case "revertCommit": {
         const short = String(message.hash ?? "").slice(0, 7);
-        await this.runBusyGit("git", `Reverting ${short}…`, () =>
-          this.git.revertCommit(message.hash), `Reverted ${short}.`
-        );
+        // Revert/cherry-pick create a new HEAD; a stale "Undo last commit" bar
+        // would otherwise reset --soft that new commit, not the original.
+        await this.runBusyGit("git", `Reverting ${short}…`, async () => {
+          await this.git.revertCommit(message.hash);
+          this.lastCommitSummary = "";
+        }, `Reverted ${short}.`);
         break;
       }
       case "cherryPickCommit": {
         const short = String(message.hash ?? "").slice(0, 7);
-        await this.runBusyGit("git", `Cherry-picking ${short}…`, () =>
-          this.git.cherryPickCommit(message.hash), `Cherry-picked ${short}.`
-        );
+        await this.runBusyGit("git", `Cherry-picking ${short}…`, async () => {
+          await this.git.cherryPickCommit(message.hash);
+          this.lastCommitSummary = "";
+        }, `Cherry-picked ${short}.`);
         break;
       }
       case "createBranch":

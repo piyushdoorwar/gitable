@@ -67,6 +67,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
     revert:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.4"/></svg>',
+    undo:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>',
     cherryPick:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="2.5"/><line x1="3" y1="12" x2="6.5" y2="12"/><line x1="11.5" y1="12" x2="16" y2="12"/><polyline points="13 7 18 12 13 17"/></svg>',
     pencil:
@@ -1562,6 +1564,9 @@
     const history = ui.state.history || [];
     const commit = history.find((c) => c.hash === hash);
     const isHead = history.length > 0 && history[0].hash === hash;
+    // The latest commit can be dropped entirely (reset --soft) only while it is
+    // still local — i.e. it is part of the unpushed ahead range.
+    const isUnpushedHead = isHead && (ui.state.ahead || 0) > 0;
     contextCommit = { hash, tags: (commit && commit.tags) || [] };
     const tags = contextCommit.tags;
     const tagItems = tags
@@ -1577,7 +1582,9 @@
       `<span class="gx-menu-sep"></span>` +
       `<button data-cmenu-action="createTag" role="menuitem" type="button">${icon("tag", "sm")}<span>Create tag…</span></button>` +
       `<span class="gx-menu-sep"></span>` +
-      (isHead ? `<button data-cmenu-action="amendCommit" role="menuitem" type="button">${icon("commit", "sm")}<span>Amend commit…</span></button><span class="gx-menu-sep"></span>` : "") +
+      (isHead ? `<button data-cmenu-action="amendCommit" role="menuitem" type="button">${icon("commit", "sm")}<span>Amend commit…</span></button>` : "") +
+      (isUnpushedHead ? `<button data-cmenu-action="undoCommit" role="menuitem" type="button">${icon("undo", "sm")}<span>Undo commit (drop)</span></button>` : "") +
+      (isHead ? `<span class="gx-menu-sep"></span>` : "") +
       `<button data-cmenu-action="revertCommit" role="menuitem" type="button">${icon("revert", "sm")}<span>Revert commit</span></button>` +
       `<button data-cmenu-action="cherryPickCommit" role="menuitem" type="button">${icon("cherryPick", "sm")}<span>Cherry-pick commit</span></button>`;
     menu.classList.remove("hidden");
@@ -1610,6 +1617,12 @@
         break;
       case "createTag":
         post({ type: "createTag", hash: commit.hash });
+        break;
+      case "undoCommit":
+        // Drop the latest (unpushed) commit, returning its changes to staged.
+        switchTab("changes");
+        switchChangeTab("staged", false);
+        post({ type: "undoLastCommit" });
         break;
       case "revertCommit":
         post({ type: "revertCommit", hash: commit.hash });
