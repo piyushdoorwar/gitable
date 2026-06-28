@@ -13,6 +13,7 @@ export const Commands = {
   generateCommitMessage: "gitable.generateCommitMessage",
   commit: "gitable.commit",
   stageAll: "gitable.stageAll",
+  
   unstageAll: "gitable.unstageAll",
   openSettings: "gitable.openSettings",
   validateApiKey: "gitable.validateApiKey",
