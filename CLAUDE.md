@@ -299,8 +299,15 @@ workspace, never committed to the repo.
 - **Changes notices.** Errors, notices, and busy messages render in a reserved
   bottom notice slot above the commit summary panel. This avoids pushing the file
   list/tabs around when a message appears.
-- **Activity bar badge.** The Gitable icon shows the count of changed files
-  (staged + unstaged) as a badge, mirroring VS Code's built-in SCM indicator.
+- **Activity bar badge.** The Gitable icon shows the count of changed files as a
+  badge, mirroring VS Code's built-in SCM indicator. `countChangedFiles()` counts
+  *distinct* paths across staged ∪ unstaged ∪ conflicts (a partial file appears in
+  both staged and unstaged but is one file). `updateBadge()` **debounces** the
+  `view.badge` write (80 ms): a single commit makes the Git API fire several
+  `onDidChange` events in quick succession, and writing the badge on each can leave
+  VS Code rendering a stale intermediate value while dropping the final write — so
+  the count appeared not to clear after a commit. Coalescing to one settled write
+  fixes it. `lastBadgeCount` skips redundant writes and is reset on view re-resolve.
 - **Conflict resolution state.** When a pull or merge leaves unresolved conflicts,
   `RepoChanges.conflicts` is populated (CLI detects XY porcelain codes containing `U`,
   `AA`, or `DD`; VS Code Git API uses `mergeChanges`). The Changes tab shows a

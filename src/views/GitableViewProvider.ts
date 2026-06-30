@@ -26,6 +26,8 @@ const MIN_STAGE_BUSY_VISIBLE_MS = 2000;
  */
 export class GitableViewProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | undefined;
+  private badgeTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastBadgeCount = -1;
   private busyKind = "";
   private busyText = "";
   private syncAction = "";
@@ -54,6 +56,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
+    // Force the next updateBadge() to write, since this fresh view has no badge.
+    this.lastBadgeCount = -1;
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "media")]
@@ -62,6 +66,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     view.webview.onDidReceiveMessage((message) => this.handleMessage(message));
     view.onDidDispose(() => {
       this.view = undefined;
+      if (this.badgeTimer) {
+        clearTimeout(this.badgeTimer);
+        this.badgeTimer = undefined;
+      }
     });
     view.onDidChangeVisibility(() => {
       if (view.visible) {
@@ -1679,16 +1687,49 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   private updateBadge(changes: unknown): void {
-    if (!this.view) {
+    const count = this.countChangedFiles(changes);
+    if (count === this.lastBadgeCount) {
       return;
     }
-    const repoChanges = changes as { staged?: unknown[]; unstaged?: unknown[] } | undefined;
-    const staged = Array.isArray(repoChanges?.staged) ? repoChanges.staged.length : 0;
-    const unstaged = Array.isArray(repoChanges?.unstaged) ? repoChanges.unstaged.length : 0;
-    const count = staged + unstaged;
-    this.view.badge = count > 0
-      ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` }
-      : undefined;
+    this.lastBadgeCount = count;
+    // A single commit (or discard/stage) makes the VS Code Git API fire several
+    // `onDidChange` events in quick succession, each triggering a refresh. Writing
+    // `view.badge` on every one can leave VS Code rendering a stale intermediate
+    // value while dropping the final write — so the badge keeps showing the old
+    // count after the working tree is already clean. Coalesce to a single write of
+    // the latest settled count once the burst stops.
+    if (this.badgeTimer) {
+      clearTimeout(this.badgeTimer);
+    }
+    this.badgeTimer = setTimeout(() => {
+      this.badgeTimer = undefined;
+      if (!this.view) {
+        return;
+      }
+      this.view.badge = count > 0
+        ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` }
+        : undefined;
+    }, 80);
+  }
+
+  /** Count of distinct changed files (staged ∪ unstaged ∪ conflicts). A file with
+   *  both staged and unstaged hunks appears in two lists but is one changed file,
+   *  so we de-duplicate by path rather than summing array lengths. */
+  private countChangedFiles(changes: unknown): number {
+    const repoChanges = changes as
+      | { staged?: Array<{ path?: string }>; unstaged?: Array<{ path?: string }>; conflicts?: Array<{ path?: string }> }
+      | undefined;
+    const paths = new Set<string>();
+    for (const group of [repoChanges?.staged, repoChanges?.unstaged, repoChanges?.conflicts]) {
+      if (Array.isArray(group)) {
+        for (const file of group) {
+          if (file?.path) {
+            paths.add(file.path);
+          }
+        }
+      }
+    }
+    return paths.size;
   }
 
   private async waitForStateRender(renderId: number): Promise<void> {
