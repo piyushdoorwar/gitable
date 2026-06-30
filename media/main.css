@@ -1882,7 +1882,32 @@ textarea {
   font-weight: 600;
 }
 .gx-commit-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   min-width: 0;
+}
+.gx-commit-title .gx-commit-subject {
+  flex: 1 1 auto;
+}
+/* Marks commits that live only in the local repo (not yet pushed). */
+.gx-unpushed-badge {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 1px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--gx-outgoing);
+  border: 1px solid color-mix(in srgb, var(--gx-outgoing) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gx-outgoing) 12%, transparent);
+  white-space: nowrap;
+}
+.gx-commit.unpushed {
+  border-left: 2px solid color-mix(in srgb, var(--gx-outgoing) 55%, var(--gx-line));
 }
 .gx-commit-subject {
   display: -webkit-box;

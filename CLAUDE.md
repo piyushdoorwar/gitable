@@ -259,6 +259,14 @@ workspace, never committed to the repo.
   explicit `remote` and tracking arguments (`push -u`, `branch --set-upstream-to`).
 - **Full SHA in history.** `git log` uses `%H` (40-char). Display truncates to 7
   chars. All git operations (diff, revert, cherry-pick, AI summary) use the full hash.
+- **Unpushed commit indicator.** `getHistory()` computes the set of local-only
+  commits via `git rev-list HEAD --not --remotes` (reachable from HEAD but not from
+  any remote ref) and sets `CommitInfo.unpushed` per commit. `--remotes` keeps this
+  correct whether the branch tracks an upstream, is published under a different name,
+  or has no upstream yet (with no remotes configured, every HEAD commit is local).
+  The History tab shows an "Unpushed" pill (outgoing color) next to the subject and
+  a left accent border on those rows, so you can see which commits still live only
+  in your local repository.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from
   the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
 - **Selectable commit history.** Files are lazy-loaded on first expand and cached

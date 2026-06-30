@@ -520,6 +520,21 @@ describe("GitCliService integration", () => {
       expect((await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], root)).trim()).toBe("upstream/feature/publish");
     });
 
+    it("flags commits not yet on any remote as unpushed in getHistory", async () => {
+      // Push the current state so everything so far is on the remote.
+      await git(["push", "upstream", "main"], root);
+
+      await writeFile(path.join(root, "tracked.txt"), "local work\n");
+      await git(["add", "tracked.txt"], root);
+      await git(["commit", "-m", "local: not pushed yet"], root);
+
+      const history = await service.getHistory(5);
+      const local = history.find((c) => c.subject === "local: not pushed yet");
+      const pushed = history.find((c) => c.subject !== "local: not pushed yet");
+      expect(local?.unpushed).toBe(true);
+      expect(pushed?.unpushed).toBe(false);
+    });
+
     it("sets upstream for an existing remote branch after the fact", async () => {
       await service.createBranch("feature/tracking");
       await git(["push", "upstream", "feature/tracking"], root);

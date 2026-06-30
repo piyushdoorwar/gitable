@@ -217,6 +217,7 @@ export class GitCliService implements GitService {
   async getHistory(limit: number): Promise<CommitInfo[]> {
     const root = this.requireRoot();
     try {
+      const unpushed = await this.getUnpushedHashes(root);
       const output = await this.run(
         ["log", "--decorate=short", `--pretty=format:%H%x09%an%x09%ar%x09%D%x09%s`, "-n", String(limit)],
         root
@@ -231,12 +232,31 @@ export class GitCliService implements GitService {
             author: author ?? "",
             relativeDate: relativeDate ?? "",
             subject: subjectParts.join("\t"),
-            tags: this.parseDecoratedTags(decorations ?? "")
+            tags: this.parseDecoratedTags(decorations ?? ""),
+            unpushed: unpushed.has(hash ?? "")
           };
         });
     } catch {
       // A brand-new repository with no commits makes `git log` fail — treat as empty.
       return [];
+    }
+  }
+
+  /** Hashes of commits reachable from HEAD but not from any remote-tracking ref.
+   *  `--remotes` covers every remote, so this stays correct for branches that
+   *  track an upstream, are published under a different name, or have no upstream
+   *  yet (with no remotes, every HEAD commit is reported as local). */
+  private async getUnpushedHashes(root: string): Promise<Set<string>> {
+    try {
+      const output = await this.run(["rev-list", "HEAD", "--not", "--remotes"], root);
+      return new Set(
+        output
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+      );
+    } catch {
+      return new Set();
     }
   }
 

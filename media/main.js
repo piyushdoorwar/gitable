@@ -2339,8 +2339,9 @@
         const expanded = ui.expandedCommits.has(c.hash);
         const selected = ui.selectedCommits.has(c.hash);
         const selectTitle = `Select ${c.subject}`;
+        const unpushed = !!c.unpushed;
         return `
-        <li class="gx-commit${expanded ? " expanded" : ""}${selected ? " selected" : ""}">
+        <li class="gx-commit${expanded ? " expanded" : ""}${selected ? " selected" : ""}${unpushed ? " unpushed" : ""}">
           <div class="gx-commit-head" data-action="toggleCommit" data-hash="${escapeHtml(c.hash)}" title="Show changed files" aria-label="Show changed files in ${escapeHtml(c.hash)}">
             <input type="checkbox" class="gx-check gx-commit-check" data-action="toggleCommitSelection" data-hash="${escapeHtml(c.hash)}" title="${escapeHtml(selectTitle)}" aria-label="${escapeHtml(selectTitle)}" ${selected ? "checked" : ""} />
             <span class="gx-commit-col-left">
@@ -2352,6 +2353,7 @@
             <span class="body">
               <div class="gx-commit-title">
                 <span class="gx-commit-subject">${escapeHtml(c.subject)}</span>
+                ${unpushed ? `<span class="gx-unpushed-badge" title="This commit is only in your local repository — not yet pushed">Unpushed</span>` : ""}
               </div>
               <div class="gx-commit-meta">
                 <span class="gx-hash">${escapeHtml(c.hash.slice(0, 7))}</span>

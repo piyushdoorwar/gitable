@@ -25,6 +25,9 @@ export interface CommitInfo {
   relativeDate: string;
   subject: string;
   tags: string[];
+  /** True when this commit is reachable from HEAD but not from any remote ref —
+   *  i.e. it still lives only in your local repository and has not been pushed. */
+  unpushed: boolean;
 }
 
 export interface RepoSummary {
