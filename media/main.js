@@ -596,17 +596,19 @@
           </span>
         </div>
         <div class="gx-branch-row">
-          <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
-            ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>
-          </button>
-          <button id="pullBtn" class="gx-sync-btn" data-action="pullSync" title="Fetch origin" aria-label="Fetch origin" type="button" disabled>
-            <span id="pullIcon" class="gx-ic sm"></span>
-            <span id="pullBadge" class="gx-sync-btn-badge hidden"></span>
-          </button>
-          <button id="pushBtn" class="gx-sync-btn" data-action="pushSync" title="Push origin" aria-label="Push origin" type="button" disabled>
-            <span id="pushIcon" class="gx-ic sm"></span>
-            <span id="pushBadge" class="gx-sync-btn-badge hidden"></span>
-          </button>
+          <div class="gx-branch-cluster">
+            <button class="gx-branch-btn" data-action="openBranches" title="Manage branches" aria-label="Manage branches" type="button">
+              ${icon("branch", "sm")}<span id="branchName" class="gx-branch-cur">—</span>
+            </button>
+            <button id="pullBtn" class="gx-sync-btn" data-action="pullSync" title="Fetch origin" aria-label="Fetch origin" type="button" disabled>
+              <span id="pullIcon" class="gx-ic sm"></span>
+              <span id="pullBadge" class="gx-sync-btn-badge hidden"></span>
+            </button>
+            <button id="pushBtn" class="gx-sync-btn" data-action="pushSync" title="Push origin" aria-label="Push origin" type="button" disabled>
+              <span id="pushIcon" class="gx-ic sm"></span>
+              <span id="pushBadge" class="gx-sync-btn-badge hidden"></span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2068,37 +2070,57 @@
     const syncAction = s.syncAction || "";
     const fetchedText = timeAgo(s.lastFetchedAt || 0);
 
-    const setBadge = (el, html) => {
-      if (html) { el.innerHTML = html; el.classList.remove("hidden"); }
-      else { el.innerHTML = ""; el.classList.add("hidden"); }
+    // Sets the badge HTML + an optional semantic color class on the badge span.
+    const setBadge = (el, html, colorClass) => {
+      el.classList.remove("gx-badge-in", "gx-badge-out", "gx-badge-tag");
+      if (html) {
+        el.innerHTML = html;
+        if (colorClass) el.classList.add(colorClass);
+        el.classList.remove("hidden");
+      } else {
+        el.innerHTML = "";
+        el.classList.add("hidden");
+      }
+    };
+    // Keeps tooltip and screen-reader label in sync (the static aria-label
+    // would otherwise always announce "Fetch origin" / "Push origin").
+    const setLabel = (btn, text) => {
+      btn.title = text;
+      btn.setAttribute("aria-label", text);
     };
 
-    // Busy: show the spinner on whichever button owns the running operation.
+    // Busy: show the spinner on whichever button owns the running operation, and
+    // keep that button at full opacity (`gx-syncing`) so the spinner stays visible.
     if (syncAction) {
       const action = syncAction.toLowerCase();
       const onPush = action.includes("push") || action.includes("publish");
       const spin = `<span class="gx-spin"></span>`;
       pullIcon.innerHTML = onPush ? ICONS.pull : spin;
       pushIcon.innerHTML = onPush ? spin : ICONS.push;
-      pullBtn.title = pushBtn.title = "Hang on…";
+      setLabel(pullBtn, "Hang on…");
+      setLabel(pushBtn, "Hang on…");
       setBadge(pullBadge, "");
       setBadge(pushBadge, "");
+      pullBtn.classList.toggle("gx-syncing", !onPush);
+      pushBtn.classList.toggle("gx-syncing", onPush);
       setDisabled(pullBtn, true);
       setDisabled(pushBtn, true);
       return;
     }
+    pullBtn.classList.remove("gx-syncing");
+    pushBtn.classList.remove("gx-syncing");
 
     const blocked = !!s.isLoading || !s.branchName;
 
     // ---- Pull / incoming button -------------------------------------------
     if (s.hasUpstream && s.behind > 0) {
       pullIcon.innerHTML = ICONS.pull;
-      pullBtn.title = `Pull ${s.behind} commit${s.behind > 1 ? "s" : ""} from origin`;
-      setBadge(pullBadge, `${s.behind}${BADGE_DOWN}`);
+      setLabel(pullBtn, `Pull ${s.behind} commit${s.behind > 1 ? "s" : ""} from origin`);
+      setBadge(pullBadge, `${s.behind}${BADGE_DOWN}`, "gx-badge-in");
     } else {
       // Up to date or no upstream — the incoming button fetches.
       pullIcon.innerHTML = ICONS.refresh;
-      pullBtn.title = fetchedText || "Fetch origin";
+      setLabel(pullBtn, fetchedText || "Fetch origin");
       setBadge(pullBadge, "");
     }
     setDisabled(pullBtn, blocked);
@@ -2106,23 +2128,27 @@
     // ---- Push / outgoing button -------------------------------------------
     pushIcon.innerHTML = ICONS.push;
     if (!s.hasUpstream) {
-      pushBtn.title = "Publish branch to origin";
+      setLabel(pushBtn, "Publish branch to origin");
       setBadge(pushBadge, "");
       setDisabled(pushBtn, blocked);
     } else if (s.ahead > 0) {
-      pushBtn.title = pendingTags > 0
-        ? `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} + ${pendingTags} tag${pendingTags > 1 ? "s" : ""}`
-        : `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} to origin`;
-      setBadge(pushBadge, pendingTags > 0
-        ? `${s.ahead}${BADGE_UP}<span class="gx-badge-sep">·</span>${pendingTags}${BADGE_TAG}`
-        : `${s.ahead}${BADGE_UP}`);
+      if (pendingTags > 0) {
+        setLabel(pushBtn, `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} + ${pendingTags} tag${pendingTags > 1 ? "s" : ""}`);
+        setBadge(pushBadge,
+          `<span class="gx-badge-seg gx-badge-out">${s.ahead}${BADGE_UP}</span>`
+          + `<span class="gx-badge-sep">·</span>`
+          + `<span class="gx-badge-seg gx-badge-tag">${pendingTags}${BADGE_TAG}</span>`);
+      } else {
+        setLabel(pushBtn, `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} to origin`);
+        setBadge(pushBadge, `${s.ahead}${BADGE_UP}`, "gx-badge-out");
+      }
       setDisabled(pushBtn, blocked);
     } else if (pendingTags > 0) {
-      pushBtn.title = `Push ${pendingTags} unpushed tag${pendingTags > 1 ? "s" : ""} to origin`;
-      setBadge(pushBadge, `${pendingTags}${BADGE_TAG}`);
+      setLabel(pushBtn, `Push ${pendingTags} unpushed tag${pendingTags > 1 ? "s" : ""} to origin`);
+      setBadge(pushBadge, `${pendingTags}${BADGE_TAG}`, "gx-badge-tag");
       setDisabled(pushBtn, blocked);
     } else {
-      pushBtn.title = "Nothing to push";
+      setLabel(pushBtn, "Nothing to push");
       setBadge(pushBadge, "");
       setDisabled(pushBtn, true);
     }

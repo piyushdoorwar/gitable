@@ -244,10 +244,16 @@ describe("VsCodeGitService", () => {
       expect(changes.unstaged[0]).toMatchObject({ path: "file.ts", status: "M", staged: false });
     });
 
-    it("getSyncInfo reads ahead/behind counts from API HEAD", async () => {
+    it("getSyncInfo always reads fresh counts from the CLI, ignoring the API cache", async () => {
+      // The API HEAD cache lags after a CLI fetch, so even when it reports
+      // counts we must not trust them — the CLI reads fresh refs from disk.
       mockRepo.state.HEAD = { name: "main", ahead: 3, behind: 1, upstream: { name: "origin/main" } };
+      const cliSpy = vi
+        .spyOn(cli, "getSyncInfo")
+        .mockResolvedValue({ ahead: 5, behind: 2, hasUpstream: true });
       const sync = await service.getSyncInfo();
-      expect(sync).toEqual({ ahead: 3, behind: 1, hasUpstream: true });
+      expect(cliSpy).toHaveBeenCalled();
+      expect(sync).toEqual({ ahead: 5, behind: 2, hasUpstream: true });
     });
 
     it("getSyncInfo defers to the CLI when HEAD has no upstream", async () => {
@@ -256,17 +262,6 @@ describe("VsCodeGitService", () => {
       const sync = await service.getSyncInfo();
       expect(cliSpy).toHaveBeenCalled();
       expect(sync).toEqual({ ahead: 0, behind: 0, hasUpstream: false });
-    });
-
-    it("getSyncInfo defers to the CLI when the API reports ahead but omits upstream", async () => {
-      // The Git API can leave `upstream` undefined for a tracking branch while
-      // still surfacing ahead/behind. Trusting it would wrongly show "Publish";
-      // the CLI's @{upstream} check is authoritative.
-      mockRepo.state.HEAD = { name: "main", ahead: 1, behind: 0 };
-      const cliSpy = vi.spyOn(cli, "getSyncInfo").mockResolvedValue({ ahead: 1, behind: 0, hasUpstream: true });
-      const sync = await service.getSyncInfo();
-      expect(cliSpy).toHaveBeenCalled();
-      expect(sync).toEqual({ ahead: 1, behind: 0, hasUpstream: true });
     });
 
     it("getRepoSummary reads name and branch from API repository state", async () => {

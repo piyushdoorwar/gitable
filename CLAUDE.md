@@ -248,9 +248,13 @@ workspace, never committed to the repo.
 
 - **Hybrid Git access.** Local mutations go through CLI; watches and ordinary
   push/pull prefer the built-in API for credential/UI integration, with a
-  transparent CLI fallback via `apiOrCli()`. `getChanges()` always uses the CLI
-  so the badge and file list are always fresh — the VS Code Git API's in-memory
-  cache (`indexChanges`/`workingTreeChanges`) can lag after commits and discards.
+  transparent CLI fallback via `apiOrCli()`. `getChanges()` and `getSyncInfo()`
+  always use the CLI so the badge, file list, and ahead/behind counts are always
+  fresh — the VS Code Git API's in-memory cache (`indexChanges`/`workingTreeChanges`
+  and `repo.state.HEAD.ahead/behind`) can lag after commits, discards, and fetches.
+  In particular a CLI `git fetch` does not invalidate the API's ahead/behind cache,
+  so reading counts from `repo.state.HEAD` made pull items appear only after 2-3
+  fetches; `getSyncInfo()` resolves `@{upstream}` via `git rev-list` instead.
   Remote-aware publishing and upstream tracking are CLI-backed because they need
   explicit `remote` and tracking arguments (`push -u`, `branch --set-upstream-to`).
 - **Full SHA in history.** `git log` uses `%H` (40-char). Display truncates to 7
