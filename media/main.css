@@ -210,11 +210,12 @@ button[aria-disabled="true"],
   padding: 4px 10px;
 }
 .gx-sync-btn {
+  /* Chunkier, easier-to-hit sync segments pinned to the right edge; the branch
+     button flexes to fill the rest of the row. */
   flex: 0 0 auto;
   justify-content: center;
-  /* Wider base so a count first appearing/clearing nudges the row less. */
-  min-width: 44px;
-  padding: 4px 9px;
+  min-width: 56px;
+  padding: 4px 14px;
 }
 .gx-branch-btn:hover,
 .gx-branch-btn.active,
