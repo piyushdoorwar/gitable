@@ -32,6 +32,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private busyText = "";
   private syncAction = "";
   private lastFetchedAt = 0;
+  /** Set when a background fetch from origin fails (offline, auth, no network) so
+   *  the pull button can surface it instead of silently pretending all is fine. */
+  private lastSyncError = "";
+  /** How many commits the History tab currently requests; grows via "Show more". */
+  private historyLimit = HISTORY_LIMIT;
+  private hasMoreHistory = false;
+  private autoFetchTimer: ReturnType<typeof setInterval> | undefined;
   private pendingTagPushes = new Set<string>();
   /** Summary of the last commit made via Gitable; cleared on push or undo. */
   private lastCommitSummary = "";
@@ -70,12 +77,38 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         clearTimeout(this.badgeTimer);
         this.badgeTimer = undefined;
       }
+      this.stopAutoFetch();
     });
     view.onDidChangeVisibility(() => {
       if (view.visible) {
         void this.silentFetchAndRefresh();
       }
     });
+    this.restartAutoFetch();
+  }
+
+  /** (Re)starts the periodic background fetch from the `gitable.autoFetch.intervalMinutes`
+   *  setting. Fetching only runs while the panel is visible; 0 disables it. */
+  restartAutoFetch(): void {
+    this.stopAutoFetch();
+    const minutes = vscode.workspace
+      .getConfiguration("gitable")
+      .get<number>("autoFetch.intervalMinutes", 5);
+    if (!minutes || minutes <= 0) {
+      return;
+    }
+    this.autoFetchTimer = setInterval(() => {
+      if (this.view?.visible && !this.syncAction) {
+        void this.silentFetchAndRefresh();
+      }
+    }, minutes * 60_000);
+  }
+
+  private stopAutoFetch(): void {
+    if (this.autoFetchTimer) {
+      clearInterval(this.autoFetchTimer);
+      this.autoFetchTimer = undefined;
+    }
   }
 
   // ---- Public entry points (used by commands) ----
@@ -175,8 +208,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "refresh":
         await this.refresh();
         break;
+      case "loadMoreHistory":
+        this.historyLimit += HISTORY_LIMIT;
+        await this.refresh();
+        break;
       case "selectRepo":
         this.git.setActiveRoot(message.root);
+        this.historyLimit = HISTORY_LIMIT;
         await this.refresh();
         break;
       case "stageFile": {
@@ -1634,6 +1672,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     await this.postState();
     try {
       await op();
+      // A successful sync clears any stale "couldn't reach origin" warning.
+      this.lastSyncError = "";
     } catch (error) {
       this.fail(error);
     } finally {
@@ -1643,15 +1683,27 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** Fetches from origin silently when the panel becomes visible, then refreshes state. */
+  /** Fetches from origin silently when the panel becomes visible or on the auto-fetch
+   *  timer, then refreshes state. Network/auth failures are surfaced inline on the
+   *  pull button (via `lastSyncError`) rather than swallowed without a trace. */
   private async silentFetchAndRefresh(): Promise<void> {
     this.syncAction = "Refreshing repository";
     await this.postState();
     try {
       await this.git.fetchOrigin();
       this.lastFetchedAt = Date.now();
-    } catch {
-      // no remote, no network — ignore silently
+      this.lastSyncError = "";
+    } catch (error) {
+      // Only flag a failure when a remote actually exists — a local-only repo has
+      // no `origin`, and that is not an error worth surfacing to the user.
+      const hasRemote = await this.git
+        .getRemotes()
+        .then((remotes) => remotes.length > 0)
+        .catch(() => false);
+      if (hasRemote) {
+        this.lastSyncError = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Background fetch failed: ${this.lastSyncError}`);
+      }
     } finally {
       this.syncAction = "";
       await this.postState();
@@ -1751,6 +1803,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let repositoryName = "No repository";
     let branchName = "";
     let changes: RepoChanges = { staged: [], unstaged: [], conflicts: [] };
+    this.hasMoreHistory = false;
     let history: unknown[] = [];
     let branches: string[] = [];
     let stashes: StashEntry[] = [];
@@ -1768,7 +1821,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         repositoryName = summary.name;
         branchName = summary.branch;
         changes = await this.git.getChanges();
-        history = await this.git.getHistory(HISTORY_LIMIT);
+        // Fetch one extra to detect whether older commits remain ("Show more").
+        const fetched = await this.git.getHistory(this.historyLimit + 1);
+        this.hasMoreHistory = fetched.length > this.historyLimit;
+        history = this.hasMoreHistory ? fetched.slice(0, this.historyLimit) : fetched;
         branches = await this.git.getBranches();
         stashes = await this.git.stashList();
         const sync = await this.git.getSyncInfo();
@@ -1806,6 +1862,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       behind,
       hasUpstream,
       syncAction: this.syncAction,
+      syncError: this.lastSyncError,
+      hasMoreHistory: this.hasMoreHistory,
       lastFetchedAt: this.lastFetchedAt,
       pendingTagCount: this.pendingTagPushes.size,
       canUndoCommit: !!this.lastCommitSummary,

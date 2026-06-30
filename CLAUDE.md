@@ -85,7 +85,7 @@ tests/
 ### Webview message protocol
 
 **Webview → host:**
-- Git: `ready`, `refresh`, `stateRendered`, `selectRepo`,
+- Git: `ready`, `refresh`, `loadMoreHistory`, `stateRendered`, `selectRepo`,
   `stageFile`, `unstageFile`, `stageFiles`, `unstageFiles`, `stageAll`, `unstageAll`,
   `discardFiles`, `commit`, `amend`,
   `openDiff`, `openFile`, `openCommitFile`, `copyFilePath`, `copyRelativePath`, `revealFile`,
@@ -116,8 +116,8 @@ tests/
 ```
 repositoryName, branchName, activeRoot, repositories,
 changes:{staged, unstaged, conflicts}, stashes,
-history, branches,
-ahead, behind, hasUpstream, syncAction, lastFetchedAt,
+history, branches, hasMoreHistory,
+ahead, behind, hasUpstream, syncAction, syncError, lastFetchedAt,
 pendingTagCount, canUndoCommit, lastCommitSummary,
 lastCommit:{summary, description} | null,
 rebaseState:{inProgress, branch?, onto?},
@@ -259,6 +259,27 @@ workspace, never committed to the repo.
   explicit `remote` and tracking arguments (`push -u`, `branch --set-upstream-to`).
 - **Full SHA in history.** `git log` uses `%H` (40-char). Display truncates to 7
   chars. All git operations (diff, revert, cherry-pick, AI summary) use the full hash.
+- **History pagination.** `historyLimit` starts at `HISTORY_LIMIT` (30) and grows by
+  `HISTORY_LIMIT` each time the webview posts `loadMoreHistory` (a "Show more commits"
+  button rendered at the bottom of the list when `state.hasMoreHistory`). `buildState()`
+  requests `historyLimit + 1` commits; if more come back than the limit it sets
+  `hasMoreHistory` and slices to the limit. Switching repos resets `historyLimit`.
+- **Background auto-fetch.** A timer (`restartAutoFetch()`) fetches from origin every
+  `gitable.autoFetch.intervalMinutes` (VS Code setting, default 5, `0` disables) so
+  ahead/behind stay current while the panel sits open. It only runs while the view is
+  visible and no other sync op is in flight, and is restarted on configuration change
+  (`onDidChangeConfiguration` in `extension.ts`). This complements the existing
+  fetch-on-visibility behavior.
+- **Surfaced fetch failures.** `silentFetchAndRefresh()` no longer swallows errors:
+  on failure (and only when a remote actually exists — local-only repos are not an
+  error) it stores `lastSyncError`, exposed as `state.syncError`. The pull button then
+  shows a warning icon (`gx-sync-error`) and tooltip "Couldn't reach origin — click to
+  retry" instead of a clean "up to date". Any successful fetch/pull/push clears it.
+- **Branch-row stability.** The sync buttons keep their badges visible during an
+  in-flight op (only the icon swaps to a 13×13 spinner that matches the icon slot) so
+  clicking refresh does not shift the row (CLS). `.gx-sync-btn` also has `min-width: 44px`
+  to damp the shift when a count first appears, and a webview `setInterval` re-runs
+  `updateSync` every 60s so the "Last fetched … ago" tooltip stays current between states.
 - **Unpushed commit indicator.** `getHistory()` computes the set of local-only
   commits via `git rev-list HEAD --not --remotes` (reachable from HEAD but not from
   any remote ref) and sets `CommitInfo.unpushed` per commit. `--remotes` keeps this

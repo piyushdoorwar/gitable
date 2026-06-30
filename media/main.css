@@ -212,7 +212,8 @@ button[aria-disabled="true"],
 .gx-sync-btn {
   flex: 0 0 auto;
   justify-content: center;
-  min-width: 34px;
+  /* Wider base so a count first appearing/clearing nudges the row less. */
+  min-width: 44px;
   padding: 4px 9px;
 }
 .gx-branch-btn:hover,
@@ -240,6 +241,10 @@ button[aria-disabled="true"],
 .gx-sync-btn > .gx-ic:first-child {
   color: var(--vscode-descriptionForeground);
   flex-shrink: 0;
+}
+/* Background fetch failed — flag the pull segment instead of feigning "up to date". */
+.gx-sync-btn.gx-sync-error > .gx-ic:first-child {
+  color: var(--vscode-editorWarning-foreground, #cca700);
 }
 .gx-branch-cur {
   flex: 1;
@@ -1586,6 +1591,29 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+.gx-load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+.gx-load-more {
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--gx-accent);
+  background: transparent;
+  border: 1px solid var(--gx-line);
+  border-radius: var(--gx-radius-sm);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.gx-load-more:hover:not(:disabled) {
+  border-color: var(--gx-accent-line);
+  background: var(--gx-accent-soft);
+}
+.gx-load-more:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .gx-commit {
   background: var(--gx-navy-card);

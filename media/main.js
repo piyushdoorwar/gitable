@@ -11,6 +11,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
     refresh:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>',
+    warning:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
     search:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
     externalLink:
@@ -1256,6 +1258,10 @@
         }
         break;
       }
+      case "loadMoreHistory":
+        if (elm) { elm.disabled = true; elm.textContent = "Loading…"; }
+        post({ type: "loadMoreHistory" });
+        break;
       case "stashStaged":
         switchChangeTab("stashes");
         post({ type: "stashStaged" });
@@ -2113,12 +2119,22 @@
     const blocked = !!s.isLoading || !s.branchName;
 
     // ---- Pull / incoming button -------------------------------------------
+    const syncError = s.syncError || "";
     if (s.hasUpstream && s.behind > 0) {
+      pullBtn.classList.remove("gx-sync-error");
       pullIcon.innerHTML = ICONS.pull;
       setLabel(pullBtn, `Pull ${s.behind} commit${s.behind > 1 ? "s" : ""} from origin`);
       setBadge(pullBadge, `${s.behind}${BADGE_DOWN}`, "gx-badge-in");
+    } else if (syncError) {
+      // A background fetch failed (offline/auth/no network) — say so instead of
+      // showing a clean "up to date" state. Clicking retries the fetch.
+      pullBtn.classList.add("gx-sync-error");
+      pullIcon.innerHTML = ICONS.warning || ICONS.refresh;
+      setLabel(pullBtn, `Couldn't reach origin — click to retry (${syncError})`);
+      setBadge(pullBadge, "");
     } else {
       // Up to date or no upstream — the incoming button fetches.
+      pullBtn.classList.remove("gx-sync-error");
       pullIcon.innerHTML = ICONS.refresh;
       setLabel(pullBtn, fetchedText || "Fetch origin");
       setBadge(pullBadge, "");
@@ -2366,7 +2382,10 @@
           ${expanded ? renderCommitFiles(c.hash) : ""}
         </li>`;
       })
-      .join("");
+      .join("")
+      + (s.hasMoreHistory
+        ? `<li class="gx-load-more-wrap"><button class="gx-load-more" data-action="loadMoreHistory" type="button">Show more commits</button></li>`
+        : "");
   }
 
   function renderHistoryActions() {
@@ -3072,4 +3091,9 @@
   switchTab("changes");
   render();
   post({ type: "ready" });
+
+  // Keep the relative "Last fetched … ago" tooltip current between state updates.
+  setInterval(() => {
+    if (ui.state && !ui.state.syncAction) updateSync(ui.state);
+  }, 60000);
 })();

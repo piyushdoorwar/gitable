@@ -37,6 +37,17 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "configuration": {
+      "title": "Gitable",
+      "properties": {
+        "gitable.autoFetch.intervalMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "markdownDescription": "How often Gitable fetches from origin in the background (while the panel is visible) to keep the ahead/behind counts current, in minutes. Set to `0` to disable background fetching."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {

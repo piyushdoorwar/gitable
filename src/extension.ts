@@ -40,6 +40,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
+  // Restart the background fetch timer when its interval setting changes.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("gitable.autoFetch.intervalMinutes")) {
+        provider.restartAutoFetch();
+      }
+    })
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand(Commands.refresh, () => provider.refresh()),
     vscode.commands.registerCommand(Commands.generateCommitMessage, () =>
