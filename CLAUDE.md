@@ -277,8 +277,10 @@ workspace, never committed to the repo.
   retry" instead of a clean "up to date". Any successful fetch/pull/push clears it.
 - **Branch-row stability.** The sync buttons keep their badges visible during an
   in-flight op (only the icon swaps to a 13×13 spinner that matches the icon slot) so
-  clicking refresh does not shift the row (CLS). `.gx-sync-btn` also has `min-width: 44px`
-  to damp the shift when a count first appears, and a webview `setInterval` re-runs
+  clicking refresh does not shift the row (CLS). The sync segments are chunky
+  (`min-width: 56px`, `padding: 4px 14px`) and pinned to the right edge while the branch
+  button flexes to fill; the width also damps the shift when a count first appears. A
+  webview `setInterval` re-runs
   `updateSync` every 60s so the "Last fetched … ago" tooltip stays current between states.
 - **Unpushed commit indicator.** `getHistory()` computes the set of local-only
   commits via `git rev-list HEAD --not --remotes` (reachable from HEAD but not from
