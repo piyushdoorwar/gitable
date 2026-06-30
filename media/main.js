@@ -2099,8 +2099,8 @@
       pushIcon.innerHTML = onPush ? spin : ICONS.push;
       setLabel(pullBtn, "Hang on…");
       setLabel(pushBtn, "Hang on…");
-      setBadge(pullBadge, "");
-      setBadge(pushBadge, "");
+      // Keep the existing badges in place while the op runs — clearing them shrinks
+      // the sync buttons mid-operation, which shifts the whole branch row (CLS).
       pullBtn.classList.toggle("gx-syncing", !onPush);
       pushBtn.classList.toggle("gx-syncing", onPush);
       setDisabled(pullBtn, true);
