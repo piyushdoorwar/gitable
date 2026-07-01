@@ -170,6 +170,7 @@
         const p = JSON.parse(raw);
         return {
           jiraEnabled: !!p.jiraEnabled,
+          tooltipsEnabled: p.tooltipsEnabled !== false,
           fileView: p.fileView === "tree" ? "tree" : "flat",
           budgets: {
             commit:   ["low","mid","high"].includes(p.budgets?.commit)   ? p.budgets.commit   : "mid",
@@ -179,7 +180,7 @@
         };
       }
     } catch (_) {}
-    return { jiraEnabled: false, fileView: "flat", budgets: { commit: "mid", summary: "mid", security: "mid" } };
+    return { jiraEnabled: false, tooltipsEnabled: true, fileView: "flat", budgets: { commit: "mid", summary: "mid", security: "mid" } };
   }
 
   function saveConfig(cfg) {
@@ -212,6 +213,11 @@
     if (toggleBtn) {
       toggleBtn.classList.toggle("on", cfg.jiraEnabled);
       toggleBtn.setAttribute("aria-pressed", String(cfg.jiraEnabled));
+    }
+    const tooltipsBtn = byId("tooltipsToggleBtn");
+    if (tooltipsBtn) {
+      tooltipsBtn.classList.toggle("on", cfg.tooltipsEnabled);
+      tooltipsBtn.setAttribute("aria-pressed", String(cfg.tooltipsEnabled));
     }
     document.querySelectorAll(".gx-budget-btn").forEach((btn) => {
       const feature = btn.getAttribute("data-feature");
@@ -433,6 +439,7 @@
     document.body.append(tooltipNode);
 
     const show = (target) => {
+      if (!ui.config.tooltipsEnabled) return;
       const text = tooltipText(target);
       if (!text) return;
       tooltipTarget = target;
@@ -795,6 +802,17 @@
           </div>
         </div>
         <div id="settingsPaneConfig" class="hidden">
+          <div class="gx-field">
+            <div class="gx-config-toggle-row">
+              <span class="gx-label gx-label-info gx-label-no-margin">
+                <span>Tooltips</span>
+                <span class="gx-info-icon gx-ic sm" title="Show hover tooltips throughout the panel. Turn off to hide all tooltips.">${ICONS.info}</span>
+              </span>
+              <button id="tooltipsToggleBtn" class="gx-toggle" data-action="toggleTooltips" type="button" aria-pressed="true">
+                <span class="gx-toggle-thumb"></span>
+              </button>
+            </div>
+          </div>
           <div class="gx-field">
             <div class="gx-config-toggle-row">
               <span class="gx-label gx-label-info gx-label-no-margin">
@@ -1307,6 +1325,18 @@
         saveConfig(ui.config);
         updateJiraVisibility();
         updateConfigUi();
+        break;
+      }
+      case "toggleTooltips": {
+        ui.config.tooltipsEnabled = !ui.config.tooltipsEnabled;
+        saveConfig(ui.config);
+        updateConfigUi();
+        // Dismiss any tooltip already on screen when turning the feature off.
+        if (!ui.config.tooltipsEnabled && tooltipNode) {
+          tooltipTarget = null;
+          tooltipNode.classList.remove("show");
+          tooltipNode.hidden = true;
+        }
         break;
       }
       case "setTokenBudget": {
