@@ -2852,7 +2852,8 @@
   // ---------- Reports ----------
 
   const TYPE_LABELS = { commitMessage: "Commit msg", commitSummary: "AI Summary", security: "Security" };
-  const TYPE_COLORS = { commitMessage: "var(--gx-accent)", commitSummary: "#7aa2ff", security: "#e7bd57" };
+  // One blue hue, three shades (darkest → lightest) so "By type" reads as a single colour.
+  const TYPE_COLORS = { commitMessage: "rgba(31,156,240,0.95)", commitSummary: "rgba(31,156,240,0.66)", security: "rgba(31,156,240,0.4)" };
   const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e" };
 
   /**
@@ -2906,8 +2907,8 @@
       if (slot) slot.count++;
     });
 
-    // Last 5 days that have data
-    const activeDays = days.filter((d) => d.count > 0).slice(-5);
+    // Last 10 calendar days (most recent window, whether or not each day had activity)
+    const recentDays = days.slice(-10);
 
     function barRow(label, count, color) {
       const pct = Math.round((count / total) * 100);
@@ -2963,23 +2964,23 @@
         ${modelRows}
       </div>` : ""}
 
-      ${activeDays.length ? `
+      ${recentDays.length ? `
       <div class="gx-rep-section">
-        <div class="gx-rep-section-title">Last 5 active days</div>
+        <div class="gx-rep-section-title">Last 10 days</div>
         <div class="gx-daychart-wrap"><canvas id="repDayChart"></canvas></div>
       </div>` : ""}
     `;
 
     // ── Chart.js bar chart ──
-    if (activeDays.length && typeof Chart !== "undefined") {
+    if (recentDays.length && typeof Chart !== "undefined") {
       const canvas = /** @type {HTMLCanvasElement|null} */ (byId("repDayChart"));
       if (canvas) {
         new Chart(canvas, {
           type: "bar",
           data: {
-            labels: activeDays.map((d) => d.label),
+            labels: recentDays.map((d) => d.label),
             datasets: [{
-              data: activeDays.map((d) => d.count),
+              data: recentDays.map((d) => d.count),
               backgroundColor: "rgba(31,156,240,0.75)",
               hoverBackgroundColor: "rgba(31,156,240,1)",
               borderRadius: 4,
