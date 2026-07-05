@@ -4,6 +4,7 @@ import { GitCliService } from "./git/GitCliService";
 import { VsCodeGitService } from "./git/VsCodeGitService";
 import { SecretService } from "./config/SecretService";
 import { SettingsService } from "./config/SettingsService";
+import { StashNoteStore } from "./config/StashNoteStore";
 import { GitableViewProvider } from "./views/GitableViewProvider";
 import { UsageStore } from "./analytics/UsageStore";
 import { JiraService } from "./jira/JiraService";
@@ -19,12 +20,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const settings = new SettingsService(context.globalState);
   const usage = new UsageStore(context.globalState);
   const jira = new JiraService(context.secrets, context.globalState);
+  const stashNotes = new StashNoteStore(context.globalState);
 
   const cli = new GitCliService(logger);
   const git = new VsCodeGitService(cli, logger);
   await git.initialize();
 
-  const provider = new GitableViewProvider(context.extensionUri, git, secrets, settings, usage, jira, logger);
+  const provider = new GitableViewProvider(context.extensionUri, git, secrets, settings, usage, jira, stashNotes, logger);
 
   context.subscriptions.push(
     logger,

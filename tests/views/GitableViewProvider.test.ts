@@ -9,6 +9,7 @@ function makeProvider(): GitableViewProvider {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
     {} as any
   );
 }

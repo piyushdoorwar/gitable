@@ -685,7 +685,10 @@ describe("GitCliService integration", () => {
       expect(stashes).toHaveLength(1);
       expect(stashes[0].index).toBe(0);
       expect(stashes[0].ref).toBe("stash@{0}");
-      expect(stashes[0].message).toMatch(/WIP on|On /);
+      // The "WIP on <branch>:" prefix is parsed out into branch + message.
+      expect(stashes[0].message).not.toMatch(/^(?:WIP on|On) /);
+      expect(stashes[0].branch).toBeTruthy();
+      expect(stashes[0].hash).toMatch(/^[0-9a-f]{40}$/);
       expect(stashes[0].date).toBeTruthy();
     });
 

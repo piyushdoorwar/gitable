@@ -53,8 +53,11 @@ export interface SyncInfo {
 export interface StashEntry {
   index: number;
   ref: string;      // "stash@{0}"
-  message: string;  // "WIP on main: fix auth"
+  message: string;  // "fix auth" (branch prefix stripped from the reflog subject)
+  branch?: string;  // "main" — the branch the stash was created on, parsed from the subject
   date: string;     // "2 hours ago"
+  hash?: string;    // full 40-char SHA of the stash commit — stable id used to key user notes
+  note?: string;    // optional user annotation describing what's in the stash (from StashNoteStore)
 }
 
 export interface RebaseState {

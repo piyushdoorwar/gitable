@@ -49,6 +49,7 @@ src/
   config/
     SecretService.ts       API keys via context.secrets (SecretStorage only)
     SettingsService.ts     provider + per-provider model via context.globalState
+    StashNoteStore.ts      user notes describing stashes, keyed by stash commit SHA (globalState)
   utils/
     DiffLimiter.ts         ignore noisy files + truncate to MAX_DIFF_CHARS
     Logger.ts              OutputChannel("Gitable")
@@ -95,7 +96,7 @@ tests/
   `mergeBranch`, `rebaseBranch`, `rebaseContinue`, `rebaseAbort`,
   `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`,
   `openMergeEditor`, `markResolved`,
-  `stashStaged`, `stashPop`, `stashApply`, `stashDrop`,
+  `stashStaged`, `stashPop`, `stashApply`, `stashDrop`, `annotateStash {hash}`,
   `createTag {hash}`, `deleteTag {name}`, `pushTags`,
   `addToGitignore {filePath}`, `undoLastCommit`,
   `openJiraIssue {key}`
@@ -341,7 +342,17 @@ workspace, never committed to the repo.
 - **Stash (staged-only).** `git stash push --staged` stashes only currently staged
   files, leaving unstaged changes intact. Pop / Apply restores the stash with
   `--index` so previously staged files return checked. The Stashes subtab lists
-  all stash entries with Pop / Apply / Drop actions.
+  all stash entries with Pop / Apply / Drop actions. Each row shows an accent stash
+  icon, the (branch-prefix-stripped) message, and a flexed meta line
+  `stash@{N} · <branch> · <relative date>` — `stashList` fetches `%gd\t%gs\t%cr\t%H`
+  and parses `WIP on <branch>:` / `On <branch>:` into `StashEntry.branch` + clean
+  `message`, plus the stash commit SHA into `hash`.
+- **Stash notes.** The stash three-dot menu has **Add note… / Edit note…**, which
+  posts `annotateStash {hash}` → `showInputBox` → `StashNoteStore`. Notes are keyed
+  by the stash **commit SHA** (`StashEntry.hash`), not the `stash@{N}` ref, because
+  refs shift as stashes are pushed/popped while the SHA is stable. `buildState`
+  prunes notes for vanished stashes and attaches surviving ones as `StashEntry.note`,
+  rendered as an italic line under the message so it's easy to see what's in a stash.
 - **Remote publishing and upstream tracking.** When the current branch has no
   upstream, the Push button's Publish flow chooses a remote (or uses the only
   configured remote) and runs `push -u`. The current-branch context menu also

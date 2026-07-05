@@ -462,7 +462,7 @@ export class GitCliService implements GitService {
     const root = this.requireRoot();
     let output: string;
     try {
-      output = await this.run(["stash", "list", "--format=%gd\t%gs\t%cr"], root);
+      output = await this.run(["stash", "list", "--format=%gd\t%gs\t%cr\t%H"], root);
     } catch {
       return [];
     }
@@ -471,9 +471,19 @@ export class GitCliService implements GitService {
       .trim()
       .split("\n")
       .map((line) => {
-        const [ref = "", message = "", date = ""] = line.split("\t");
+        const [ref = "", subject = "", date = "", hash = ""] = line.split("\t");
         const match = /stash@\{(\d+)\}/.exec(ref);
-        return { index: match ? parseInt(match[1], 10) : 0, ref, message, date };
+        // Reflog subjects look like "WIP on <branch>: <msg>" or "On <branch>: <msg>".
+        // Ref names can't contain ":", so the branch is everything up to the first colon.
+        const parsed = /^(?:WIP on|On) ([^:]+): (.*)$/.exec(subject);
+        return {
+          index: match ? parseInt(match[1], 10) : 0,
+          ref,
+          message: parsed ? parsed[2] : subject,
+          branch: parsed ? parsed[1] : undefined,
+          date,
+          hash: hash || undefined
+        };
       });
   }
 

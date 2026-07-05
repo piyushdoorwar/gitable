@@ -5,6 +5,7 @@ import { buildCommitSummaryPrompt, buildSecurityReviewPrompt } from "../ai/promp
 import { parseGeneratedMessage, parseSecurityReview } from "../ai/AiProvider";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
+import { StashNoteStore } from "../config/StashNoteStore";
 import { UsageStore } from "../analytics/UsageStore";
 import { JiraService } from "../jira/JiraService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
@@ -58,6 +59,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     private readonly settings: SettingsService,
     private readonly usage: UsageStore,
     private readonly jira: JiraService,
+    private readonly stashNotes: StashNoteStore,
     private readonly logger: Logger
   ) {}
 
@@ -417,6 +419,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.runBusyGit("git", "Dropping stash…", () => this.git.stashDrop(ref), "Stash dropped.");
         break;
       }
+      case "annotateStash":
+        await this.annotateStash(String(message.hash ?? ""));
+        break;
       case "copyBranchName": {
         const name = String(message.name ?? "");
         await vscode.env.clipboard.writeText(name);
@@ -1792,6 +1797,22 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     this.pendingStateRenders.delete(renderId);
   }
 
+  /** Prompts for (and stores) a note describing what's in a stash, keyed by its commit SHA. */
+  private async annotateStash(hash: string): Promise<void> {
+    if (!hash) return;
+    const existing = this.stashNotes.get(hash) ?? "";
+    const input = await vscode.window.showInputBox({
+      title: "Stash note",
+      prompt: "Describe what's in this stash (leave empty to remove the note)",
+      value: existing,
+      placeHolder: "e.g. WIP redesign of the pill transitions"
+    });
+    if (input === undefined) return; // user cancelled
+    this.stashNotes.set(hash, input);
+    this.pendingNotice = input.trim() ? "Stash note saved." : "Stash note removed.";
+    await this.postState();
+  }
+
   private async buildState(): Promise<Record<string, unknown>> {
     const provider = this.settings.getProvider();
     const model = this.settings.getModel(provider);
@@ -1827,6 +1848,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         history = this.hasMoreHistory ? fetched.slice(0, this.historyLimit) : fetched;
         branches = await this.git.getBranches();
         stashes = await this.git.stashList();
+        // Drop notes for stashes that no longer exist, then attach the rest.
+        this.stashNotes.prune(stashes.map((st) => st.hash).filter((h): h is string => !!h));
+        stashes = stashes.map((st) => ({ ...st, note: this.stashNotes.get(st.hash) }));
         const sync = await this.git.getSyncInfo();
         ahead = sync.ahead;
         behind = sync.behind;

@@ -289,30 +289,68 @@ button[aria-disabled="true"],
 .gx-stash-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 8px;
+  padding: 7px 8px;
   min-width: 0;
   background: var(--gx-navy-card);
   border: 1px solid var(--gx-line);
   border-radius: var(--gx-radius-sm);
 }
+.gx-stash-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--gx-radius-sm);
+  color: var(--gx-accent);
+  background: color-mix(in srgb, var(--gx-accent) 14%, transparent);
+}
+.gx-stash-icon svg {
+  width: 15px;
+  height: 15px;
+}
 .gx-stash-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 .gx-stash-msg {
   font-size: 12px;
+  font-weight: 600;
   color: var(--vscode-foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.gx-stash-note {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
 .gx-stash-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10.5px;
   color: var(--vscode-descriptionForeground);
+  min-width: 0;
+}
+.gx-stash-meta-part {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.gx-stash-dot {
+  flex: 0 0 auto;
+  opacity: 0.6;
 }
 .gx-stash-actions {
   display: inline-flex;

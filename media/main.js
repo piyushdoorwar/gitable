@@ -1293,7 +1293,14 @@
         break;
       case "openStashMenu": {
         const rect = elm.getBoundingClientRect();
-        openStashMenu(elm.getAttribute("data-ref"), rect.right, rect.bottom + 4, true);
+        openStashMenu(
+          elm.getAttribute("data-ref"),
+          elm.getAttribute("data-hash") || "",
+          elm.getAttribute("data-has-note") === "1",
+          rect.right,
+          rect.bottom + 4,
+          true
+        );
         break;
       }
       case "openMergeEditor":
@@ -1753,13 +1760,18 @@
   // ---- Stash context menu ----
   let contextStash = null;
 
-  function openStashMenu(ref, x, y, alignRight) {
+  function openStashMenu(ref, hash, hasNote, x, y, alignRight) {
     closeCommitMenu(); closeFileMenu(); closeBranchMenu(); closeTagMenu();
-    contextStash = { ref };
+    contextStash = { ref, hash };
     const menu = byId("stashContextMenu");
+    const noteItem = hash
+      ? `<button data-smenu-action="annotateStash" role="menuitem" type="button">${icon("pencil", "sm")}<span>${hasNote ? "Edit note…" : "Add note…"}</span></button>` +
+        `<span class="gx-menu-sep"></span>`
+      : "";
     menu.innerHTML =
       `<button data-smenu-action="stashApply" role="menuitem" type="button">${icon("stashPop", "sm")}<span>Apply (keep stash)</span></button>` +
       `<span class="gx-menu-sep"></span>` +
+      noteItem +
       `<button data-smenu-action="stashDrop" role="menuitem" type="button" class="gx-menu-danger">${icon("trash", "sm")}<span>Drop stash</span></button>`;
     menu.classList.remove("hidden");
     menu.style.left = "0px"; menu.style.top = "0px";
@@ -1780,12 +1792,13 @@
 
   function handleStashMenuAction(action) {
     if (!contextStash) return;
-    const { ref } = contextStash;
+    const { ref, hash } = contextStash;
     closeStashMenu();
     if (action === "stashApply") {
       switchChangeTab("working");
       post({ type: "stashApply", ref });
     } else if (action === "stashDrop") post({ type: "stashDrop", ref });
+    else if (action === "annotateStash") post({ type: "annotateStash", hash });
   }
 
   // ---- Tag context menu ----
@@ -1822,18 +1835,30 @@
 
   function renderStashList(stashes) {
     if (!stashes || stashes.length === 0) return "";
-    return stashes.map((s) =>
-      `<li class="gx-stash-item">
+    return stashes.map((s) => {
+      const note = (s.note || "").trim();
+      const title = note || s.message;
+      const meta = [s.ref, s.branch, s.date]
+        .filter(Boolean)
+        .map((p) => `<span class="gx-stash-meta-part">${escapeHtml(p)}</span>`)
+        .join('<span class="gx-stash-dot">·</span>');
+      const hasNote = note ? "1" : "0";
+      const noteRow = note
+        ? `<span class="gx-stash-note" title="${escapeHtml(note)}">${escapeHtml(note)}</span>`
+        : "";
+      return `<li class="gx-stash-item${note ? " gx-stash-has-note" : ""}">
+        <span class="gx-stash-icon" aria-hidden="true">${icon("stash", "sm")}</span>
         <span class="gx-stash-body">
-          <span class="gx-stash-msg" title="${escapeHtml(s.message)}">${escapeHtml(s.message)}</span>
-          <span class="gx-stash-meta">${escapeHtml(s.date)}</span>
+          <span class="gx-stash-msg" title="${escapeHtml(title)}">${escapeHtml(s.message)}</span>
+          ${noteRow}
+          <span class="gx-stash-meta">${meta}</span>
         </span>
         <span class="gx-stash-actions">
           <button class="gx-mini-action gx-stash-pop-btn" data-action="stashPop" data-ref="${escapeHtml(s.ref)}" title="Pop: apply and remove this stash" aria-label="Pop: apply and remove this stash" type="button">${icon("stashPop", "sm")}<span>Pop</span></button>
-          <button class="gx-mini-action gx-stash-more-btn" data-action="openStashMenu" data-ref="${escapeHtml(s.ref)}" title="More stash actions" aria-label="More stash actions" type="button"><span aria-hidden="true">···</span></button>
+          <button class="gx-mini-action gx-stash-more-btn" data-action="openStashMenu" data-ref="${escapeHtml(s.ref)}" data-hash="${escapeHtml(s.hash || "")}" data-has-note="${hasNote}" title="More stash actions" aria-label="More stash actions" type="button"><span aria-hidden="true">···</span></button>
         </span>
-      </li>`
-    ).join("");
+      </li>`;
+    }).join("");
   }
 
   function renderConflictList(files) {
