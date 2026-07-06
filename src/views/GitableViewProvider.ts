@@ -28,6 +28,7 @@ const MIN_STAGE_BUSY_VISIBLE_MS = 2000;
 export class GitableViewProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | undefined;
   private badgeTimer: ReturnType<typeof setTimeout> | undefined;
+  private badgeConfirmTimer: ReturnType<typeof setTimeout> | undefined;
   private lastBadgeCount = -1;
   private busyKind = "";
   private busyText = "";
@@ -78,6 +79,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       if (this.badgeTimer) {
         clearTimeout(this.badgeTimer);
         this.badgeTimer = undefined;
+      }
+      if (this.badgeConfirmTimer) {
+        clearTimeout(this.badgeConfirmTimer);
+        this.badgeConfirmTimer = undefined;
       }
       this.stopAutoFetch();
     });
@@ -1745,9 +1750,6 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   private updateBadge(changes: unknown): void {
     const count = this.countChangedFiles(changes);
-    if (count === this.lastBadgeCount) {
-      return;
-    }
     this.lastBadgeCount = count;
     // A single commit (or discard/stage) makes the VS Code Git API fire several
     // `onDidChange` events in quick succession, each triggering a refresh. Writing
@@ -1760,13 +1762,31 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     }
     this.badgeTimer = setTimeout(() => {
       this.badgeTimer = undefined;
-      if (!this.view) {
-        return;
+      this.writeBadge(count);
+      // VS Code can still drop or render a stale badge if our write lands while it
+      // is processing its own burst of Git change events. Once that dropped write
+      // leaves the icon out of sync, no later refresh corrects it (the count hasn't
+      // changed since). Re-assert the same value once the storm has fully settled so
+      // a dropped write self-heals — this is what left "1" on the icon after commit.
+      if (this.badgeConfirmTimer) {
+        clearTimeout(this.badgeConfirmTimer);
       }
-      this.view.badge = count > 0
-        ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` }
-        : undefined;
+      this.badgeConfirmTimer = setTimeout(() => {
+        this.badgeConfirmTimer = undefined;
+        if (this.lastBadgeCount === count) {
+          this.writeBadge(count);
+        }
+      }, 450);
     }, 80);
+  }
+
+  private writeBadge(count: number): void {
+    if (!this.view) {
+      return;
+    }
+    this.view.badge = count > 0
+      ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` }
+      : undefined;
   }
 
   /** Count of distinct changed files (staged ∪ unstaged ∪ conflicts). A file with

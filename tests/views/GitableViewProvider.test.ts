@@ -63,16 +63,16 @@ describe("GitableViewProvider badge", () => {
     expect(view.badge).toEqual({ value: 1, tooltip: "1 file changed" });
   });
 
-  it("coalesces a burst of updates and writes only the final settled count", () => {
+  it("coalesces a burst of updates to the final settled count (no intermediate writes)", () => {
     const provider = makeProvider();
-    let writes = 0;
+    const written: unknown[] = [];
     const view = {
       _badge: undefined as unknown,
       get badge() {
         return this._badge;
       },
       set badge(v: unknown) {
-        writes++;
+        written.push(v);
         this._badge = v;
       }
     };
@@ -84,7 +84,33 @@ describe("GitableViewProvider badge", () => {
     (provider as any).updateBadge({ staged: [], unstaged: [], conflicts: [] });
     vi.runAllTimers();
 
-    expect(writes).toBe(1);
+    // The intermediate counts (5, 1) are never written — only the settled value.
+    expect(written.every((v) => v === undefined)).toBe(true);
+    expect(view.badge).toBeUndefined();
+  });
+
+  it("re-asserts the settled count so a dropped VS Code badge write self-heals", () => {
+    const provider = makeProvider();
+    const written: unknown[] = [];
+    const view = {
+      _badge: undefined as unknown,
+      get badge() {
+        return this._badge;
+      },
+      set badge(v: unknown) {
+        written.push(v);
+        this._badge = v;
+      }
+    };
+
+    (provider as any).view = view;
+    (provider as any).updateBadge({ staged: [], unstaged: [], conflicts: [] });
+    vi.runAllTimers();
+
+    // Written at least twice (primary + confirming re-assert), always the settled value,
+    // so a first write dropped by VS Code mid-burst is corrected by the second.
+    expect(written.length).toBeGreaterThanOrEqual(2);
+    expect(written.every((v) => v === undefined)).toBe(true);
     expect(view.badge).toBeUndefined();
   });
 });
