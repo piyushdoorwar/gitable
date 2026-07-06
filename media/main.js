@@ -2852,8 +2852,9 @@
   // ---------- Reports ----------
 
   const TYPE_LABELS = { commitMessage: "Commit msg", commitSummary: "AI Summary", security: "Security" };
-  // One blue hue, three shades (darkest → lightest) so "By type" reads as a single colour.
-  const TYPE_COLORS = { commitMessage: "rgba(31,156,240,0.95)", commitSummary: "rgba(31,156,240,0.66)", security: "rgba(31,156,240,0.4)" };
+  // Single blue for every "By type" bar so the section reads as one colour.
+  const TYPE_BLUE = "rgba(31,156,240,0.95)";
+  const TYPE_COLORS = { commitMessage: TYPE_BLUE, commitSummary: TYPE_BLUE, security: TYPE_BLUE };
   const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e" };
 
   /**
@@ -2917,7 +2918,7 @@
         <div class="gx-rep-bar-row">
           <span class="gx-rep-bar-label">${escapeHtml(label)}</span>
           <span class="gx-rep-bar-track">
-            <span class="gx-rep-bar-fill" style="width:${width}%;background:${color}"></span>
+            <span class="gx-rep-bar-fill" data-w="${width}" data-c="${escapeHtml(color)}"></span>
           </span>
           <span class="gx-rep-bar-count">${count}</span>
         </div>`;
@@ -2970,6 +2971,15 @@
         <div class="gx-daychart-wrap"><canvas id="repDayChart"></canvas></div>
       </div>` : ""}
     `;
+
+    // Apply bar fill width/colour via the CSSOM — inline style="" attributes are
+    // blocked by the webview CSP (style-src has no 'unsafe-inline'), so the fill
+    // must be sized in JS or the bars render invisibly.
+    el.querySelectorAll(".gx-rep-bar-fill").forEach((fill) => {
+      const f = /** @type {HTMLElement} */ (fill);
+      f.style.width = `${f.dataset.w}%`;
+      f.style.background = f.dataset.c || "var(--gx-accent)";
+    });
 
     // ── Chart.js bar chart ──
     if (recentDays.length && typeof Chart !== "undefined") {
