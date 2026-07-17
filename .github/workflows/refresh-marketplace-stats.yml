@@ -1,0 +1,54 @@
+name: Refresh Marketplace installs
+
+on:
+  schedule:
+    - cron: "35 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      changed: ${{ steps.persist.outputs.changed }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch Marketplace installs
+        run: node scripts/fetch-marketplace-stats.mjs
+
+      - name: Commit updated count
+        id: persist
+        run: |
+          if git diff --quiet -- site/index.html; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html
+          git commit -m "chore: refresh Marketplace installs"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-site.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

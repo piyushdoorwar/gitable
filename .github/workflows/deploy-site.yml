@@ -1,6 +1,8 @@
 name: Deploy marketing site to Pages
 
 on:
+  workflow_call:
+
   push:
     branches: ["main"]
     paths:
