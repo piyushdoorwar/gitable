@@ -916,6 +916,11 @@ footer > span {
   color: var(--text);
 }
 
+.analytics-disclosure {
+  margin: 0;
+  font-size: 12px;
+}
+
 [data-reveal] {
   opacity: 1;
   transform: translateY(0);
