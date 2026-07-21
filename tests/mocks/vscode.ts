@@ -22,7 +22,8 @@ export const extensions = {
 };
 
 export const Uri = {
-  file: vi.fn((filePath: string) => ({ fsPath: filePath, scheme: "file" }))
+  file: vi.fn((filePath: string) => ({ fsPath: filePath, scheme: "file" })),
+  from: vi.fn((components: Record<string, unknown>) => components)
 };
 
 export const commands = {

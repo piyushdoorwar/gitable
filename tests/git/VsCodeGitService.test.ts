@@ -108,6 +108,8 @@ describe("VsCodeGitService", () => {
       fsPath: p,
       scheme: "file"
     }));
+    (vscodeMock.Uri.from as ReturnType<typeof vi.fn>).mockReset();
+    (vscodeMock.Uri.from as ReturnType<typeof vi.fn>).mockImplementation((components: Record<string, unknown>) => components);
   });
 
   afterEach(async () => {
@@ -326,6 +328,36 @@ describe("VsCodeGitService", () => {
         { fsPath: path.join(root, "file.ts"), scheme: "git", ref: `${hash}~1` },
         { fsPath: path.join(root, "file.ts"), scheme: "git", ref: hash },
         `file.ts (${hash.slice(0, 7)})`
+      );
+    });
+
+    it("openCommitDiff compares an added file against an empty document", async () => {
+      const hash = "abc1234def5678";
+      await service.openCommitDiff(hash, "new-file.ts", "A");
+      expect(vscodeMock.commands.executeCommand).toHaveBeenCalledWith(
+        "vscode.diff",
+        {
+          scheme: "gitable-empty",
+          path: "/new-file.ts",
+          query: `revision=${encodeURIComponent(`${hash}~1`)}`
+        },
+        { fsPath: path.join(root, "new-file.ts"), scheme: "git", ref: hash },
+        `new-file.ts (${hash.slice(0, 7)})`
+      );
+    });
+
+    it("openCommitDiff compares a deleted file against an empty document", async () => {
+      const hash = "abc1234def5678";
+      await service.openCommitDiff(hash, "deleted-file.ts", "D");
+      expect(vscodeMock.commands.executeCommand).toHaveBeenCalledWith(
+        "vscode.diff",
+        { fsPath: path.join(root, "deleted-file.ts"), scheme: "git", ref: `${hash}~1` },
+        {
+          scheme: "gitable-empty",
+          path: "/deleted-file.ts",
+          query: `revision=${encodeURIComponent(hash)}`
+        },
+        `deleted-file.ts (${hash.slice(0, 7)})`
       );
     });
 

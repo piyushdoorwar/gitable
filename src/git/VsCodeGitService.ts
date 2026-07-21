@@ -1,6 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
+import { emptyDocumentUri } from "./EmptyDocumentProvider";
 import { GitCliService } from "./GitCliService";
 import { GitService, PullStrategy } from "./GitService";
 import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
@@ -243,7 +244,7 @@ export class VsCodeGitService implements GitService {
   }
 
   /** Opens a commit's file change in the diff editor (parent ↔ this commit). */
-  async openCommitDiff(hash: string, filePath: string, _status: string): Promise<void> {
+  async openCommitDiff(hash: string, filePath: string, status: string): Promise<void> {
     const repo = this.getActiveRepository();
     const root = repo ? repo.rootUri.fsPath : this.getActiveRoot();
     if (!root) {
@@ -258,10 +259,16 @@ export class VsCodeGitService implements GitService {
       return;
     }
     const toGit = (ref: string) => api.toGitUri!(fileUri, ref);
+    const before = status === "A"
+      ? emptyDocumentUri(filePath, `${hash}~1`)
+      : toGit(`${hash}~1`);
+    const after = status === "D"
+      ? emptyDocumentUri(filePath, hash)
+      : toGit(hash);
     await vscode.commands.executeCommand(
       "vscode.diff",
-      toGit(`${hash}~1`),
-      toGit(hash),
+      before,
+      after,
       `${name} (${short})`
     );
   }

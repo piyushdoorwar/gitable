@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { Commands, VIEW_ID } from "./constants";
 import { GitCliService } from "./git/GitCliService";
 import { VsCodeGitService } from "./git/VsCodeGitService";
+import { EMPTY_DOCUMENT_SCHEME, EmptyDocumentProvider } from "./git/EmptyDocumentProvider";
 import { SecretService } from "./config/SecretService";
 import { SettingsService } from "./config/SettingsService";
 import { StashNoteStore } from "./config/StashNoteStore";
@@ -30,6 +31,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     logger,
+    vscode.workspace.registerTextDocumentContentProvider(
+      EMPTY_DOCUMENT_SCHEME,
+      new EmptyDocumentProvider()
+    ),
     vscode.window.registerWebviewViewProvider(VIEW_ID, provider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
