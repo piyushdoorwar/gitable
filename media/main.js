@@ -405,9 +405,19 @@
   }
   function setDisabled(elm, disabled) {
     if (!elm) return;
-    elm.toggleAttribute("aria-disabled", !!disabled);
-    elm.classList.toggle("gx-disabled", !!disabled);
+    const isDisabled = !!disabled;
+    // aria-disabled is an enumerated ARIA attribute, not a boolean HTML
+    // attribute. toggleAttribute() would produce aria-disabled="", which our
+    // action guard (and accessibility tools) does not interpret as disabled.
+    elm.setAttribute("aria-disabled", isDisabled ? "true" : "false");
+    elm.classList.toggle("gx-disabled", isDisabled);
     elm.removeAttribute("disabled");
+  }
+  function isDisabledAction(elm) {
+    if (!elm) return false;
+    return elm.disabled === true
+      || elm.getAttribute("aria-disabled") === "true"
+      || elm.classList.contains("gx-disabled");
   }
   function setInputDisabled(elm, disabled) {
     if (!elm) return;
@@ -1005,7 +1015,7 @@
         return;
       }
       const target = e.target.closest("[data-action]");
-      if (target && target.getAttribute("aria-disabled") === "true") {
+      if (isDisabledAction(target)) {
         e.preventDefault();
         return;
       }
@@ -1155,6 +1165,9 @@
   }
 
   function handleAction(action, elm, event) {
+    // Keep the action dispatcher safe for callers other than the delegated
+    // click handler (for example, future keyboard shortcuts or tests).
+    if (isDisabledAction(elm)) return;
     const s = ui.state;
     switch (action) {
       case "stageAll":
