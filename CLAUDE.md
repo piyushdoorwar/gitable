@@ -332,6 +332,11 @@ workspace, never committed to the repo.
   VS Code rendering a stale intermediate value while dropping the final write — so
   the count appeared not to clear after a commit. Coalescing to one settled write
   fixes it. `lastBadgeCount` skips redundant writes and is reset on view re-resolve.
+  Clearing uses `{ value: 0 }`, **not** `undefined`: VS Code's `WebviewViewPane.updateBadge()`
+  only calls `showViewActivity()` for a truthy badge (unlike `TreeViewPane`, it has no
+  `else activity.clear()`), so an undefined badge left the stale count on the Activity Bar
+  icon until the next non-zero write. The Activity Bar renders a number badge only when the
+  summed value is `> 0`, so a zero badge reads as "no badge".
 - **Conflict resolution state.** When a pull or merge leaves unresolved conflicts,
   `RepoChanges.conflicts` is populated (CLI detects XY porcelain codes containing `U`,
   `AA`, or `DD`; VS Code Git API uses `mergeChanges`). The Changes tab shows a

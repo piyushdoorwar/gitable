@@ -1784,9 +1784,17 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     if (!this.view) {
       return;
     }
+    // Clearing with `undefined` does NOT work for a WebviewView: VS Code's
+    // WebviewViewPane.updateBadge() only calls showViewActivity() when the new
+    // badge is truthy — unlike TreeViewPane, it has no `else activity.clear()`
+    // branch. So the previous activity (e.g. "2") stays on the Activity Bar icon
+    // until some later non-undefined badge replaces it, which is why the count
+    // only reset once a new file changed. A zero-valued badge goes through the
+    // branch VS Code does handle, and the Activity Bar renders a badge only when
+    // the summed number is > 0 — so this clears the icon for real.
     this.view.badge = count > 0
       ? { value: count, tooltip: `${count} file${count === 1 ? "" : "s"} changed` }
-      : undefined;
+      : { value: 0, tooltip: "No changes" };
   }
 
   /** Count of distinct changed files (staged ∪ unstaged ∪ conflicts). A file with
