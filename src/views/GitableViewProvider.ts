@@ -19,6 +19,10 @@ type TabName = "changes" | "history" | "settings";
 type BranchSwitchChoice = "bring" | "keep";
 type SelectedCommit = { hash: string; subject: string };
 const MIN_STAGE_BUSY_VISIBLE_MS = 2000;
+/** Window used to coalesce the burst of Git change events one operation fires. */
+const REFRESH_DEBOUNCE_MS = 120;
+/** Minimum gap between fetches triggered by the panel becoming visible. */
+const VISIBILITY_FETCH_INTERVAL_MS = 30_000;
 
 /**
  * Backs the Gitable sidebar webview. Owns the bidirectional message protocol,
@@ -51,6 +55,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private stateRenderSeq = 0;
   private readonly pendingStateRenders = new Map<number, () => void>();
   private postStateVersion = 0;
+  /** Serializes state builds so two never run (and spawn git processes) at once. */
+  private stateChain: Promise<void> = Promise.resolve();
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  /** True while a background fetch is running, so we never stack `git fetch` calls. */
+  private fetchInFlight = false;
+  private lastVisibilityFetchAt = 0;
   private readonly modelsCache: Partial<Record<ProviderId, string[]>> = {};
 
   constructor(
@@ -84,12 +94,25 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         clearTimeout(this.badgeConfirmTimer);
         this.badgeConfirmTimer = undefined;
       }
+      if (this.refreshTimer) {
+        clearTimeout(this.refreshTimer);
+        this.refreshTimer = undefined;
+      }
       this.stopAutoFetch();
     });
     view.onDidChangeVisibility(() => {
-      if (view.visible) {
-        void this.silentFetchAndRefresh();
+      if (!view.visible) {
+        return;
       }
+      // Toggling between sidebar views fires this every time; fetching on each
+      // one hammers the remote and races other git work. Refresh always, fetch
+      // at most once per interval.
+      if (Date.now() - this.lastVisibilityFetchAt < VISIBILITY_FETCH_INTERVAL_MS) {
+        void this.refresh();
+        return;
+      }
+      this.lastVisibilityFetchAt = Date.now();
+      void this.silentFetchAndRefresh();
     });
     this.restartAutoFetch();
   }
@@ -105,7 +128,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this.autoFetchTimer = setInterval(() => {
-      if (this.view?.visible && !this.syncAction) {
+      // `busyKind` covers user-initiated git work (staging, committing, branch
+      // switches); fetching underneath it is what makes those fail with a lock error.
+      if (this.view?.visible && !this.syncAction && !this.busyKind && !this.fetchInFlight) {
         void this.silentFetchAndRefresh();
       }
     }, minutes * 60_000);
@@ -122,6 +147,23 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   async refresh(): Promise<void> {
     await this.postState();
+  }
+
+  /**
+   * Coalesced refresh for Git change events. The built-in Git extension fires
+   * several `onDidChange` events per operation, and each `buildState()` spawns
+   * ~9 git processes — refreshing on every one floods the repository with
+   * concurrent git invocations, which is both wasteful and a source of
+   * `index.lock` contention. Only the last event of a burst does real work.
+   */
+  scheduleRefresh(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      void this.refresh();
+    }, REFRESH_DEBOUNCE_MS);
   }
 
   async focusAndOpenTab(tab: TabName): Promise<void> {
@@ -1697,6 +1739,14 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
    *  timer, then refreshes state. Network/auth failures are surfaced inline on the
    *  pull button (via `lastSyncError`) rather than swallowed without a trace. */
   private async silentFetchAndRefresh(): Promise<void> {
+    // Never stack a background fetch on top of another git operation: a second
+    // `git fetch` (or one racing a stage/commit) contends for the repository
+    // locks and surfaces as a spurious error. Just refresh the panel instead.
+    if (this.fetchInFlight || this.busyKind || this.syncAction) {
+      await this.refresh();
+      return;
+    }
+    this.fetchInFlight = true;
     this.syncAction = "Refreshing repository";
     await this.postState();
     try {
@@ -1715,7 +1765,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         this.logger.warn(`Background fetch failed: ${this.lastSyncError}`);
       }
     } finally {
-      this.syncAction = "";
+      this.fetchInFlight = false;
+      // Only clear our own label — a user-initiated pull/push that started while
+      // we were fetching owns `syncAction` now, and its spinner must survive.
+      if (this.syncAction === "Refreshing repository") {
+        this.syncAction = "";
+      }
       await this.postState();
     }
   }
@@ -1732,8 +1787,20 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const version = ++this.postStateVersion;
+    // Queue behind any in-flight build. Overlapping builds would each run a full
+    // set of git commands only for the older one to be discarded, so they are
+    // serialized and superseded ones are dropped before doing any work.
+    const run = this.stateChain.then(() => this.deliverState(version, waitForRender));
+    this.stateChain = run.catch(() => undefined);
+    await run;
+  }
+
+  private async deliverState(version: number, waitForRender: boolean): Promise<void> {
+    // A newer postState() call queued up behind us — skip the build entirely.
+    if (!this.view || version !== this.postStateVersion) {
+      return;
+    }
     const data = await this.buildState();
-    // A newer postState() call started after us — its result is fresher; bail out.
     if (version !== this.postStateVersion) {
       return;
     }

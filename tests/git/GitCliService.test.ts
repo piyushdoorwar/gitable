@@ -61,6 +61,39 @@ describe("GitCliService integration", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  describe("repository lock contention", () => {
+    it("retries a staging command until the lock is released", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+      const lockPath = path.join(root, ".git", "index.lock");
+      // Simulate VS Code's own git process holding the index lock: the first
+      // attempt fails, and the lock clears before the retries are exhausted.
+      await writeFile(lockPath, "");
+      setTimeout(() => void rm(lockPath, { force: true }), 120);
+
+      await service.stageFiles(["tracked.txt"]);
+
+      const changes = await service.getChanges();
+      expect(changes.staged.map((change) => change.path)).toEqual(["tracked.txt"]);
+    });
+
+    it("still fails when the lock is never released", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
+      const lockPath = path.join(root, ".git", "index.lock");
+      await writeFile(lockPath, "");
+
+      await expect(service.stageFiles(["tracked.txt"])).rejects.toBeInstanceOf(GitServiceError);
+
+      await rm(lockPath, { force: true });
+    });
+
+    it("does not retry an ordinary git failure", async () => {
+      const startedAt = Date.now();
+      await expect(service.checkoutBranch("does-not-exist")).rejects.toBeInstanceOf(GitServiceError);
+      // Retrying would add ~730ms of backoff; a plain failure returns immediately.
+      expect(Date.now() - startedAt).toBeLessThan(600);
+    });
+  });
+
   it("stages and unstages individual files", async () => {
     await writeFile(path.join(root, "tracked.txt"), "base\nchanged\n");
     await writeFile(path.join(root, "new.txt"), "new\n");

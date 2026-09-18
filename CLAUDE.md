@@ -291,6 +291,26 @@ workspace, never committed to the repo.
   The History tab shows an "Unpushed" pill (outgoing color) next to the subject and
   a left accent border on those rows, so you can see which commits still live only
   in your local repository.
+- **Git lock retries.** VS Code's built-in Git extension runs its own `git` processes
+  against the same repository, so a Gitable mutation (`add`, `reset`, `commit`, `stash`)
+  can land while `.git/index.lock` is held and die with "Unable to create
+  '.git/index.lock': File exists" — the error that used to disappear on a second click.
+  `GitCliService.run()` retries such failures (80/200/450 ms backoff) and only those:
+  the match is on `lockErrorPattern`, and retrying is safe because a command that failed
+  to take the lock had no effect. Reads (`git status`) are unaffected — git tolerates a
+  held lock there. Everything, including `rebase --continue`, goes through `run()`;
+  `exec()` is the single un-retried invocation underneath.
+- **Coalesced refreshes.** One Git operation fires several `onDidChange` events and each
+  `buildState()` spawns ~9 git processes, so `extension.ts` calls `scheduleRefresh()`
+  (120 ms trailing debounce) instead of `refresh()`. `postState()` additionally queues on
+  `stateChain` so two builds never run at once, and a build superseded while queued is
+  skipped before doing any git work rather than after.
+- **Fetch coordination.** `silentFetchAndRefresh()` refuses to run while another fetch,
+  a `syncAction`, or a `busyKind` operation is in flight (it just refreshes instead) —
+  a background fetch landing on top of a stage/commit was a source of lock errors. Its
+  `finally` only clears `syncAction` if the label is still its own, so a user pull/push
+  that started mid-fetch keeps its spinner. Visibility-triggered fetches are throttled to
+  one per `VISIBILITY_FETCH_INTERVAL_MS` (30 s); the auto-fetch timer also checks `busyKind`.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from
   the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
 - **Selectable commit history.** Files are lazy-loaded on first expand and cached

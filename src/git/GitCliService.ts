@@ -23,6 +23,11 @@ function unquoteGitPath(p: string): string {
  */
 export class GitCliService implements GitService {
   private static readonly branchStashPrefix = "Gitable saved changes for ";
+  /** Git failed only because another process held the repository lock. */
+  private static readonly lockErrorPattern =
+    /\.lock': File exists|Another git process seems to be running|cannot lock ref/i;
+  /** Backoff before each retry of a lock-contended command. */
+  private static readonly lockRetryDelaysMs = [80, 200, 450];
   private activeRoot: string | undefined;
 
   constructor(private readonly logger: Logger) {}
@@ -547,19 +552,9 @@ export class GitCliService implements GitService {
 
   async rebaseContinue(): Promise<void> {
     // GIT_EDITOR=true prevents git from opening an editor for the commit message.
-    await new Promise<void>((resolve, reject) => {
-      execFile(
-        "git",
-        ["rebase", "--continue"],
-        { cwd: this.requireRoot(), env: { ...process.env, GIT_EDITOR: "true" }, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
-        (error, _stdout, stderr) => {
-          if (error) {
-            reject(new GitServiceError((stderr || error.message).toString().trim(), error));
-          } else {
-            resolve();
-          }
-        }
-      );
+    await this.run(["rebase", "--continue"], this.requireRoot(), {
+      ...process.env,
+      GIT_EDITOR: "true"
     });
   }
 
@@ -679,17 +674,46 @@ export class GitCliService implements GitService {
     return this.activeRoot;
   }
 
-  /** Runs `git <args>` in `cwd` and resolves with stdout. */
-  private run(args: string[], cwd: string): Promise<string> {
+  /**
+   * Runs `git <args>` in `cwd` and resolves with stdout.
+   *
+   * Retries transient lock contention. VS Code's built-in Git extension runs its
+   * own `git` processes against the same repository, so a mutation (`add`,
+   * `reset`, `commit`, `stash`, …) can land while `.git/index.lock` is held and
+   * fail with "Unable to create '.git/index.lock': File exists" — the error users
+   * hit occasionally and that goes away on a second click. Retrying is safe
+   * precisely because the lock was never acquired: the command had no effect.
+   */
+  private async run(args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<string> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.exec(args, cwd, env);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const canRetry =
+          attempt < GitCliService.lockRetryDelaysMs.length &&
+          GitCliService.lockErrorPattern.test(message);
+        if (!canRetry) {
+          this.logger.error(`git ${args.join(" ")}`, message);
+          throw error;
+        }
+        const delay = GitCliService.lockRetryDelaysMs[attempt];
+        this.logger.warn(`git ${args.join(" ")} hit a repository lock; retrying in ${delay}ms.`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  /** One `git` invocation. Rejects with a {@link GitServiceError} carrying stderr. */
+  private exec(args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise((resolve, reject) => {
       execFile(
         "git",
         args,
-        { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+        { cwd, env, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
         (error, stdout, stderr) => {
           if (error) {
             const message = (stderr || error.message || "git command failed").toString().trim();
-            this.logger.error(`git ${args.join(" ")}`, message);
             reject(new GitServiceError(message, error));
             return;
           }

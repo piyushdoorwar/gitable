@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GitableViewProvider } from "../../src/views/GitableViewProvider";
 
-function makeProvider(): GitableViewProvider {
+function makeProvider(git: unknown = {}): GitableViewProvider {
   return new GitableViewProvider(
     {} as any,
-    {} as any,
+    git as any,
     {} as any,
     {} as any,
     {} as any,
@@ -116,5 +116,69 @@ describe("GitableViewProvider badge", () => {
     expect(written.length).toBeGreaterThanOrEqual(2);
     expect(written.every((v) => JSON.stringify(v) === JSON.stringify(CLEARED))).toBe(true);
     expect(view.badge).toEqual(CLEARED);
+  });
+});
+
+describe("GitableViewProvider refresh coalescing", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("collapses a burst of Git change events into a single refresh", () => {
+    const provider = makeProvider();
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    (provider as any).refresh = refresh;
+
+    // One commit makes the built-in Git extension fire several change events.
+    for (let i = 0; i < 6; i++) {
+      provider.scheduleRefresh();
+    }
+    expect(refresh).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GitableViewProvider background fetch", () => {
+  it("skips fetching while a user git operation is in flight", async () => {
+    const fetchOrigin = vi.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({ fetchOrigin });
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    (provider as any).refresh = refresh;
+    (provider as any).busyKind = "stage";
+
+    await (provider as any).silentFetchAndRefresh();
+
+    expect(fetchOrigin).not.toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips fetching while another fetch is still running", async () => {
+    const fetchOrigin = vi.fn().mockResolvedValue(undefined);
+    const provider = makeProvider({ fetchOrigin });
+    (provider as any).fetchInFlight = true;
+
+    await (provider as any).silentFetchAndRefresh();
+
+    expect(fetchOrigin).not.toHaveBeenCalled();
+  });
+
+  it("leaves a user sync label that started during the fetch untouched", async () => {
+    // The user hits Push while the background fetch is still in flight.
+    const fetchOrigin = vi.fn(async () => {
+      (provider as any).syncAction = "Pushing";
+    });
+    const provider = makeProvider({ fetchOrigin });
+    (provider as any).postState = vi.fn().mockResolvedValue(undefined);
+
+    await (provider as any).silentFetchAndRefresh();
+
+    expect(fetchOrigin).toHaveBeenCalledTimes(1);
+    expect((provider as any).syncAction).toBe("Pushing");
+    expect((provider as any).fetchInFlight).toBe(false);
   });
 });

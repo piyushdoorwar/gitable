@@ -43,7 +43,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Push fresh state to the webview whenever Git state changes on disk.
   context.subscriptions.push(
     git.registerChangeListener(() => {
-      void provider.refresh();
+      // Debounced: one Git operation fires several change events in a burst.
+      provider.scheduleRefresh();
     })
   );
 
