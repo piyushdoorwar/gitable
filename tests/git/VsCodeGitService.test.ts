@@ -294,6 +294,34 @@ describe("VsCodeGitService", () => {
       );
     });
 
+    it("openDiff for a staged new file compares an empty document against the index", async () => {
+      await service.openDiff("new-file.ts", true, "A");
+      expect(vscodeMock.commands.executeCommand).toHaveBeenCalledWith(
+        "vscode.diff",
+        {
+          scheme: "gitable-empty",
+          path: "/new-file.ts",
+          query: `revision=${encodeURIComponent("HEAD")}`
+        },
+        { fsPath: path.join(root, "new-file.ts"), scheme: "git", ref: "~" },
+        "new-file.ts (Staged)"
+      );
+    });
+
+    it("openDiff for a staged rename compares an empty document against the index", async () => {
+      await service.openDiff("renamed.ts", true, "R");
+      expect(vscodeMock.commands.executeCommand).toHaveBeenCalledWith(
+        "vscode.diff",
+        {
+          scheme: "gitable-empty",
+          path: "/renamed.ts",
+          query: `revision=${encodeURIComponent("HEAD")}`
+        },
+        { fsPath: path.join(root, "renamed.ts"), scheme: "git", ref: "~" },
+        "renamed.ts (Staged)"
+      );
+    });
+
     it("openDiff for an untracked file opens the file directly", async () => {
       await service.openDiff("file.ts", false, "U");
       expect(vscodeMock.commands.executeCommand).toHaveBeenCalledWith(

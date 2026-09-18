@@ -231,7 +231,12 @@ export class VsCodeGitService implements GitService {
       return;
     }
     if (staged) {
-      await vscode.commands.executeCommand("vscode.diff", toGit("HEAD"), toGit("~"), `${name} (Staged)`);
+      // A/R/C do not exist at HEAD under this path, and the Git content provider
+      // throws FileNotFound for a missing path — use an empty left-hand document.
+      const before = status === "A" || status === "R" || status === "C"
+        ? emptyDocumentUri(filePath, "HEAD")
+        : toGit("HEAD");
+      await vscode.commands.executeCommand("vscode.diff", before, toGit("~"), `${name} (Staged)`);
     } else {
       await vscode.commands.executeCommand("vscode.diff", toGit("~"), fileUri, `${name} (Working Tree)`);
     }
