@@ -1402,6 +1402,30 @@ textarea {
 .gx-input-action:hover {
   color: var(--gx-accent-strong);
 }
+/* The prefix add/remove toggle lives on the LEFT edge so it is never mistaken for
+   part of the AI action on the right — two same-size glyphs side by side read as
+   one control. */
+.gx-input-action-left {
+  left: 1px;
+  right: auto;
+  flex-direction: row-reverse;
+  padding: 0 0 0 9px;
+  border-radius: var(--gx-radius-sm) 0 0 var(--gx-radius-sm);
+}
+.gx-input-action-muted {
+  color: var(--vscode-descriptionForeground);
+}
+.gx-input-action-muted:hover {
+  color: var(--gx-accent);
+}
+.gx-input-action .gx-ic.sm,
+.gx-input-action .gx-ic.sm svg {
+  width: 13px;
+  height: 13px;
+}
+.gx-input-wrap input.has-action-left {
+  padding-left: 38px;
+}
 .gx-input-action .gx-ic,
 .gx-input-action .gx-ic svg {
   width: 16px;
@@ -1440,20 +1464,6 @@ textarea {
 }
 .gx-prefix-field {
   margin-bottom: 12px;
-}
-.gx-prefix-btn {
-  width: 20px;
-  height: 20px;
-  color: var(--vscode-descriptionForeground);
-  opacity: 0.85;
-}
-.gx-prefix-btn:hover {
-  opacity: 1;
-}
-.gx-prefix-btn .gx-ic,
-.gx-prefix-btn .gx-ic svg {
-  width: 12px;
-  height: 12px;
 }
 
 /* Custom dropdown ---------------------------------------------------- */

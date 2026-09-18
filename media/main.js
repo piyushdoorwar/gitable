@@ -392,8 +392,13 @@
     const remove = byId("prefixRemoveBtn");
     if (row) row.classList.toggle("hidden", !enabled);
     if (toggle) toggle.classList.toggle("hidden", enabled);
+    // The summary only reserves room for a second inline action while the prefix
+    // toggle is actually showing.
+    // Room on the left only while the prefix toggle is showing.
+    const summary = byId("commitSummary");
+    if (summary) summary.classList.toggle("has-action-left", !enabled);
     if (input && input.value !== ui.commitPrefix.value) input.value = ui.commitPrefix.value || "";
-    setHint(toggle, ui.commitPrefix.value.trim() ? `Prefix: ${ui.commitPrefix.value.trim()}` : "Prefix");
+    setHint(toggle, ui.commitPrefix.value.trim() ? `Prefix: ${ui.commitPrefix.value.trim()}` : "Add a prefix");
     setHint(remove, "Remove prefix");
   }
   function escapeHtml(value) {
@@ -698,28 +703,30 @@
 
         <div id="changesNotice" class="gx-bottom-notice"></div>
         <div id="commitCard" class="gx-card">
+          <!-- No field labels: each input's placeholder already names it, so the
+               uppercase captions were pure duplication. The prefix add/remove
+               buttons moved inside their inputs to keep their rows. -->
           <div id="commitPrefixRow" class="gx-field gx-prefix-field hidden">
-            <label class="gx-label gx-label-row" for="commitPrefix">
-              <span>Prefix</span>
-              <button id="prefixRemoveBtn" class="gx-iconbtn gx-prefix-btn" data-action="removePrefix" title="Remove prefix" aria-label="Remove prefix" type="button">${icon("minus", "sm")}</button>
-            </label>
-            <input id="commitPrefix" type="text" placeholder="JIRA-123" maxlength="48" autocomplete="off" spellcheck="false" />
+            <div class="gx-input-wrap">
+              <input id="commitPrefix" class="has-action-left" type="text" placeholder="Prefix" maxlength="48" autocomplete="off" spellcheck="false" aria-label="Commit prefix" />
+              <button id="prefixRemoveBtn" class="gx-input-action gx-input-action-left gx-input-action-muted" data-action="removePrefix" title="Remove prefix" aria-label="Remove prefix" type="button">
+                <span class="gx-vsep"></span><span class="gx-ic sm">${ICONS.minus}</span>
+              </button>
+            </div>
           </div>
           <div class="gx-field">
-            <label class="gx-label gx-label-row" for="commitSummary">
-              <span>Summary</span>
-              <button id="prefixToggleBtn" class="gx-iconbtn gx-prefix-btn" data-action="enablePrefix" title="Prefix" aria-label="Prefix" type="button">${icon("plus", "sm")}</button>
-            </label>
             <div class="gx-input-wrap">
-              <input id="commitSummary" class="has-action" type="text" placeholder="Summary (required)" maxlength="120" />
+              <input id="commitSummary" class="has-action" type="text" placeholder="Summary (required)" maxlength="120" aria-label="Commit summary" />
+              <button id="prefixToggleBtn" class="gx-input-action gx-input-action-left gx-input-action-muted" data-action="enablePrefix" title="Add a prefix" aria-label="Add a prefix" type="button">
+                <span class="gx-vsep"></span><span class="gx-ic sm">${ICONS.plus}</span>
+              </button>
               <button id="generateBtn" class="gx-input-action" data-action="generate" type="button" title="Generate commit message with AI" aria-label="Generate commit message with AI">
                 <span class="gx-vsep"></span><span class="gx-ic">${ICONS.sparkle}</span>
               </button>
             </div>
           </div>
           <div class="gx-field">
-            <label class="gx-label" for="commitDescription">Description</label>
-            <textarea id="commitDescription" placeholder="Description (optional)"></textarea>
+            <textarea id="commitDescription" placeholder="Description (optional)" aria-label="Commit description"></textarea>
           </div>
           <div id="amendBar" class="gx-amend-bar hidden">
             <span class="gx-amend-bar-label">${icon("commit", "sm")}<span>Amending last commit</span></span>
