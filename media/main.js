@@ -2401,7 +2401,7 @@
       <li class="gx-file${isStaged ? " gx-file-staged" : ""}" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}">
         <input type="checkbox" class="gx-check" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" title="${escapeHtml(selectTitle)}" aria-label="${escapeHtml(selectTitle)}" ${checked} />
         ${fileIcon(f.path)}
-        <span class="gx-path" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(displayText)}</span>
+        <span class="gx-path${treeMode ? " gx-path-name" : ""}" data-action="openFile" data-path="${escapeHtml(f.path)}" data-staged="${isStaged ? 1 : 0}" data-status="${escapeHtml(f.status)}" title="Open changes — ${escapeHtml(f.path)}">${escapeHtml(displayText)}</span>
         ${partialBadge}
         <span class="gx-right">
           ${statusGlyph(f.status)}

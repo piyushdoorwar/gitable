@@ -408,6 +408,17 @@ workspace, never committed to the repo.
 - **Force push with lease.** A normal push that is rejected (error matches `/rejected|non-fast-forward|fetch first/i`) triggers a VS Code warning modal offering **Force Push**. If confirmed, `git push --force-with-lease` is used — this refuses if someone else has pushed to the remote since the last fetch, preventing accidental clobbers.
 - **Auto-select file checkboxes.** Files in the Working and Staged lists are checked by default when they first appear. A `_seenFileKeys` Set tracks which keys have been seen; only genuinely new keys are auto-checked. Files the user explicitly unchecks stay unchecked across re-renders. Moving a file between Working and Staged changes its key (`path:false` vs `path:true`), so it is auto-checked in its new section. The "Stage all" and "Unstage all" buttons were removed — "Stage selected" / "Unstage selected" cover all cases when everything is pre-checked.
 - **Tree/flat file view.** `ui.config.fileView` (`"flat" | "tree"`, localStorage-persisted) controls how files are displayed in Working and Staged. In tree mode `buildFileTree(files)` converts flat path arrays into a nested node structure; `renderFileTree(nodes, isStaged, partialPaths)` renders folder rows (chevron + pink folder icon + folder checkbox) with `<ul class="gx-tree-children">` for indentation — no inline styles so the CSP is satisfied. `ui.collapsedFolders` (a `Set<string>`) persists fold state across renders. `applyFolderIndeterminate(listEl, isStaged)` runs after every render to set `.indeterminate` on folder checkboxes; it skips collapsed folders (detected by the absence of a rendered `<ul class="gx-tree-children">` child) so collapsing never unintentionally unchecks files. Toggled via Flat / Tree buttons in Settings → Config.
+- **Status marker colors.** `--gx-status-modified/added/deleted` map to the
+  `--vscode-gitDecoration-*ResourceForeground` palette (old hexes as fallbacks) so the
+  markers match the SCM view and adapt per theme — the hardcoded hexes were ~1.7:1 on a
+  light sidebar. Deleted is red, not the accent blue it used to be. `--gx-status-renamed`
+  deliberately does **not** follow the theme (most themes colour renamed the same green as
+  added); it stays blue, with a darker value in the `body.vscode-light` block.
+  `.gx-partial-badge` derives from `--gx-accent` via `color-mix` for the same reason.
+- **Path truncation.** `.gx-path` is `direction: rtl` so full paths ellipsize at the head
+  and keep the filename. Tree rows render only the basename, where that hides the useful
+  part ("…eGitService.test.ts"), so `renderFile()` adds `.gx-path-name` (`direction: ltr`)
+  when `treeMode` is set.
 - **Tooltips toggle.** `ui.config.tooltipsEnabled` (default `true`, localStorage-persisted
   in `gitable.config.v1`) gates the custom tooltip. `initTooltips`' `show()` bails when it
   is off, so no tooltip renders anywhere; native `title` attributes are already stripped by

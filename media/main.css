@@ -13,6 +13,17 @@
   --gx-outgoing: var(--vscode-gitDecoration-untrackedResourceForeground, #4caf50);
   --gx-tag: var(--vscode-gitDecoration-renamedResourceForeground, #d6a23a);
 
+  /* File status markers. Sourced from the same git-decoration palette as the SCM
+     view so they match it and adapt per theme — the old hardcoded hexes were
+     tuned for dark backgrounds and dropped to ~1.6:1 on a light sidebar. The
+     hexes survive as fallbacks for themes that define no decoration colors. */
+  --gx-status-modified: var(--vscode-gitDecoration-modifiedResourceForeground, #e7bd57);
+  --gx-status-added: var(--vscode-gitDecoration-addedResourceForeground, #62d39a);
+  --gx-status-deleted: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+  /* Renamed stays blue rather than following the theme: most themes colour renamed
+     the same green as added, and the two would stop being tellable apart. */
+  --gx-status-renamed: #7aa2ff;
+
   --gx-radius: 8px;
   --gx-radius-sm: 6px;
   --gx-gap: 10px;
@@ -69,6 +80,13 @@ button[aria-disabled="true"],
 .gx-disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Keyboard focus. Written with :where() so it carries zero specificity — any
+   component that styles its own focus ring (.gx-check, .gx-tag-btn) still wins. */
+:where(button, input, select, textarea, a[href], [tabindex]):focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, var(--gx-accent));
+  outline-offset: 1px;
 }
 
 .gx-tooltip {
@@ -1039,13 +1057,15 @@ button[aria-disabled="true"],
 .gx-file:hover {
   background: var(--gx-navy-card);
 }
+/* Derived from the accent so it follows the light-theme override; the fixed
+   #7aa2ff was unreadable on a light sidebar. */
 .gx-partial-badge {
   flex: 0 0 auto;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(122, 162, 255, 0.14);
-  color: #7aa2ff;
-  border: 1px solid rgba(122, 162, 255, 0.22);
+  background: color-mix(in srgb, var(--gx-accent) 12%, transparent);
+  color: var(--gx-accent);
+  border: 1px solid color-mix(in srgb, var(--gx-accent) 28%, transparent);
   font-size: 9.5px;
   font-weight: 700;
   line-height: 1.4;
@@ -1056,7 +1076,9 @@ button[aria-disabled="true"],
   height: 16px;
   flex: 0 0 auto;
   margin: 0;
-  border: 1.5px solid var(--gx-accent-line);
+  /* Unchecked boxes were a 32%-alpha accent outline (~1.5:1) and all but vanished;
+     a muted foreground tint reads clearly in both dark and light themes. */
+  border: 1.5px solid color-mix(in srgb, var(--vscode-foreground) 45%, transparent);
   border-radius: 5px;
   background: transparent;
   position: relative;
@@ -1149,10 +1171,17 @@ button[aria-disabled="true"],
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Full paths ellipsize at the head so the filename (the useful end) survives. */
   direction: rtl;
   text-align: left;
   font-size: 12px;
   cursor: pointer;
+}
+/* Tree rows show only the basename, where head-truncation hides the part that
+   identifies the file ("…eGitService.test.ts"). Ellipsize at the tail instead —
+   the coloured file-type icon already conveys the extension. */
+.gx-path-name {
+  direction: ltr;
 }
 .gx-path:hover {
   color: var(--gx-accent);
@@ -1183,10 +1212,12 @@ button[aria-disabled="true"],
   width: 13px;
   height: 13px;
 }
-.gx-stat-M { color: #e7bd57; }
-.gx-stat-A { color: #62d39a; }
-.gx-stat-D { color: var(--gx-accent-strong); }
-.gx-stat-R { color: #7aa2ff; }
+.gx-stat-M { color: var(--gx-status-modified); }
+.gx-stat-A { color: var(--gx-status-added); }
+/* Deleted reads red like everywhere else in VS Code — it used to render in the
+   accent blue, which looks informational rather than destructive. */
+.gx-stat-D { color: var(--gx-status-deleted); }
+.gx-stat-R { color: var(--gx-status-renamed); }
 .gx-stat-X { color: var(--vscode-editorWarning-foreground, #e8b500); }
 
 .gx-row-action {
@@ -1941,11 +1972,11 @@ textarea {
   min-width: 0;
 }
 .gx-ds-add {
-  color: #62d39a;
+  color: var(--gx-status-added);
   font-weight: 600;
 }
 .gx-ds-del {
-  color: var(--gx-accent-strong);
+  color: var(--gx-status-deleted);
   font-weight: 600;
 }
 .gx-commit-title {
@@ -2088,6 +2119,8 @@ body.vscode-light {
   --gx-alt-card-bg: rgba(0, 0, 0, 0.03);
   --gx-undo-bar-bg: rgba(0, 0, 0, 0.05);
   --gx-line:        var(--vscode-widget-border, rgba(0, 0, 0, 0.12));
+  /* The dark-tuned renamed blue is only 2.3:1 on a light sidebar. */
+  --gx-status-renamed: #3a6fd8;
 }
 
 /* Toggle switch */
@@ -2727,7 +2760,9 @@ body.vscode-light {
   .gx-sec-safe { padding: 10px 8px; }
   .gx-branch-row { gap: 6px; }
   .gx-branch-btn { padding: 4px 7px; gap: 4px; }
-  .gx-sync-btn { padding: 4px 6px; gap: 4px; }
+  /* The sync segments keep their full 56px floor at every width, which leaves the
+     branch name a few characters in a narrow sidebar. Let them shrink first. */
+  .gx-sync-btn { padding: 4px 6px; gap: 4px; min-width: 44px; }
   .gx-change-subtabs { gap: 3px; }
   .gx-change-subtab { padding: 0 4px; gap: 3px; }
 }
@@ -2737,4 +2772,5 @@ body.vscode-light {
   .gx-card,
   .gx-sec-safe { padding: 8px 6px; }
   .gx-change-subtab { font-size: 11px; }
+  .gx-sync-btn { min-width: 38px; padding: 4px 4px; }
 }
