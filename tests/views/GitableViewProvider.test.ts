@@ -10,7 +10,7 @@ function makeProvider(git: unknown = {}): GitableViewProvider {
     {} as any,
     {} as any,
     {} as any,
-    {} as any
+    { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
   );
 }
 
@@ -180,5 +180,21 @@ describe("GitableViewProvider background fetch", () => {
     expect(fetchOrigin).toHaveBeenCalledTimes(1);
     expect((provider as any).syncAction).toBe("Pushing");
     expect((provider as any).fetchInFlight).toBe(false);
+  });
+});
+
+describe("GitableViewProvider message errors", () => {
+  it("surfaces an unexpected handler failure and releases the busy state", async () => {
+    const provider = makeProvider();
+    (provider as any).postState = vi.fn().mockResolvedValue(undefined);
+    (provider as any).busyKind = "stage";
+    (provider as any).busyText = "Staging file...";
+    (provider as any).handleMessage = vi.fn().mockRejectedValue(new Error("boom"));
+
+    await (provider as any).handleMessageSafely({ type: "stageFiles" });
+
+    expect((provider as any).busyKind).toBe("");
+    expect((provider as any).busyText).toBe("");
+    expect((provider as any).pendingError).toBe("boom");
   });
 });

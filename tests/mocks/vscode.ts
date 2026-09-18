@@ -11,7 +11,10 @@ export const window = {
       show() {},
       dispose() {}
     };
-  }
+  },
+  showErrorMessage: vi.fn((..._args: unknown[]): any => Promise.resolve(undefined)),
+  showInformationMessage: vi.fn((..._args: unknown[]): any => Promise.resolve(undefined)),
+  showWarningMessage: vi.fn((..._args: unknown[]): any => Promise.resolve(undefined))
 };
 
 // Spyable stubs used by VsCodeGitService tests.

@@ -83,7 +83,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "media")]
     };
     view.webview.html = this.getHtml(view.webview);
-    view.webview.onDidReceiveMessage((message) => this.handleMessage(message));
+    view.webview.onDidReceiveMessage((message) => void this.handleMessageSafely(message));
     view.onDidDispose(() => {
       this.view = undefined;
       if (this.badgeTimer) {
@@ -231,6 +231,22 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ---- Message handling ----
+
+  /**
+   * Last-resort boundary for the webview message loop. Most handlers wrap their
+   * own work, but anything that throws outside those wrappers would otherwise
+   * become a silent unhandled rejection: no error shown, and whatever busy state
+   * the handler had set left stuck on screen. Surface it and release the UI.
+   */
+  private async handleMessageSafely(message: any): Promise<void> {
+    try {
+      await this.handleMessage(message);
+    } catch (error) {
+      this.clearBusy();
+      this.fail(error);
+      await this.postState().catch(() => undefined);
+    }
+  }
 
   private async handleMessage(message: any): Promise<void> {
     if (!message || typeof message.type !== "string") {

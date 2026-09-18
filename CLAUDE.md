@@ -311,6 +311,12 @@ workspace, never committed to the repo.
   `finally` only clears `syncAction` if the label is still its own, so a user pull/push
   that started mid-fetch keeps its spinner. Visibility-triggered fetches are throttled to
   one per `VISIBILITY_FETCH_INTERVAL_MS` (30 s); the auto-fetch timer also checks `busyKind`.
+- **Message-loop error boundary.** `onDidReceiveMessage` dispatches through
+  `handleMessageSafely()`, which catches anything the individual handlers don't. Without
+  it a throw outside a `runGit`/`runSyncOp`/`try` wrapper became a silent unhandled
+  rejection: no notification, no `state.error`, and the busy spinner stuck on screen. The
+  boundary clears busy state, routes the error through `fail()` (notification + Logger +
+  `state.error`), and posts fresh state.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from
   the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
 - **Selectable commit history.** Files are lazy-loaded on first expand and cached
