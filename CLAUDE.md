@@ -426,6 +426,15 @@ workspace, never committed to the repo.
   intact for screen readers — only the *visual* tooltip is suppressed. Toggled via a switch
   at the top of Settings → Config (`toggleTooltips`); turning it off also dismisses any
   tooltip currently on screen.
+- **Icon set consistency.** Every line icon in `ICONS` uses the same recipe:
+  `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, **`stroke-width="2"`**,
+  round caps and joins. Widths used to range 1.5–2.4, which made icons look randomly
+  heavier or lighter beside each other (`folder` at 1.5 next to `file` at 2 in tree view
+  was the worst). Solid fills are reserved for small glyph marks (`sparkle`, `dot`,
+  `dots`, `shieldAi`'s inner star) and the `jira` brand logo. Keep new icons on the same
+  recipe — don't paste vendor SVGs in (`settings`, `reports` and `folder` were SVGRepo
+  imports in a different visual language, with leftover `SVGRepo_*` wrapper groups).
+
 - **Config panel info icons.** Each section header in Settings → Config (Appearance, Jira Integration, File View, AI Token Budget) carries an inline `ICONS.info` icon (13×13 px, `gx-info-icon gx-ic sm`) with a `title` attribute instead of a hint paragraph below the label. The icon is muted by default and turns pink on hover. Token budget Low/Mid/High buttons each carry a `title` with the exact char limit ("~10,000 chars of diff" etc.).
 - **Jira integration.** Optional panel (toggled in Settings → Jira). Credentials (base URL, email, API token via SecretStorage) connect to Jira Cloud's REST API v3. Issues assigned to the current user and not Done are fetched (`maxResults=50`). Search is local-only (filters the cached 50 results). Status badges use keyword matching (`jiraStatusClass()`). Three-dot menu per issue: Copy key, Copy branch name, Open in Jira (via `vscode.env.openExternal`). Sort by any column cycles asc → desc → off. All Jira and AI network calls use `fetchWithTimeout` (45 s) which throws `RequestTimeoutError` on abort.
 - **History tab sticky header.** The history action bar (selected count + Summary/Security/Clear buttons) is a `flex: 0 0 auto` header; only the commit list below it scrolls. Same flex-column + scroll-wrapper pattern as the Changes panel (`#panel-history { display:flex; flex-direction:column; overflow:hidden }` + `.gx-history-scroll { flex:1 1 auto; overflow-y:auto }`).
