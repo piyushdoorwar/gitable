@@ -14,7 +14,14 @@
     <title>Gitable Privacy Policy</title>
     <link rel="canonical" href="https://piyushdoorwar.github.io/gitable/policy/" />
     <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="../styles.css" />
+    <script>document.documentElement.classList.add("js");</script>
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Gitable" />
@@ -38,93 +45,134 @@
     <meta name="twitter:image:alt" content="Gitable logo" />
   </head>
   <body>
+    <!-- Icon sprite, inline so <use> works on file:// as well as when hosted. -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+      <symbol id="i-vscode" viewBox="0 0 32 32"><path fill="currentColor" stroke="none" d="M28 25.6l-5.9 2.4-9.7-9.6-6.1 4.8L4 21.9V10.1l2.3-1.2 6.1 4.8L22.1 4 28 6.4v19.2zM15.7 16l6.3 5V11l-6.3 5zM6.3 19.7 10 16l-3.6-3.7-.1 7.4z"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 2.2l1.9 5.4 5.4 1.9-5.4 1.9L12 16.8l-1.9-5.4L4.7 9.5l5.4-1.9z"/><path fill="currentColor" stroke="none" d="M18.7 13.6l.85 2.45 2.45.85-2.45.85-.85 2.45-.85-2.45-2.45-.85 2.45-.85z"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5.5V11c0 5.25 3.6 9.74 8 11.5 4.4-1.76 8-6.25 8-11.5V5.5L12 2z"/><path fill="currentColor" stroke="none" d="M12 8l.75 2.1 2.1.75-2.1.75L12 13.7l-.75-2.1-2.1-.75 2.1-.75z"/></symbol>
+      <symbol id="i-branch" viewBox="0 0 24 24"><line x1="6" y1="4" x2="6" y2="14"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M18 9.4c0 4-3.5 5.6-6 5.6"/></symbol>
+      <symbol id="i-merge" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><line x1="6" y1="8.4" x2="6" y2="15.6"/><path d="M18 8.4c0 5.6-4.5 9.6-12 9.6"/></symbol>
+      <symbol id="i-commit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><line x1="3" y1="12" x2="8.6" y2="12"/><line x1="15.4" y1="12" x2="21" y2="12"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></symbol>
+      <symbol id="i-changes" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+      <symbol id="i-stash" viewBox="0 0 24 24"><path d="M12 3v10m-3.5-3.5L12 13l3.5-3.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 21h18M7 21v-7M12 21V6M17 21v-4"/></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+      <symbol id="i-conflict" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></symbol>
+      <symbol id="i-push" viewBox="0 0 24 24"><path d="M12 21v-8"/><path d="m8 16 4-4 4 4"/><path d="M4.6 14.5A6 6 0 0 1 8 3.6a6.5 6.5 0 0 1 11.7 3.4A4.8 4.8 0 0 1 19 16.4"/></symbol>
+      <symbol id="i-pull" viewBox="0 0 24 24"><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/><path d="M4.6 14.5A6 6 0 0 1 8 3.6a6.5 6.5 0 0 1 11.7 3.4A4.8 4.8 0 0 1 19 16.4"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.6.8L12 7.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M2 2l20 20"/><path d="M5.8 8.2A6 6 0 0 0 7 20h10.5M21 16.5A4.5 4.5 0 0 0 17.5 9h-1.3A7 7 0 0 0 9.4 4.5"/></symbol>
+    </svg>
+    <a class="skip-link" href="#main">Skip to content</a>
+
     <header class="topbar">
-      <a class="brand" href="../" aria-label="Gitable home">
-        <img src="../assets/icons/icon.svg" alt="" />
-        <span>Gitable</span>
-      </a>
-      <nav aria-label="Primary navigation">
-        <a href="../#features">Features</a>
-        <a href="../#workflow">Workflow</a>
-        <a href="../#privacy">Privacy</a>
-      </nav>
+      <div class="wrap">
+        <a class="brand" href="../" aria-label="Gitable home">
+          <img src="../assets/icons/icon.svg" alt="" width="28" height="28" />
+          <span>Gitable</span>
+        </a>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav">
+          <svg class="ic i-menu" aria-hidden="true"><use href="#i-menu" /></svg>
+          <svg class="ic i-close" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+        <nav class="nav" id="site-nav" aria-label="Primary">
+          <a href="../#get-started">Get started</a>
+          <a href="../#features">Features</a>
+          <a href="../#workflow">Workflow</a>
+          <a href="./" aria-current="page">Privacy</a>
+          <a class="nav-gh" href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">
+            <svg class="ic" aria-hidden="true"><use href="#i-github" /></svg>
+            <span>GitHub</span>
+          </a>
+        </nav>
+      </div>
     </header>
 
-    <main>
-      <section class="policy-page">
-        <div class="policy-hero" data-reveal>
-          <p class="eyebrow">Privacy policy</p>
+    <main id="main">
+      <section class="page-hero">
+        <div class="wrap narrow">
+          <span class="eyebrow">Privacy policy</span>
           <h1>Gitable Privacy Policy</h1>
-          <p class="lede">Gitable is a local-first VS Code extension for Git workflows and AI-assisted commit messages.</p>
+          <p>Gitable is a local-first VS Code extension for Git workflows and AI-assisted commit messages.</p>
         </div>
+      </section>
 
-        <div class="policy-content" data-reveal>
-          <article>
-            <h2>Data Gitable reads</h2>
+      <section class="page-body">
+        <div class="wrap narrow">
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-file" /></svg>Data Gitable reads</h2>
             <p>Gitable reads Git repository metadata, file status, diffs, branch information, commit history, and stash information so it can show the panel and perform Git actions you request.</p>
           </article>
-
-          <article>
-            <h2>AI requests</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-sparkle" /></svg>AI requests</h2>
             <p>When you generate a commit message, summary, or security review, Gitable sends the selected diff or selected commit data directly from VS Code to the AI provider you configured: OpenAI, Gemini, or Claude.</p>
           </article>
-
-          <article>
-            <h2>API keys</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>API keys</h2>
             <p>API keys are stored using VS Code SecretStorage. They are not written to your repository, committed to files, or sent to any server owned by this extension.</p>
           </article>
-
-          <article>
-            <h2>No backend and no telemetry</h2>
+          <article class="prose-card callout" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-cloud-off" /></svg>No backend and no telemetry</h2>
             <p>Gitable does not operate a backend service for extension data. It does not collect analytics, crash reports, repository contents, prompts, AI responses, or usage history.</p>
           </article>
-
-          <article>
-            <h2>Local usage reports</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-chart" /></svg>Local usage reports</h2>
             <p>Usage reports, when shown in the extension, are computed locally from local extension storage to help you understand your AI calls. They are not transmitted by Gitable.</p>
           </article>
-
-          <article>
-            <h2>Third-party providers</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-arrow" /></svg>Third-party providers</h2>
             <p>AI providers (OpenAI, Google, Anthropic) operate under their own privacy policies and terms. The developer is not responsible for how those providers handle data sent to their APIs.</p>
           </article>
-
-          <article>
-            <h2>AI output disclaimer</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-conflict" /></svg>AI output disclaimer</h2>
             <p>Commit messages, summaries, and security reviews generated by AI may contain inaccuracies. You are responsible for reviewing all AI output before acting on it. Do not rely on generated content for critical decisions without verification.</p>
           </article>
-
-          <article>
-            <h2>No warranty</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>No warranty</h2>
             <p>Gitable is provided on an "as is" and "as available" basis, without warranties of any kind, express or implied. Use of the extension is at your own risk.</p>
           </article>
-
-          <article>
-            <h2>Limitation of liability</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>Limitation of liability</h2>
             <p>To the maximum extent permitted by law, the developer is not liable for any damages arising from use of Gitable, including but not limited to data loss, loss of profits, or business interruption.</p>
           </article>
-
-          <article>
-            <h2>User responsibility</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-check" /></svg>User responsibility</h2>
             <p>You are solely responsible for how you use Gitable, the prompts you send to AI providers, and any actions taken based on generated output. You are also responsible for complying with your AI provider's terms of service.</p>
           </article>
-
-          <article>
-            <h2>Contact</h2>
+          <article class="prose-card" data-reveal>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail" /></svg>Contact</h2>
             <p>For privacy questions, email <a href="mailto:piyushdoorwar+gitable@gmail.com">piyushdoorwar+gitable@gmail.com</a>.</p>
           </article>
         </div>
       </section>
     </main>
 
-    <footer>
-      <span>Gitable</span>
-      <p class="analytics-disclosure">
-        This site uses Cloudflare Web Analytics to understand site usage.
-      </p>
-      <div class="footer-links">
-        <a href="../">Home</a>
-        <a href="https://github.com/piyushdoorwar/gitable" rel="noreferrer">GitHub</a>
+    <footer class="footer">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="../" aria-label="Gitable home">
+            <img src="../assets/icons/icon.svg" alt="" width="24" height="24" />
+            <span>Gitable</span>
+          </a>
+          <p>AI Git workflow panel for VS Code. This site uses Cloudflare Web Analytics to understand site usage.</p>
+        </div>
+        <div class="footer-links">
+          <a href="../"><svg class="ic" aria-hidden="true"><use href="#i-arrow" /></svg>Home</a>
+          <a href="https://github.com/piyushdoorwar/gitable" rel="noreferrer"><svg class="ic" aria-hidden="true"><use href="#i-github" /></svg>GitHub</a>
+          <a href="mailto:piyushdoorwar+gitable@gmail.com"><svg class="ic" aria-hidden="true"><use href="#i-mail" /></svg>Support</a>
+        </div>
       </div>
     </footer>
 
