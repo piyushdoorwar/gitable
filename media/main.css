@@ -190,6 +190,12 @@ button[aria-disabled="true"],
   color: var(--vscode-descriptionForeground);
   opacity: 0.75;
 }
+/* One notch above "sm" so the gear's teeth stay crisp; all three share it. */
+.gx-hdr-btn .gx-ic,
+.gx-hdr-btn .gx-ic svg {
+  width: 14px;
+  height: 14px;
+}
 .gx-hdr-btn:hover {
   opacity: 1;
   color: var(--vscode-foreground);

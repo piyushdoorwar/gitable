@@ -468,9 +468,12 @@ workspace, never committed to the repo.
   round caps and joins. Widths used to range 1.5–2.4, which made icons look randomly
   heavier or lighter beside each other (`folder` at 1.5 next to `file` at 2 in tree view
   was the worst). Solid fills are reserved for small glyph marks (`sparkle`, `dot`,
-  `dots`, `shieldAi`'s inner star) and the `jira` brand logo. Keep new icons on the same
+  `dots`, `shieldAi`'s inner star). Keep new icons on the same
   recipe — don't paste vendor SVGs in (`settings`, `reports` and `folder` were SVGRepo
   imports in a different visual language, with leftover `SVGRepo_*` wrapper groups).
+  The header trio is `reports` (bar chart with axis), `jira` (an outline ticket — the solid
+  Jira logo outweighed its neighbours) and `settings` (gear), rendered at 14px via
+  `.gx-hdr-btn .gx-ic` so the gear's teeth stay crisp.
 
 - **Typography.** The panel uses DM Sans, bundled in `media/fonts/` (latin 400–700 woff2,
   SIL OFL 1.1 — see `media/fonts/OFL.txt`) and loaded via `@font-face`; the CSP allows
