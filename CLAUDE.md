@@ -96,7 +96,7 @@ tests/
   `mergeBranch`, `rebaseBranch`, `rebaseContinue`, `rebaseAbort`,
   `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`,
   `openMergeEditor`, `markResolved`,
-  `stashStaged`, `stashPop`, `stashApply`, `stashDrop`, `annotateStash {hash}`,
+  `stashStaged`, `stashFiles {filePaths}`, `stashPop`, `stashApply`, `stashDrop`, `annotateStash {hash}`,
   `createTag {hash}`, `deleteTag {name}`, `pushTags`,
   `addToGitignore {filePath}`, `undoLastCommit`,
   `openJiraIssue {key}`
@@ -107,6 +107,7 @@ tests/
 
 **Host → webview:**
 - `state` (full snapshot on every change)
+- `busy` (`busyKind`/`busyText`/`isLoading` only — AI progress text, no git work)
 - `setCommitFields`, `clearCommitFields`, `switchTab`, `changesSubTab`
 - `commitFiles` (lazy-loaded on first expand of a commit row)
 - `commitSummary` (AI result for a specific commit hash)
@@ -311,6 +312,37 @@ workspace, never committed to the repo.
   `finally` only clears `syncAction` if the label is still its own, so a user pull/push
   that started mid-fetch keeps its spinner. Visibility-triggered fetches are throttled to
   one per `VISIBILITY_FETCH_INTERVAL_MS` (30 s); the auto-fetch timer also checks `busyKind`.
+- **Parallel state builds.** `buildState()` runs its git reads (`getChanges`, `getHistory`,
+  `getBranches`, `stashList`, `getSyncInfo`, `getRebaseState`, `getLastCommitMessage`) and
+  both SecretStorage presence checks concurrently via `Promise.all`; `getHistory` also runs its
+  `rev-list` and `log` side by side. Safe because `getChanges()` runs
+  `git --no-optional-locks status`, so no read takes `index.lock`. `SecretService.hasApiKey()`
+  and `JiraService.hasToken()` cache presence (invalidated on store/delete and
+  `secrets.onDidChange`) because a keyring round-trip per refresh is slow on libsecret.
+  `MIN_STAGE_BUSY_VISIBLE_MS` is 350 ms (it was 2 s, which made every stage click feel slow).
+  AI progress text is pushed with the lightweight `busy` message instead of a full state build.
+- **NUL-separated git parsing.** `getChanges()` uses `status --porcelain -z` and
+  `getCommitFiles()` uses `diff-tree -z`. The newline formats quote/C-escape paths with
+  spaces, quotes or non-ASCII bytes and render renames as `old -> new`, which broke on such
+  names. With `-z`, a rename's source path is the next NUL field.
+- **Rebase state in worktrees.** `getRebaseState()` looks under `git rev-parse --absolute-git-dir`
+  (cached per root), not `<root>/.git`, which is a *file* in linked worktrees and submodules.
+- **Success feedback.** `notifySuccess()` writes the panel notice and only shows a toast when the
+  view is hidden (command-palette use). Errors still toast via `fail()`.
+- **Force delete.** Deleting an unmerged branch (`branch -d` → "not fully merged") offers a modal
+  **Force Delete** (`branch -D`) instead of failing outright.
+- **Jira URL safety.** `JiraService.normalizeBaseUrl()` trims, strips trailing slashes and requires
+  `https:` (the token goes out as Basic auth); enforced on save and before every request.
+- **Webview rendering.** `setHtml(node, html)` skips the DOM write when markup is unchanged (most
+  state pushes change nothing in a given list), preserving hover/focus; `syncChecks()` re-aligns
+  checkbox state afterwards. Chart.js is no longer a `<script>` tag: `main.js` injects it on first
+  Reports open using the boot script's nonce (`data-chart-src`), destroys the previous chart
+  before re-rendering, and reads its colours from CSS variables so it follows the theme.
+- **Theme tokens.** Feedback colours come from `--gx-info`, `--gx-success`, `--gx-warning`,
+  `--gx-danger` and `--gx-sev-*`; tints use `color-mix(in srgb, var(--token) N%, transparent)`.
+  `body.vscode-light` retunes them to ≥4.5:1 and darkens file-type glyphs via `filter`;
+  `body.vscode-high-contrast[-light]` adds real borders and uses contrast colours for accent/focus;
+  `prefers-reduced-motion` disables motion except spinners. Don't add raw hexes — add or reuse a token.
 - **Message-loop error boundary.** `onDidReceiveMessage` dispatches through
   `handleMessageSafely()`, which catches anything the individual handlers don't. Without
   it a throw outside a `runGit`/`runSyncOp`/`try` wrapper became a silent unhandled
@@ -378,6 +410,11 @@ workspace, never committed to the repo.
   `stash@{N} · <branch> · <relative date>` — `stashList` fetches `%gd\t%gs\t%cr\t%H`
   and parses `WIP on <branch>:` / `On <branch>:` into `StashEntry.branch` + clean
   `message`, plus the stash commit SHA into `hash`.
+- **Stash from the working tree.** The Working toolbar has a Stash button that posts
+  `stashFiles {filePaths}` for the checked files → `git stash push --include-untracked -- <paths>`,
+  so changes can be shelved without staging them first. Disabled while conflicts exist.
+  The pull wrapper's stash is labelled "Gitable auto-stash before pull" so one left behind
+  by a conflicting restore is recognisable in the Stashes tab.
 - **Stash notes.** The stash three-dot menu has **Add note… / Edit note…**, which
   posts `annotateStash {hash}` → `showInputBox` → `StashNoteStore`. Notes are keyed
   by the stash **commit SHA** (`StashEntry.hash`), not the `stash@{N}` ref, because

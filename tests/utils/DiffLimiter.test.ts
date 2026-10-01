@@ -17,6 +17,13 @@ describe("DiffLimiter.isIgnored", () => {
     expect(DiffLimiter.isIgnored("pnpm-lock.yaml")).toBe(true);
   });
 
+  it("ignores other ecosystems' lockfiles and snapshots", () => {
+    for (const f of ["Cargo.lock", "sub/Gemfile.lock", "poetry.lock", "composer.lock", "go.sum", "bun.lockb", "__snapshots__/a.test.ts.snap"]) {
+      expect(DiffLimiter.isIgnored(f)).toBe(true);
+    }
+    expect(DiffLimiter.isIgnored("src/lock.ts")).toBe(false);
+  });
+
   it("ignores .min.js files", () => {
     expect(DiffLimiter.isIgnored("vendor.min.js")).toBe(true);
     expect(DiffLimiter.isIgnored("lib/bundle.min.js")).toBe(true);

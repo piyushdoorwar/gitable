@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import * as path from "path";
 import * as vscode from "vscode";
 import { AiProviderFactory } from "../ai/AiProviderFactory";
@@ -18,7 +19,9 @@ import { Logger } from "../utils/Logger";
 type TabName = "changes" | "history" | "settings";
 type BranchSwitchChoice = "bring" | "keep";
 type SelectedCommit = { hash: string; subject: string };
-const MIN_STAGE_BUSY_VISIBLE_MS = 2000;
+/** Keeps a stage/unstage spinner on screen long enough to read, without making
+ *  a sub-100 ms `git add` feel slow (this used to be a flat 2 s per click). */
+const MIN_STAGE_BUSY_VISIBLE_MS = 350;
 /** Window used to coalesce the burst of Git change events one operation fires. */
 const REFRESH_DEBOUNCE_MS = 120;
 /** Minimum gap between fetches triggered by the panel becoming visible. */
@@ -467,6 +470,19 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "stashStaged":
         await this.runBusyGit("git", "Stashing staged changes…", () => this.git.stashStaged(), "Changes stashed.");
         break;
+      case "stashFiles": {
+        const paths = Array.isArray(message.filePaths)
+          ? message.filePaths.map((item: unknown) => String(item).trim()).filter(Boolean)
+          : [];
+        if (!paths.length) break;
+        await this.runBusyGit(
+          "git",
+          `Stashing ${paths.length === 1 ? "file" : `${paths.length} files`}…`,
+          () => this.git.stashFiles(paths),
+          paths.length === 1 ? `Stashed ${paths[0]}.` : `Stashed ${paths.length} files.`
+        );
+        break;
+      }
       case "stashPop": {
         const ref = String(message.ref ?? "");
         await this.runBusyGit("git", "Restoring stash…", () => this.git.stashPop(ref), "Stash applied and removed.");
@@ -603,7 +619,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         const key = String(message.key ?? "");
         const { baseUrl } = this.jira.getConfig();
         if (key && baseUrl) {
-          await vscode.env.openExternal(vscode.Uri.parse(`${baseUrl}/browse/${key}`));
+          await vscode.env.openExternal(vscode.Uri.parse(`${baseUrl}/browse/${encodeURIComponent(key)}`));
         }
         break;
       }
@@ -670,8 +686,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     try {
       await this.git.commit(summary.trim(), description?.trim());
       this.lastCommitSummary = summary.trim();
-      this.pendingNotice = "Commit created.";
-      vscode.window.showInformationMessage("Gitable: commit created.");
+      this.notifySuccess("Commit created.");
       this.view?.webview.postMessage({ type: "clearCommitFields" });
       this.view?.webview.postMessage({ type: "changesSubTab", tab: "working" });
     } catch (error) {
@@ -689,8 +704,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     try {
       await this.git.amend(summary.trim(), description?.trim());
       this.lastCommitSummary = summary.trim();
-      this.pendingNotice = "Commit amended.";
-      vscode.window.showInformationMessage("Gitable: commit amended.");
+      this.notifySuccess("Commit amended.");
       this.view?.webview.postMessage({ type: "clearCommitFields" });
     } catch (error) {
       this.fail(error);
@@ -770,8 +784,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     await this.postState();
     try {
       await action();
-      this.pendingNotice = successMessage;
-      vscode.window.showInformationMessage(`Gitable: ${successMessage}`);
+      this.notifySuccess(successMessage);
     } catch (error) {
       this.fail(error);
     } finally {
@@ -852,9 +865,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     this.setBusy("git", `Switching to ${targetBranch}…`);
     await this.postState();
     try {
-      const successMessage = await action();
-      this.pendingNotice = successMessage;
-      vscode.window.showInformationMessage(`Gitable: ${successMessage}`);
+      this.notifySuccess(await action());
     } catch (error) {
       this.fail(error);
     } finally {
@@ -900,17 +911,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     if (!hash || !this.view) return;
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
-      const providerId = this.settings.getProvider() as ProviderId;
-      const apiKey = await this.secrets.getApiKey(providerId);
-      if (!apiKey) {
-        post({ type: "commitSummary", hash, error: "No API key saved — go to Settings to add one." });
+      const ai = await this.resolveAi();
+      if ("error" in ai) {
+        post({ type: "commitSummary", hash, error: ai.error });
         return;
       }
-      const model = this.settings.getModel(providerId);
-      if (!model) {
-        post({ type: "commitSummary", hash, error: "No model selected — go to Settings to pick one." });
-        return;
-      }
+      const { providerId, apiKey, model } = ai;
       const rawDiff = await this.git.getCommitDiff(hash);
       const { diff } = DiffLimiter.prepare(rawDiff, maxChars);
       const { system, user } = buildCommitSummaryPrompt(subject, diff);
@@ -930,17 +936,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const label = this.selectedCommitLabel(commits);
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
-      const providerId = this.settings.getProvider() as ProviderId;
-      const apiKey = await this.secrets.getApiKey(providerId);
-      if (!apiKey) {
-        post({ type: "commitSummary", hash: label, error: "No API key saved — go to Settings to add one." });
+      const ai = await this.resolveAi();
+      if ("error" in ai) {
+        post({ type: "commitSummary", hash: label, error: ai.error });
         return;
       }
-      const model = this.settings.getModel(providerId);
-      if (!model) {
-        post({ type: "commitSummary", hash: label, error: "No model selected — go to Settings to pick one." });
-        return;
-      }
+      const { providerId, apiKey, model } = ai;
       const prepared = await this.prepareSelectedCommitDiffs(commits, maxChars);
       if (!prepared.diff.trim()) {
         post({ type: "commitSummary", hash: label, error: "No reviewable diff found for the selected commits." });
@@ -969,17 +970,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     if (!this.view) return;
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
-      const providerId = this.settings.getProvider() as ProviderId;
-      const apiKey = await this.secrets.getApiKey(providerId);
-      if (!apiKey) {
-        post({ type: "securityReview", error: "No API key saved — go to Settings to add one." });
+      const ai = await this.resolveAi();
+      if ("error" in ai) {
+        post({ type: "securityReview", error: ai.error });
         return;
       }
-      const model = this.settings.getModel(providerId);
-      if (!model) {
-        post({ type: "securityReview", error: "No model selected — go to Settings to pick one." });
-        return;
-      }
+      const { providerId, apiKey, model } = ai;
       const diff = staged ? await this.git.getStagedDiff() : await this.git.getUnstagedDiff();
       const diffStat = staged ? await this.git.getStagedDiffStat() : undefined;
       const { diff: limitedDiff } = DiffLimiter.prepare(diff, maxChars);
@@ -1000,17 +996,12 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const scope = this.selectedCommitLabel(commits);
     const post = (payload: object) => this.view!.webview.postMessage(payload);
     try {
-      const providerId = this.settings.getProvider() as ProviderId;
-      const apiKey = await this.secrets.getApiKey(providerId);
-      if (!apiKey) {
-        post({ type: "securityReview", scope, error: "No API key saved — go to Settings to add one." });
+      const ai = await this.resolveAi();
+      if ("error" in ai) {
+        post({ type: "securityReview", scope, error: ai.error });
         return;
       }
-      const model = this.settings.getModel(providerId);
-      if (!model) {
-        post({ type: "securityReview", scope, error: "No model selected — go to Settings to pick one." });
-        return;
-      }
+      const { providerId, apiKey, model } = ai;
       const prepared = await this.prepareSelectedCommitDiffs(commits, maxChars);
       if (!prepared.diff.trim()) {
         post({ type: "securityReview", scope, error: "No reviewable diff found for the selected commits." });
@@ -1032,6 +1023,22 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const msg = error instanceof Error ? error.message : "Failed to run security review.";
       post({ type: "securityReview", scope, error: msg });
     }
+  }
+
+  /** Provider, key and model for an AI call, or the reason one can't be made. */
+  private async resolveAi(): Promise<
+    { providerId: ProviderId; apiKey: string; model: string } | { error: string }
+  > {
+    const providerId = this.settings.getProvider() as ProviderId;
+    const apiKey = await this.secrets.getApiKey(providerId);
+    if (!apiKey) {
+      return { error: "No API key saved — go to Settings to add one." };
+    }
+    const model = this.settings.getModel(providerId);
+    if (!model) {
+      return { error: "No model selected — go to Settings to pick one." };
+    }
+    return { providerId, apiKey, model };
   }
 
   private parseSelectedCommits(value: unknown): SelectedCommit[] {
@@ -1146,7 +1153,22 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     await this.runBusyGit(
       "git",
       `Deleting ${name}…`,
-      () => this.git.deleteBranch(name),
+      async () => {
+        try {
+          await this.git.deleteBranch(name);
+        } catch (error) {
+          // `branch -d` refuses unmerged work; offer -D instead of a dead end.
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!/not fully merged/i.test(msg)) throw error;
+          const force = await vscode.window.showWarningMessage(
+            `"${name}" has commits that are not merged anywhere.`,
+            { modal: true, detail: "Force-deleting it discards those commits (they stay recoverable via the reflog for a while)." },
+            "Force Delete"
+          );
+          if (force !== "Force Delete") throw new Error("Branch delete cancelled.");
+          await this.git.deleteBranch(name, true);
+        }
+      },
       `Branch ${name} deleted.`
     );
   }
@@ -1159,8 +1181,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     await this.postState();
     try {
       await this.git.mergeBranch(name);
-      this.pendingNotice = `Merged ${name} into ${current}.`;
-      vscode.window.showInformationMessage(`Gitable: Merged ${name} into ${current}.`);
+      this.notifySuccess(`Merged ${name} into ${current}.`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("CONFLICT") || msg.includes("Automatic merge failed")) {
@@ -1391,7 +1412,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
     const stopProgress = this.startProgressMessages(
       ["Calculating diff…", "Drafting commit message…", "Connecting the dots…", "Almost there…"],
-      (msg) => { this.setBusy("generate", msg); void this.postState(); }
+      (msg) => { this.setBusy("generate", msg); this.postBusy(); }
     );
     try {
       const ai = AiProviderFactory.create(provider);
@@ -1454,8 +1475,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const ai = AiProviderFactory.create(provider);
       const ok = await ai.validateApiKey(apiKey);
       if (ok) {
-        vscode.window.showInformationMessage(`Gitable: ${provider} API key is valid.`);
-        this.pendingNotice = "API key validated.";
+        this.notifySuccess(`${provider} API key is valid.`);
         await this.cacheModels(provider, apiKey);
       } else {
         this.fail(`The ${provider} API key was rejected.`);
@@ -1494,8 +1514,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     await this.secrets.setApiKey(provider, apiKey.trim());
-    vscode.window.showInformationMessage(`Gitable: ${provider} API key saved.`);
-    this.pendingNotice = "API key saved securely (SecretStorage).";
+    this.notifySuccess("API key saved securely (SecretStorage).");
     await this.cacheModels(provider, apiKey.trim());
     await this.postState();
   }
@@ -1508,8 +1527,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     await this.settings.setModel(provider, model);
-    vscode.window.showInformationMessage(`Gitable: model set to ${model}.`);
-    this.pendingNotice = "Model saved.";
+    this.pendingNotice = `Model set to ${model}.`;
     await this.postState();
   }
 
@@ -1666,6 +1684,17 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   // ---- State ----
 
+  /** Pushes only the busy fields — progress text changes don't need a full
+   *  state build (and its ~10 git processes). */
+  private postBusy(): void {
+    void this.view?.webview.postMessage({
+      type: "busy",
+      busyKind: this.busyKind,
+      busyText: this.busyText,
+      isLoading: !!this.busyKind
+    });
+  }
+
   private setBusy(kind: string, text: string): void {
     this.busyKind = kind;
     this.busyText = text;
@@ -1727,7 +1756,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         await this.git.stashPop("stash@{0}");
       } catch {
         // Pop produced conflicts — refresh will surface them in the Conflicts section
-        this.pendingError = "Conflicts detected after restoring your stashed changes. Resolve them before committing.";
+        // A conflicting pop leaves the stash entry in place, so nothing is lost.
+        this.pendingError =
+          "Pulled, but restoring your changes hit conflicts. Resolve them in Conflicts; " +
+          "your changes are also kept in the Stashes tab (\"Gitable auto-stash before pull\").";
       }
     });
   }
@@ -1788,6 +1820,18 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         this.syncAction = "";
       }
       await this.postState();
+    }
+  }
+
+  /**
+   * Reports a successful operation. The panel's notice slot already shows it, so
+   * a toast on top is only noise — unless the panel is hidden (the action came
+   * from the command palette), where the toast is the only feedback there is.
+   */
+  private notifySuccess(message: string): void {
+    this.pendingNotice = message;
+    if (!this.view?.visible) {
+      vscode.window.showInformationMessage(`Gitable: ${message}`);
     }
   }
 
@@ -1927,9 +1971,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   private async buildState(): Promise<Record<string, unknown>> {
     const provider = this.settings.getProvider();
     const model = this.settings.getModel(provider);
-    const hasApiKey = await this.secrets.hasApiKey(provider);
     const jiraConfig = this.jira.getConfig();
-    const jiraHasToken = await this.jira.hasToken();
+    const secretsReady = Promise.all([this.secrets.hasApiKey(provider), this.jira.hasToken()]);
 
     let repositories: Array<{ name: string; root: string }> = [];
     let repositoryName = "No repository";
@@ -1947,27 +1990,44 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let stateError = this.pendingError;
 
     try {
-      repositories = await this.git.listRepositories();
-      const summary = await this.git.getRepoSummary();
+      const [repos, summary] = await Promise.all([this.git.listRepositories(), this.git.getRepoSummary()]);
+      repositories = repos;
       if (summary) {
         repositoryName = summary.name;
         branchName = summary.branch;
-        changes = await this.git.getChanges();
-        // Fetch one extra to detect whether older commits remain ("Show more").
-        const fetched = await this.git.getHistory(this.historyLimit + 1);
+        // These are all independent read-only git invocations (status runs with
+        // --no-optional-locks), so they run concurrently instead of one after
+        // another — a refresh used to be ~10 sequential process spawns.
+        const [
+          nextChanges,
+          fetched,
+          nextBranches,
+          nextStashes,
+          sync,
+          nextRebaseState,
+          nextLastCommit
+        ] = await Promise.all([
+          this.git.getChanges(),
+          // Fetch one extra to detect whether older commits remain ("Show more").
+          this.git.getHistory(this.historyLimit + 1),
+          this.git.getBranches(),
+          this.git.stashList(),
+          this.git.getSyncInfo(),
+          this.git.getRebaseState(),
+          this.git.getLastCommitMessage()
+        ]);
+        changes = nextChanges;
         this.hasMoreHistory = fetched.length > this.historyLimit;
         history = this.hasMoreHistory ? fetched.slice(0, this.historyLimit) : fetched;
-        branches = await this.git.getBranches();
-        stashes = await this.git.stashList();
+        branches = nextBranches;
         // Drop notes for stashes that no longer exist, then attach the rest.
-        this.stashNotes.prune(stashes.map((st) => st.hash).filter((h): h is string => !!h));
-        stashes = stashes.map((st) => ({ ...st, note: this.stashNotes.get(st.hash) }));
-        const sync = await this.git.getSyncInfo();
+        this.stashNotes.prune(nextStashes.map((st) => st.hash).filter((h): h is string => !!h));
+        stashes = nextStashes.map((st) => ({ ...st, note: this.stashNotes.get(st.hash) }));
         ahead = sync.ahead;
         behind = sync.behind;
         hasUpstream = sync.hasUpstream;
-        rebaseState = await this.git.getRebaseState();
-        lastCommit = await this.git.getLastCommitMessage();
+        rebaseState = nextRebaseState;
+        lastCommit = nextLastCommit;
       }
     } catch (error) {
       if (!stateError) {
@@ -1978,6 +2038,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
     // Models are never hardcoded — only what the provider's API returned.
     const models = this.modelsCache[provider] ?? [];
+    const [hasApiKey, jiraHasToken] = await secretsReady.catch(() => [false, false]);
 
     return {
       repositoryName,
@@ -2046,6 +2107,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "media", "main.css")
     );
+    // Chart.js (~200 KB) is only needed by the Reports panel, so main.js injects
+    // it on first use (with this nonce) instead of parsing it on every load.
     const csp = [
       `default-src 'none'`,
       `img-src ${webview.cspSource}`,
@@ -2064,18 +2127,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div id="app"></div>
-  <script nonce="${nonce}" src="${chartUri}"></script>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
+  <script nonce="${nonce}" src="${scriptUri}" data-chart-src="${chartUri}"></script>
 </body>
 </html>`;
   }
 }
 
+/** CSP nonce — must be unguessable, so it comes from the CSPRNG, not Math.random. */
 function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let text = "";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
+  return randomBytes(24).toString("base64url");
 }

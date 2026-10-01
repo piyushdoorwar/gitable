@@ -148,6 +148,17 @@ describe("GitCliService integration", () => {
     expect(await service.getChanges()).toEqual({ staged: [], unstaged: [], conflicts: [] });
   });
 
+  it("deleteBranch refuses an unmerged branch unless forced", async () => {
+    await git(["checkout", "-b", "unmerged"], root);
+    await writeFile(path.join(root, "tracked.txt"), "branch only\n");
+    await git(["commit", "-am", "unmerged work"], root);
+    await git(["checkout", "main"], root);
+
+    await expect(service.deleteBranch("unmerged")).rejects.toThrow(/not fully merged/);
+    await service.deleteBranch("unmerged", true);
+    expect(await service.getBranches()).toEqual(["main"]);
+  });
+
   it("switches branches and brings local changes to the target branch", async () => {
     await git(["checkout", "-b", "test"], root);
     await writeFile(path.join(root, "target.txt"), "target\n");
@@ -446,6 +457,37 @@ describe("GitCliService integration", () => {
     });
   });
 
+  describe("getChanges — unusual paths", () => {
+    it("keeps paths with spaces, quotes and unicode intact", async () => {
+      const names = ["with space.txt", 'quo"te.txt', "ünï.txt"];
+      for (const name of names) {
+        await writeFile(path.join(root, name), "x\n");
+      }
+      const changes = await service.getChanges();
+      expect(changes.unstaged.map((c) => c.path).sort()).toEqual([...names].sort());
+    });
+
+    it("parses a rename whose new name contains ' -> '", async () => {
+      await git(["mv", "tracked.txt", "a -> b.txt"], root);
+      const changes = await service.getChanges();
+      expect(changes.staged).toHaveLength(1);
+      expect(changes.staged[0]).toMatchObject({ path: "a -> b.txt", originalPath: "tracked.txt", status: "R" });
+    });
+
+    it("lists commit files with spaces and renames via getCommitFiles", async () => {
+      await git(["mv", "tracked.txt", "new name.txt"], root);
+      await writeFile(path.join(root, "added file.txt"), "x\n");
+      await git(["add", "-A"], root);
+      await git(["commit", "-m", "rename"], root);
+      const head = (await git(["rev-parse", "HEAD"], root)).trim();
+      const files = await service.getCommitFiles(head);
+      expect(files.map((f) => [f.path, f.status]).sort()).toEqual([
+        ["added file.txt", "A"],
+        ["new name.txt", "R"]
+      ]);
+    });
+  });
+
   // ---- diff content ---------------------------------------------------------
 
   describe("diff content", () => {
@@ -690,6 +732,21 @@ describe("GitCliService integration", () => {
   });
 
   describe("stash", () => {
+    it("stashFiles stashes only the chosen working-tree files, untracked included", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "base\nedited\n");
+      await writeFile(path.join(root, "keep.txt"), "keep\n");
+      await writeFile(path.join(root, "new.txt"), "new\n");
+      await service.stashFiles(["tracked.txt", "new.txt"]);
+
+      const changes = await service.getChanges();
+      expect(changes.unstaged.map((c) => c.path)).toEqual(["keep.txt"]);
+      expect(await service.stashList()).toHaveLength(1);
+
+      await service.stashPop("stash@{0}");
+      const restored = (await service.getChanges()).unstaged.map((c) => c.path).sort();
+      expect(restored).toEqual(["keep.txt", "new.txt", "tracked.txt"]);
+    });
+
     it("stashList returns empty array when there are no stashes", async () => {
       const stashes = await service.stashList();
       expect(stashes).toEqual([]);
@@ -1014,6 +1071,28 @@ describe("GitCliService integration", () => {
       const state = await service.getRebaseState();
       expect(state.inProgress).toBe(true);
       expect(state.branch).toBe("my-feature");
+    });
+
+    it("getRebaseState detects a rebase inside a linked worktree", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "main version\n");
+      await git(["commit", "-am", "main: edit"], root);
+      const wt = await mkdtemp(path.join(os.tmpdir(), "gitable-wt-"));
+      await rm(wt, { recursive: true, force: true });
+      await git(["worktree", "add", "-b", "wt-branch", wt, "HEAD~1"], root);
+      try {
+        await writeFile(path.join(wt, "tracked.txt"), "worktree version\n");
+        await git(["commit", "-am", "wt: conflicting"], wt);
+        const wtService = new GitCliService(new TestLogger() as unknown as Logger);
+        wtService.setActiveRoot(wt);
+        await wtService.rebase("main").catch(() => {});
+        const state = await wtService.getRebaseState();
+        expect(state.inProgress).toBe(true);
+        expect(state.branch).toBe("wt-branch");
+        await wtService.rebaseAbort();
+      } finally {
+        await git(["worktree", "remove", "--force", wt], root).catch(() => {});
+        await rm(wt, { recursive: true, force: true });
+      }
     });
 
     it("rebaseAbort restores the branch after a conflicted rebase", async () => {

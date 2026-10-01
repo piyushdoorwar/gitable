@@ -398,9 +398,9 @@ export class VsCodeGitService implements GitService {
     return this.cli.renameBranch(oldName, newName);
   }
 
-  deleteBranch(name: string): Promise<void> {
+  deleteBranch(name: string, force = false): Promise<void> {
     this.syncCliRoot();
-    return this.cli.deleteBranch(name);
+    return this.cli.deleteBranch(name, force);
   }
 
   mergeBranch(name: string): Promise<void> {
@@ -423,6 +423,11 @@ export class VsCodeGitService implements GitService {
   stashStaged(): Promise<void> {
     this.syncCliRoot();
     return this.cli.stashStaged();
+  }
+
+  stashFiles(paths: string[], message?: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.stashFiles(paths, message);
   }
 
   stashAll(): Promise<void> {

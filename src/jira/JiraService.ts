@@ -18,10 +18,17 @@ const BASE_URL_KEY = "gitable.jira.baseUrl";
 const EMAIL_KEY = "gitable.jira.email";
 
 export class JiraService {
+  /** Cached token presence — `hasToken` runs on every state build. */
+  private tokenPresent: boolean | undefined;
+
   constructor(
     private readonly secrets: vscode.SecretStorage,
     private readonly state: vscode.Memento
-  ) {}
+  ) {
+    secrets.onDidChange?.((e) => {
+      if (e.key === SECRET_KEY) this.tokenPresent = undefined;
+    });
+  }
 
   getConfig(): JiraConfig {
     return {
@@ -31,8 +38,26 @@ export class JiraService {
   }
 
   async saveConfig(baseUrl: string, email: string): Promise<void> {
-    await this.state.update(BASE_URL_KEY, baseUrl.replace(/\/$/, "").trim());
+    await this.state.update(BASE_URL_KEY, JiraService.normalizeBaseUrl(baseUrl));
     await this.state.update(EMAIL_KEY, email.trim());
+  }
+
+  /**
+   * Trims and strips trailing slashes, and insists on https: the API token goes
+   * out as Basic auth on every request, so a plain-http URL would leak it.
+   */
+  static normalizeBaseUrl(raw: string): string {
+    const trimmed = raw.trim().replace(/\/+$/, "");
+    let url: URL;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      throw new Error("Jira base URL is not a valid URL (e.g. https://yourcompany.atlassian.net).");
+    }
+    if (url.protocol !== "https:") {
+      throw new Error("Jira base URL must use https:// — the API token would otherwise be sent unencrypted.");
+    }
+    return trimmed;
   }
 
   async getToken(): Promise<string | undefined> {
@@ -41,11 +66,15 @@ export class JiraService {
 
   async saveToken(token: string): Promise<void> {
     await this.secrets.store(SECRET_KEY, token.trim());
+    this.tokenPresent = undefined;
   }
 
   async hasToken(): Promise<boolean> {
-    const t = await this.getToken();
-    return !!t && t.length > 0;
+    if (this.tokenPresent === undefined) {
+      const t = await this.getToken();
+      this.tokenPresent = !!t && t.length > 0;
+    }
+    return this.tokenPresent;
   }
 
   async validate(): Promise<void> {
@@ -54,6 +83,7 @@ export class JiraService {
     if (!baseUrl || !email || !token) {
       throw new Error("Jira base URL, email, and API token are all required.");
     }
+    JiraService.normalizeBaseUrl(baseUrl); // refuse a stored non-https URL
     const res = await fetchWithTimeout(`${baseUrl}/rest/api/3/myself`, {
       headers: this.buildHeaders(email, token),
     });
@@ -69,6 +99,7 @@ export class JiraService {
     if (!baseUrl || !email || !token) {
       throw new Error("Jira is not configured. Add your credentials in Settings → Jira.");
     }
+    JiraService.normalizeBaseUrl(baseUrl); // refuse a stored non-https URL
     const base = `assignee = currentUser() AND statusCategory != Done`;
     const jql = query.trim()
       ? `${base} AND text ~ "${query.replace(/"/g, '\\"')}" ORDER BY updated DESC`
@@ -81,20 +112,23 @@ export class JiraService {
     }
     const data = (await res.json()) as {
       issues?: Array<{
-        key: string;
-        fields: {
-          summary: string;
-          status: { name: string };
-          issuetype: { name: string };
+        key?: string;
+        fields?: {
+          summary?: string;
+          status?: { name?: string };
+          issuetype?: { name?: string };
         };
       }>;
     };
-    return (data.issues ?? []).map((i) => ({
-      key: i.key,
-      summary: i.fields.summary,
-      status: i.fields.status.name,
-      type: i.fields.issuetype.name,
-    }));
+    // Field-level permissions or custom schemes can omit any of these.
+    return (data.issues ?? [])
+      .filter((i) => !!i?.key)
+      .map((i) => ({
+        key: String(i.key),
+        summary: i.fields?.summary ?? "",
+        status: i.fields?.status?.name ?? "",
+        type: i.fields?.issuetype?.name ?? "",
+      }));
   }
 
   private buildHeaders(email: string, token: string): Record<string, string> {

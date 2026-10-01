@@ -6,11 +6,6 @@ import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError, PullStrategy } from "./GitService";
 import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
 
-/** Strip surrounding double-quotes that git adds to paths containing spaces or special chars. */
-function unquoteGitPath(p: string): string {
-  return p.startsWith('"') && p.endsWith('"') ? p.slice(1, -1) : p;
-}
-
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
  *
@@ -29,6 +24,7 @@ export class GitCliService implements GitService {
   /** Backoff before each retry of a lock-contended command. */
   private static readonly lockRetryDelaysMs = [80, 200, 450];
   private activeRoot: string | undefined;
+  private readonly gitDirs = new Map<string, string>();
 
   constructor(private readonly logger: Logger) {}
 
@@ -72,26 +68,33 @@ export class GitCliService implements GitService {
 
   async getChanges(): Promise<RepoChanges> {
     const root = this.requireRoot();
-    const output = await this.run(["-c", "core.quotepath=false", "status", "--porcelain", "--untracked-files=all"], root);
+    // `-z` gives NUL-separated, never-quoted paths: the newline form quotes and
+    // C-escapes paths with spaces, quotes or non-ASCII bytes, and renders renames
+    // as "old -> new", which is ambiguous for a file literally named "a -> b".
+    // `--no-optional-locks` stops status from taking index.lock to refresh stat
+    // info, which otherwise collides with VS Code's Git extension and our own
+    // staging/commit commands.
+    const output = await this.run(
+      ["--no-optional-locks", "status", "--porcelain", "-z", "--untracked-files=all"],
+      root
+    );
     const staged: FileChange[] = [];
     const unstaged: FileChange[] = [];
     const conflicts: FileChange[] = [];
 
-    for (const line of output.split("\n")) {
-      if (!line.trim()) {
+    const entries = output.split("\0");
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.length < 4) {
         continue;
       }
-      const x = line.charAt(0);
-      const y = line.charAt(1);
-      let filePath = line.slice(3);
+      const x = entry.charAt(0);
+      const y = entry.charAt(1);
+      const filePath = entry.slice(3);
       let originalPath: string | undefined;
-
-      const arrow = filePath.indexOf(" -> ");
-      if (arrow !== -1) {
-        originalPath = unquoteGitPath(filePath.slice(0, arrow));
-        filePath = unquoteGitPath(filePath.slice(arrow + 4));
-      } else {
-        filePath = unquoteGitPath(filePath);
+      // Renames and copies carry their source path as the next NUL-separated field.
+      if (x === "R" || x === "C" || y === "R" || y === "C") {
+        originalPath = entries[++i] || undefined;
       }
 
       // Git can report untracked directories as "dir/" — skip these directory-only entries.
@@ -222,11 +225,14 @@ export class GitCliService implements GitService {
   async getHistory(limit: number): Promise<CommitInfo[]> {
     const root = this.requireRoot();
     try {
-      const unpushed = await this.getUnpushedHashes(root);
-      const output = await this.run(
-        ["log", "--decorate=short", `--pretty=format:%H%x09%an%x09%ar%x09%D%x09%s`, "-n", String(limit)],
-        root
-      );
+      // Independent reads — run them side by side.
+      const [unpushed, output] = await Promise.all([
+        this.getUnpushedHashes(root),
+        this.run(
+          ["log", "--decorate=short", `--pretty=format:%H%x09%an%x09%ar%x09%D%x09%s`, "-n", String(limit)],
+          root
+        )
+      ]);
       return output
         .split("\n")
         .filter((line) => line.trim().length > 0)
@@ -277,23 +283,26 @@ export class GitCliService implements GitService {
   /** Files changed by a single commit (vs its parent; root commit shows all). */
   async getCommitFiles(hash: string): Promise<FileChange[]> {
     const root = this.requireRoot();
+    // `-z`: NUL-separated fields with raw (unquoted) paths — "M\0path\0" or, for
+    // renames/copies, "R100\0old\0new\0".
     const output = await this.run(
-      ["-c", "core.quotepath=false", "diff-tree", "--no-commit-id", "--name-status", "-r", "-M", "--root", hash],
+      ["diff-tree", "-z", "--no-commit-id", "--name-status", "-r", "-M", "--root", hash],
       root
     );
     const files: FileChange[] = [];
-    for (const line of output.split("\n")) {
-      if (!line.trim()) {
+    const fields = output.split("\0");
+    for (let i = 0; i < fields.length; i++) {
+      const code = fields[i].trim();
+      if (!code) {
         continue;
       }
-      const parts = line.split("\t");
-      const letter = parts[0].trim().charAt(0).toUpperCase();
-      // Renames/copies report "R100\told\tnew" — use the new path.
-      const rawPath = (letter === "R" || letter === "C") && parts[2] ? parts[2] : parts[1];
-      if (!rawPath) {
+      const letter = code.charAt(0).toUpperCase();
+      const isPair = letter === "R" || letter === "C";
+      const filePath = isPair ? fields[i + 2] : fields[i + 1];
+      i += isPair ? 2 : 1;
+      if (!filePath) {
         continue;
       }
-      const filePath = unquoteGitPath(rawPath);
       files.push({
         path: filePath,
         displayPath: filePath,
@@ -443,8 +452,8 @@ export class GitCliService implements GitService {
     await this.run(["branch", "-m", oldName, newName], this.requireRoot());
   }
 
-  async deleteBranch(name: string): Promise<void> {
-    await this.run(["branch", "-d", name], this.requireRoot());
+  async deleteBranch(name: string, force = false): Promise<void> {
+    await this.run(["branch", force ? "-D" : "-d", name], this.requireRoot());
   }
 
   async mergeBranch(name: string): Promise<void> {
@@ -459,8 +468,22 @@ export class GitCliService implements GitService {
     await this.run(["stash", "push", "--staged"], this.requireRoot());
   }
 
+  /** Stashes the given paths' changes (untracked files included), leaving every
+   *  other file — and anything already staged elsewhere — untouched. */
+  async stashFiles(paths: string[], message?: string): Promise<void> {
+    if (!paths.length) {
+      return;
+    }
+    const args = ["stash", "push", "--include-untracked"];
+    if (message && message.trim()) {
+      args.push("-m", message.trim());
+    }
+    await this.run([...args, "--", ...paths], this.requireRoot());
+  }
+
   async stashAll(): Promise<void> {
-    await this.run(["stash", "push", "--include-untracked"], this.requireRoot());
+    // Labelled so a stash left behind by a conflicting restore is recognisable.
+    await this.run(["stash", "push", "--include-untracked", "-m", "Gitable auto-stash before pull"], this.requireRoot());
   }
 
   async stashList(): Promise<StashEntry[]> {
@@ -564,9 +587,10 @@ export class GitCliService implements GitService {
 
   async getRebaseState(): Promise<RebaseState> {
     const root = this.requireRoot();
-    const gitDir = path.join(root, ".git");
+    // Worktrees and submodules have a `.git` *file* pointing elsewhere, so the
+    // rebase state lives under the real git dir, not `<root>/.git`.
+    const gitDir = await this.resolveGitDir(root);
 
-    // git worktrees store rebase state under .git/worktrees/<name>/rebase-merge
     const candidates = [
       path.join(gitDir, "rebase-merge"),
       path.join(gitDir, "rebase-apply"),
@@ -637,6 +661,25 @@ export class GitCliService implements GitService {
     } catch {
       return "(no branch)";
     }
+  }
+
+  /** Absolute git dir for `root`, resolved once per root (it never changes). */
+  private async resolveGitDir(root: string): Promise<string> {
+    const cached = this.gitDirs.get(root);
+    if (cached) {
+      return cached;
+    }
+    let gitDir = path.join(root, ".git");
+    try {
+      const resolved = (await this.run(["rev-parse", "--absolute-git-dir"], root)).trim();
+      if (resolved) {
+        gitDir = resolved;
+      }
+    } catch {
+      // Fall back to the conventional location.
+    }
+    this.gitDirs.set(root, gitDir);
+    return gitDir;
   }
 
   private branchStashMessage(branch: string): string {

@@ -118,8 +118,8 @@ export interface GitService {
   /** Renames a local branch. */
   renameBranch(oldName: string, newName: string): Promise<void>;
 
-  /** Deletes a local branch (safe delete — fails if unmerged). */
-  deleteBranch(name: string): Promise<void>;
+  /** Deletes a local branch; `force` (-D) also deletes one that is not fully merged. */
+  deleteBranch(name: string, force?: boolean): Promise<void>;
 
   /** Merges the given branch into the currently checked-out branch. */
   mergeBranch(name: string): Promise<void>;
@@ -135,6 +135,9 @@ export interface GitService {
 
   /** Stashes all local changes including untracked files. */
   stashAll(): Promise<void>;
+
+  /** Stashes only the given paths (working-tree and untracked), no staging needed. */
+  stashFiles(paths: string[], message?: string): Promise<void>;
 
   /** Returns all stash entries, newest first. Empty array when there are none. */
   stashList(): Promise<StashEntry[]>;

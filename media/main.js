@@ -1,5 +1,10 @@
 (function () {
   const vscode = acquireVsCodeApi();
+  // Captured synchronously: `document.currentScript` is only set during the
+  // initial run. The nonce lets the lazily injected Chart.js pass the CSP.
+  const bootScript = /** @type {HTMLScriptElement|null} */ (document.currentScript);
+  const CHART_SRC = (bootScript && bootScript.dataset.chartSrc) || "";
+  const SCRIPT_NONCE = (bootScript && (bootScript.nonce || bootScript.getAttribute("nonce"))) || "";
 
   const SUMMARY_MESSAGES = ["Reading commits…", "Summarizing changes…", "Connecting the dots…", "Almost there…"];
   const SECURITY_MESSAGES = ["Reviewing the code…", "Joining the dots…", "Matching against known vulnerabilities…", "Categorizing risks…", "Almost there…"];
@@ -343,6 +348,17 @@
       progressState.timer = null;
     }
   }
+  /**
+   * innerHTML, but a no-op when the markup is identical to what was last written.
+   * Most state pushes change nothing in a given list; rebuilding it anyway costs
+   * layout, drops hover state and resets focus inside it.
+   */
+  function setHtml(node, html) {
+    if (!node) return;
+    if (node.__gxHtml === html) return;
+    node.__gxHtml = html;
+    node.innerHTML = html;
+  }
   function byId(id) {
     return /** @type {HTMLElement} */ (document.getElementById(id));
   }
@@ -673,6 +689,8 @@
               <span class="spacer"></span>
               <span class="gx-section-actions">
                 <button id="unstagedSecurityBtn" class="gx-mini-action gx-mini-action-ai" data-action="securityReview" data-staged="0" title="Security review of unstaged changes" aria-label="Security review of unstaged changes" type="button">${ICONS.shieldAi}</button>
+                <span class="gx-mini-sep"></span>
+                <button id="stashSelectedBtn" class="gx-mini-action" data-action="stashSelected" title="Stash selected files" aria-label="Stash selected files" type="button">${ICONS.stash}</button>
                 <span class="gx-mini-sep"></span>
                 <button id="discardSelectedBtn" class="gx-mini-action gx-danger hidden" data-action="discardSelected" title="Discard selected files" aria-label="Discard selected files" type="button">${ICONS.trash}</button>
                 <button id="stageSelectedBtn" class="gx-mini-action" data-action="stageSelected" title="Stage selected files" aria-label="Stage selected files" type="button">${ICONS.plus}</button>
@@ -1193,6 +1211,15 @@
         }
         break;
       }
+      case "stashSelected": {
+        // Stash straight from the working tree — no detour through Staged.
+        const paths = selectedPaths(s.changes.unstaged, false);
+        if (paths.length) {
+          switchChangeTab("stashes");
+          post({ type: "stashFiles", filePaths: paths });
+        }
+        break;
+      }
       case "discardSelected": {
         const paths = selectedPaths(s.changes.unstaged, false);
         if (paths.length) post({ type: "discardFiles", filePaths: paths, staged: false });
@@ -1470,7 +1497,7 @@
       case "securityReviewSelectedCommits": {
         const commits = selectedCommitPayload();
         if (!commits.length) return;
-        ui.activeSecurityReview = { staged: false, scope: selectedCommitLabel(commits), loading: true };
+        ui.activeSecurityReview = { staged: false, scope: selectedCommitLabel(commits), fromHistory: true, loading: true };
         byId("panel-security").classList.remove("hidden");
         startAiProgress(SECURITY_MESSAGES, ui.securityProgress, renderSecurityPanel);
         post({ type: "securityReviewCommits", commits, maxChars: getMaxChars("security") });
@@ -1936,14 +1963,20 @@
     const stagedFiles = s.changes.staged || [];
     const unstagedFiles = s.changes.unstaged || [];
     const partialPaths = partialFilePaths(stagedFiles, unstagedFiles);
-    byId("stagedList").innerHTML = renderFileList(stagedFiles, true, partialPaths);
-    byId("unstagedList").innerHTML = renderFileList(unstagedFiles, false, partialPaths);
+    setHtml(byId("stagedList"), renderFileList(stagedFiles, true, partialPaths));
+    setHtml(byId("unstagedList"), renderFileList(unstagedFiles, false, partialPaths));
     byId("stagedCount").textContent = String(stagedFiles.length);
     byId("unstagedCount").textContent = String(unstagedFiles.length);
+    syncChecks(byId("stagedList"), true);
+    syncChecks(byId("unstagedList"), false);
     if (ui.config.fileView === "tree") {
       applyFolderIndeterminate(byId("stagedList"), true);
       applyFolderIndeterminate(byId("unstagedList"), false);
     }
+
+    // Declared up front: the rebase bar below reads it, and reading a `const`
+    // before its declaration throws — which froze the whole panel mid-rebase.
+    const busy = !!s.isLoading;
 
     // Conflicts section
     const conflicts = (s.changes && s.changes.conflicts) || [];
@@ -1958,7 +1991,7 @@
         : `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all before committing`;
       conflictsSection.classList.remove("hidden");
       byId("conflictsCount").textContent = String(conflicts.length);
-      byId("conflictsList").innerHTML = renderConflictList(conflicts);
+      setHtml(byId("conflictsList"), renderConflictList(conflicts));
     } else {
       conflictsBanner.classList.add("hidden");
       conflictsSection.classList.add("hidden");
@@ -1978,12 +2011,11 @@
 
     // Stash section
     const stashes = s.stashes || [];
-    byId("stashList").innerHTML = renderStashList(stashes);
+    setHtml(byId("stashList"), renderStashList(stashes));
     const stashCountEl = byId("stashCount");
     stashCountEl.textContent = String(stashes.length);
     renderChangeSubTabs();
 
-    const busy = !!s.isLoading;
     const hasStaged = stagedFiles.length > 0;
     const commitPanelActive = ui.activeChangeTab === "staged";
     const provLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
@@ -2062,6 +2094,12 @@
     const unstageSelected = byId("unstageSelectedBtn");
     const stageSelected = byId("stageSelectedBtn");
     const discardSelected = byId("discardSelectedBtn");
+    const stashSelected = byId("stashSelectedBtn");
+    setHint(
+      stashSelected,
+      selectedUnstaged ? `Stash ${plural(selectedUnstaged, "selected file")}` : "Select changed files to stash"
+    );
+    setDisabled(stashSelected, busy || selectedUnstaged === 0 || hasConflictsNow);
     setHint(
       unstageSelected,
       selectedStaged ? `Unstage ${plural(selectedStaged, "selected file")}` : "Uncheck files above to keep them staged"
@@ -2094,6 +2132,15 @@
     });
   }
 
+  /** Brings file checkboxes in line with `ui.selected` — needed when setHtml()
+   *  skipped a rewrite but the selection changed (e.g. auto-check, bulk toggle). */
+  function syncChecks(listEl, isStaged) {
+    listEl.querySelectorAll(".gx-check:not(.gx-folder-check)").forEach((box) => {
+      const p = box.getAttribute("data-path");
+      if (p) box.checked = ui.selected.has(selectionKey(p, isStaged));
+    });
+  }
+
   function partialFilePaths(stagedFiles, unstagedFiles) {
     const unstaged = new Set((unstagedFiles || []).map((file) => file.path));
     return new Set((stagedFiles || []).filter((file) => unstaged.has(file.path)).map((file) => file.path));
@@ -2104,12 +2151,12 @@
     const filter = (ui.branchFilter || "").toLowerCase();
     const branches = (s.branches || []).filter((b) => b.toLowerCase().includes(filter));
     if (!branches.length) {
-      list.innerHTML = `<li class="gx-empty">${
+      setHtml(list, `<li class="gx-empty">${
         s.branches && s.branches.length ? "No matching branches" : "No branches"
-      }</li>`;
+      }</li>`);
       return;
     }
-    list.innerHTML = branches
+    setHtml(list, branches
       .map((b) => {
         const current = b === s.branchName;
         return `<li class="gx-branch-item${current ? " current" : ""}" data-action="switchBranchTo" data-name="${escapeHtml(
@@ -2122,7 +2169,7 @@
             ${current ? `<span class="gx-ic sm gx-branch-check">${ICONS.check}</span>` : ""}
           </li>`;
       })
-      .join("");
+      .join(""));
   }
 
   function timeAgo(ts) {
@@ -2422,10 +2469,10 @@
     pruneCommitSelection(commits);
     renderHistoryActions();
     if (!commits.length) {
-      list.innerHTML = `<li class="gx-empty">No commits yet</li>`;
+      setHtml(list, `<li class="gx-empty">No commits yet</li>`);
       return;
     }
-    list.innerHTML = commits
+    setHtml(list, commits
       .map((c) => {
         const expanded = ui.expandedCommits.has(c.hash);
         const selected = ui.selectedCommits.has(c.hash);
@@ -2460,7 +2507,7 @@
       .join("")
       + (s.hasMoreHistory
         ? `<li class="gx-load-more-wrap"><button class="gx-load-more" data-action="loadMoreHistory" type="button">Show more commits</button></li>`
-        : "");
+        : ""));
   }
 
   function renderHistoryActions() {
@@ -2574,6 +2621,9 @@
     if (!sr) { container.innerHTML = ""; return; }
 
     const scope = sr.scope || (sr.staged ? "Staged Changes" : "Working Tree Changes");
+    const backBtn = sr.fromHistory
+      ? `<button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("history", "sm")}<span>Back to History</span></button>`
+      : `<button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("changes", "sm")}<span>Back to Changes</span></button>`;
 
     if (sr.loading) {
       const progressText = SECURITY_MESSAGES[ui.securityProgress.idx] || SECURITY_MESSAGES[0];
@@ -2590,7 +2640,7 @@
           <div class="gx-ai-panel-meta"><span class="gx-sec-scope">${escapeHtml(scope)}</span></div>
           <div class="gx-ai-panel-error">${escapeHtml(sr.error)}</div>
           <div class="gx-ai-panel-actions">
-            <button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("changes", "sm")}<span>Back to Changes</span></button>
+            ${backBtn}
           </div>
         </div>`;
       return;
@@ -2621,7 +2671,7 @@
         </div>
         <div class="gx-ai-panel-actions">
           <button class="gx-btn gx-btn-primary" data-action="copySecurityReview" type="button">${icon("copy", "sm")}<span>Copy</span></button>
-          <button class="gx-btn gx-btn-ghost" data-action="closeSecurityReview" type="button">${icon("changes", "sm")}<span>Back to Changes</span></button>
+          ${backBtn}
         </div>
       </div>`;
   }
@@ -2795,7 +2845,7 @@
   }
 
   function jiraStatusClass(status) {
-    const s = status.toLowerCase();
+    const s = String(status || "").toLowerCase();
     if (s.includes("progress") || s.includes("doing") || s.includes("active")) return "gx-jira-st-progress";
     if (s.includes("review") || s.includes("testing") || s.includes("qa")) return "gx-jira-st-review";
     if (s.includes("done") || s.includes("closed") || s.includes("resolved") || s.includes("complete")) return "gx-jira-st-done";
@@ -2825,9 +2875,9 @@
     const query = ((/** @type {HTMLInputElement|null} */ (byId("jiraSearchInput")))?.value ?? "").trim().toLowerCase();
     let issues = query
       ? ui.jiraIssues.filter((i) =>
-          i.key.toLowerCase().includes(query) ||
-          i.summary.toLowerCase().includes(query) ||
-          i.status.toLowerCase().includes(query)
+          String(i.key || "").toLowerCase().includes(query) ||
+          String(i.summary || "").toLowerCase().includes(query) ||
+          String(i.status || "").toLowerCase().includes(query)
         )
       : [...ui.jiraIssues];
     if (!issues.length) {
@@ -2871,9 +2921,36 @@
 
   // ---------- Reports ----------
 
+  /** Loads Chart.js on first use; resolves false if it can't be loaded. */
+  let chartLoader = null;
+  function loadChartJs() {
+    if (typeof Chart !== "undefined") return Promise.resolve(true);
+    if (!CHART_SRC) return Promise.resolve(false);
+    if (!chartLoader) {
+      chartLoader = new Promise((resolve) => {
+        const script = document.createElement("script");
+        script.src = CHART_SRC;
+        if (SCRIPT_NONCE) script.nonce = SCRIPT_NONCE;
+        script.onload = () => resolve(typeof Chart !== "undefined");
+        script.onerror = () => { chartLoader = null; resolve(false); };
+        document.head.append(script);
+      });
+    }
+    return chartLoader;
+  }
+  /** The live day chart; destroyed before its canvas is replaced so Chart.js
+   *  doesn't keep the old instance (and its resize observer) alive. */
+  let dayChart = null;
+  /** Resolves a CSS custom property to a concrete colour for Chart.js (canvas
+   *  can't read `var(...)`), so the chart follows the active VS Code theme. */
+  function cssColor(name, fallback) {
+    const v = getComputedStyle(document.body).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
   const TYPE_LABELS = { commitMessage: "Commit msg", commitSummary: "AI Summary", security: "Security" };
   // Single blue for every "By type" bar so the section reads as one colour.
-  const TYPE_BLUE = "rgba(31,156,240,0.95)";
+  const TYPE_BLUE = "var(--gx-accent)";
   const TYPE_COLORS = { commitMessage: TYPE_BLUE, commitSummary: TYPE_BLUE, security: TYPE_BLUE };
   const PROVIDER_COLORS = { openai: "#19c37d", gemini: "#6aa9ff", claude: "#e8991e" };
 
@@ -2883,6 +2960,11 @@
   function renderReports(entries) {
     const el = byId("reportsContent");
     if (!el) return;
+
+    if (dayChart) {
+      dayChart.destroy();
+      dayChart = null;
+    }
 
     if (entries === null) {
       el.innerHTML = `<div class="gx-rep-loading"><span class="gx-spin"></span><span>Loading…</span></div>`;
@@ -3002,17 +3084,22 @@
     });
 
     // ── Chart.js bar chart ──
-    if (recentDays.length && typeof Chart !== "undefined") {
-      const canvas = /** @type {HTMLCanvasElement|null} */ (byId("repDayChart"));
-      if (canvas) {
-        new Chart(canvas, {
+    if (recentDays.length) {
+      void loadChartJs().then((ok) => {
+        const canvas = /** @type {HTMLCanvasElement|null} */ (byId("repDayChart"));
+        if (!ok || !canvas || !canvas.isConnected) return;
+        if (dayChart) dayChart.destroy();
+        const accent = cssColor("--gx-accent", "#1f9cf0");
+        const muted = cssColor("--vscode-descriptionForeground", "#9a9a9a");
+        const grid = cssColor("--gx-line", "rgba(128,128,128,0.2)");
+        dayChart = new Chart(canvas, {
           type: "bar",
           data: {
             labels: recentDays.map((d) => d.label),
             datasets: [{
               data: recentDays.map((d) => d.count),
-              backgroundColor: "rgba(31,156,240,0.75)",
-              hoverBackgroundColor: "rgba(31,156,240,1)",
+              backgroundColor: accent,
+              hoverBackgroundColor: accent,
               borderRadius: 4,
               borderSkipped: false,
             }]
@@ -3031,24 +3118,24 @@
             scales: {
               x: {
                 grid: { display: false },
-                ticks: { color: "rgba(180,180,190,0.7)", font: { size: 10 } },
+                ticks: { color: muted, font: { size: 10 } },
                 border: { display: false },
               },
               y: {
                 beginAtZero: true,
                 ticks: {
-                  color: "rgba(180,180,190,0.5)",
+                  color: muted,
                   font: { size: 9 },
                   stepSize: 1,
                   maxTicksLimit: 5,
                 },
-                grid: { color: "rgba(255,255,255,0.05)" },
+                grid: { color: grid },
                 border: { display: false },
               }
             }
           }
         });
-      }
+      });
     }
   }
 
@@ -3066,6 +3153,15 @@
             requestAnimationFrame(() => post({ type: "stateRendered", renderId: message.renderId }));
           });
         }
+        break;
+      case "busy":
+        // Progress-text update from the host — no new git data, just re-render.
+        ui.state = Object.assign(ui.state, {
+          busyKind: message.busyKind || "",
+          busyText: message.busyText || "",
+          isLoading: !!message.isLoading
+        });
+        render();
         break;
       case "setCommitFields":
         if (typeof message.summary === "string")
