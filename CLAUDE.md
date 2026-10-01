@@ -472,6 +472,19 @@ workspace, never committed to the repo.
   recipe — don't paste vendor SVGs in (`settings`, `reports` and `folder` were SVGRepo
   imports in a different visual language, with leftover `SVGRepo_*` wrapper groups).
 
+- **Typography.** The panel uses DM Sans, bundled in `media/fonts/` (latin 400–700 woff2,
+  SIL OFL 1.1 — see `media/fonts/OFL.txt`) and loaded via `@font-face`; the CSP allows
+  `font-src ${webview.cspSource}` only, so nothing is fetched at runtime. `--gx-font` and
+  `--gx-mono` (the user's editor font, for hashes/keys/counts) are declared on `body`, not
+  `:root`, so the `--vscode-*` fallbacks resolve. Settings → Config → **Use VS Code font**
+  (`ui.config.nativeFont`) adds `body.gx-font-native` to switch back to the editor UI font.
+- **File-type badges.** `fileIcon()` renders a short tinted label (`TS`, `JS`, `{}`, `MD`,
+  `DKR`…) in the `.gx-ext-*` colour instead of one identical document outline per row;
+  images and extensionless files keep a glyph. Labels come from `EXT_LABEL` /
+  `FILENAME_LABEL`, else the first three letters of the extension.
+- **Brand and stash icons.** The header shows the Gitable mark (`ICONS.brand`, same geometry
+  as `media/icon.svg`) rather than a generic book. Stash uses an archive box (`stash`,
+  `stashPop`): the old tray-with-down-arrow read as "download".
 - **Config panel info icons.** Each section header in Settings → Config (Appearance, Jira Integration, File View, AI Token Budget) carries an inline `ICONS.info` icon (13×13 px, `gx-info-icon gx-ic sm`) with a `title` attribute instead of a hint paragraph below the label. The icon is muted by default and turns pink on hover. Token budget Low/Mid/High buttons each carry a `title` with the exact char limit ("~10,000 chars of diff" etc.).
 - **Jira integration.** Optional panel (toggled in Settings → Jira). Credentials (base URL, email, API token via SecretStorage) connect to Jira Cloud's REST API v3. Issues assigned to the current user and not Done are fetched (`maxResults=50`). Search is local-only (filters the cached 50 results). Status badges use keyword matching (`jiraStatusClass()`). Three-dot menu per issue: Copy key, Copy branch name, Open in Jira (via `vscode.env.openExternal`). Sort by any column cycles asc → desc → off. All Jira and AI network calls use `fetchWithTimeout` (45 s) which throws `RequestTimeoutError` on abort.
 - **History tab sticky header.** The history action bar (selected count + Summary/Security/Clear buttons) is a `flex: 0 0 auto` header; only the commit list below it scrolls. Same flex-column + scroll-wrapper pattern as the Changes panel (`#panel-history { display:flex; flex-direction:column; overflow:hidden }` + `.gx-history-scroll { flex:1 1 auto; overflow-y:auto }`).

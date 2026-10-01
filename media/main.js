@@ -28,10 +28,14 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><line x1="6" y1="8.4" x2="6" y2="15.6"/><path d="M18 8.4c0 5.6-4.5 9.6-12 9.6"/></svg>',
     rebase:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><line x1="18" y1="8.4" x2="18" y2="15.6"/><path d="M6 15.6C6 10 10 8.4 18 8.4"/></svg>',
+    // Archive box: "put away for later". The old tray-with-arrow read as Download.
     stash:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m-3.5-3.5L12 13l3.5-3.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>',
     stashPop:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="5" rx="1.5"/><path d="M12 21V11m-3.5 3.5L12 11l3.5 3.5"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/><path d="M3 11h18"/><path d="M12 15V3"/><path d="m8.5 6.5 3.5-3.5 3.5 3.5"/></svg>',
+    /** Gitable logo mark (same geometry as media/icon.svg). */
+    brand:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.66 6.34A8 8 0 1 0 20 12h-9"/><circle cx="17.66" cy="6.34" r="2.2"/><circle cx="20" cy="12" r="2.2"/><circle cx="11" cy="12" r="2.2"/></svg>',
     sparkle:
       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2l1.9 5.4 5.4 1.9-5.4 1.9L12 16.8l-1.9-5.4L4.7 9.5l5.4-1.9z"/><path d="M18.7 13.6l.85 2.45 2.45.85-2.45.85-.85 2.45-.85-2.45-2.45-.85 2.45-.85z"/></svg>',
     commit:
@@ -176,6 +180,7 @@
         return {
           jiraEnabled: !!p.jiraEnabled,
           tooltipsEnabled: p.tooltipsEnabled !== false,
+          nativeFont: !!p.nativeFont,
           fileView: p.fileView === "tree" ? "tree" : "flat",
           budgets: {
             commit:   ["low","mid","high"].includes(p.budgets?.commit)   ? p.budgets.commit   : "mid",
@@ -185,7 +190,7 @@
         };
       }
     } catch (_) {}
-    return { jiraEnabled: false, tooltipsEnabled: true, fileView: "flat", budgets: { commit: "mid", summary: "mid", security: "mid" } };
+    return { jiraEnabled: false, tooltipsEnabled: true, nativeFont: false, fileView: "flat", budgets: { commit: "mid", summary: "mid", security: "mid" } };
   }
 
   function saveConfig(cfg) {
@@ -218,6 +223,12 @@
     if (toggleBtn) {
       toggleBtn.classList.toggle("on", cfg.jiraEnabled);
       toggleBtn.setAttribute("aria-pressed", String(cfg.jiraEnabled));
+    }
+    document.body.classList.toggle("gx-font-native", !!cfg.nativeFont);
+    const fontBtn = byId("fontToggleBtn");
+    if (fontBtn) {
+      fontBtn.classList.toggle("on", !!cfg.nativeFont);
+      fontBtn.setAttribute("aria-pressed", String(!!cfg.nativeFont));
     }
     const tooltipsBtn = byId("tooltipsToggleBtn");
     if (tooltipsBtn) {
@@ -628,7 +639,7 @@
     app.innerHTML = `
       <div class="gx-header">
         <div class="gx-repo-row">
-          <span class="gx-repo-name">${icon("repo", "sm")}<span id="repoName">—</span></span>
+          <span class="gx-repo-name">${icon("brand", "gx-brand")}<span id="repoName">—</span></span>
           <span class="gx-header-actions">
             <button class="gx-iconbtn gx-hdr-btn" data-action="openReports" title="Usage reports" aria-label="Usage reports" type="button">${icon("reports", "sm")}</button>
             <button id="jiraHeaderBtn" class="gx-iconbtn gx-hdr-btn" data-action="openJira" title="Jira issues" aria-label="Jira issues" type="button">${icon("jira", "sm")}</button>
@@ -851,6 +862,17 @@
           <div class="gx-field">
             <div class="gx-config-toggle-row">
               <span class="gx-label gx-label-info gx-label-no-margin">
+                <span>Use VS Code font</span>
+                <span class="gx-info-icon gx-ic sm" title="Use the editor's UI font in this panel instead of Gitable's DM Sans.">${ICONS.info}</span>
+              </span>
+              <button id="fontToggleBtn" class="gx-toggle" data-action="toggleNativeFont" type="button" aria-pressed="false">
+                <span class="gx-toggle-thumb"></span>
+              </button>
+            </div>
+          </div>
+          <div class="gx-field">
+            <div class="gx-config-toggle-row">
+              <span class="gx-label gx-label-info gx-label-no-margin">
                 <span>Jira Integration</span>
                 <span class="gx-info-icon gx-ic sm" title="Shows the Jira icon and settings tab when enabled.">${ICONS.info}</span>
               </span>
@@ -960,7 +982,7 @@
         <span class="gx-menu-sep"></span>
         <button data-menu-action="copyFilePath" role="menuitem" type="button">${icon("file", "sm")}<span>Copy file path</span></button>
         <button data-menu-action="copyRelativePath" role="menuitem" type="button">${icon("file", "sm")}<span>Copy relative path</span></button>
-        <button data-menu-action="revealFile" role="menuitem" type="button">${icon("repo", "sm")}<span>Show in file manager</span></button>
+        <button data-menu-action="revealFile" role="menuitem" type="button">${icon("folder", "sm")}<span>Show in file manager</span></button>
       </div>
 
       <div id="commitContextMenu" class="gx-context-menu hidden" role="menu"></div>
@@ -1381,6 +1403,11 @@
         updateConfigUi();
         break;
       }
+      case "toggleNativeFont":
+        ui.config.nativeFont = !ui.config.nativeFont;
+        saveConfig(ui.config);
+        updateConfigUi();
+        break;
       case "toggleTooltips": {
         ui.config.tooltipsEnabled = !ui.config.tooltipsEnabled;
         saveConfig(ui.config);
@@ -2307,13 +2334,21 @@
     }
   }
 
+  /** Badge text for well-known names whose extension says little or nothing. */
+  const FILENAME_LABEL = { dockerfile: "DKR", makefile: "MK", gemfile: "RB", rakefile: "RB", cmakelists: "CMK" };
+  const EXT_LABEL = { json: "{}", jsonc: "{}", json5: "{}", markdown: "MD", mdx: "MDX", yaml: "YML", dockerfile: "DKR" };
+
+  /** File-type badge: a short tinted label (TS, JS, {}, MD…) rather than one
+   *  generic outline per row; images and extensionless files keep a glyph. */
   function fileIcon(path) {
     const base = (String(path || "").split("/").pop() || "").toLowerCase();
     const match = /\.([a-z0-9]+)$/.exec(base);
     const ext = match ? match[1] : "";
-    const cls = EXT_CLASS[ext] || FILENAME_CLASS[base.replace(/\..*$/, "")] || "default";
-    const glyph = cls === "img" ? ICONS.image : ICONS.file;
-    return `<span class="gx-ftype gx-ext-${cls}">${glyph}</span>`;
+    const stem = base.replace(/\..*$/, "");
+    const cls = EXT_CLASS[ext] || FILENAME_CLASS[stem] || "default";
+    const label = FILENAME_LABEL[stem] || EXT_LABEL[ext] || ext.slice(0, 3);
+    const content = cls === "img" ? ICONS.image : label ? escapeHtml(label) : ICONS.file;
+    return `<span class="gx-ftype gx-ext-${cls}" aria-hidden="true">${content}</span>`;
   }
 
   /** Right-side status marker: yellow dot = modified, green + = added, etc. */
@@ -3269,6 +3304,8 @@
 
   // ---------- Boot ----------
   buildShell();
+  // Apply persisted config (font choice) before the first paint.
+  updateConfigUi();
   updateJiraVisibility();
   switchTab("changes");
   render();

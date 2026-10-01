@@ -1,3 +1,10 @@
+/* DM Sans ships with the extension (media/fonts, SIL OFL 1.1) — the webview CSP
+   allows fonts from the extension only, so nothing is fetched at runtime. */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/dm-sans-400.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/dm-sans-500.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/dm-sans-600.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/dm-sans-700.woff2") format("woff2"); }
+
 :root {
   /* Brand palette (from the Gitable logo) */
   --gx-accent: #1f9cf0;
@@ -58,11 +65,18 @@ body {
 }
 
 body {
+  /* Typography: Gitable's UI face, falling back to the editor's UI font. Code-ish
+     text (hashes, keys, counts) uses the user's editor font. Declared on body, not
+     :root, so the --vscode-* variables are in scope wherever VS Code defines them;
+     Settings → Config can switch back to VS Code's font (body.gx-font-native). */
+  --gx-font: "DM Sans", var(--vscode-font-family, system-ui), sans-serif;
+  --gx-mono: var(--vscode-editor-font-family, ui-monospace), monospace;
   margin: 0;
   padding: 0;
-  font-family: var(--vscode-font-family);
+  font-family: var(--gx-font);
   font-size: 12.5px;
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
   color: var(--vscode-foreground);
   background:
     radial-gradient(120% 60% at 80% -10%, rgba(31, 156, 240, 0.08), transparent 60%),
@@ -197,6 +211,11 @@ button[aria-disabled="true"],
 }
 .gx-repo-name .gx-ic {
   color: var(--gx-accent);
+}
+.gx-repo-name .gx-ic.gx-brand,
+.gx-repo-name .gx-ic.gx-brand svg {
+  width: 16px;
+  height: 16px;
 }
 
 .gx-branch-row {
@@ -1130,15 +1149,25 @@ button[aria-disabled="true"],
   box-shadow: 0 0 0 2px rgba(31, 156, 240, 0.12);
 }
 /* File-type icon (left), coloured by extension */
+/* File-type badge: a short label tinted with the type colour (the colour classes
+   below set `color`). Reads faster than identical document outlines. */
 .gx-ftype {
   flex: 0 0 auto;
   display: inline-flex;
-  width: 15px;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
   height: 15px;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 30%, transparent);
+  font: 700 8.5px/1 var(--gx-font);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 .gx-ftype svg {
-  width: 15px;
-  height: 15px;
+  width: 11px;
+  height: 11px;
 }
 .gx-ext-ts { color: #4a9bd8; }
 .gx-ext-js { color: var(--gx-sev-medium); }
@@ -1284,9 +1313,17 @@ button[aria-disabled="true"],
 .gx-btn-primary {
   color: var(--gx-accent-ink);
   background: var(--gx-accent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--gx-accent) 30%, transparent),
+    0 6px 18px -10px color-mix(in srgb, var(--gx-accent) 70%, transparent);
 }
 .gx-btn-primary:hover {
   background: var(--gx-accent-strong);
+}
+.gx-btn-primary:active:not(.gx-disabled) {
+  transform: translateY(1px);
+}
+.gx-btn-primary.gx-disabled {
+  box-shadow: none;
 }
 .gx-btn-ghost {
   color: var(--gx-accent);
@@ -2092,7 +2129,7 @@ textarea {
   min-width: 0;
 }
 .gx-hash {
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--gx-mono);
   color: var(--gx-accent);
 }
 
@@ -2158,6 +2195,10 @@ body.vscode-light {
    Darken them as a set on light themes rather than maintaining a second palette. */
 body.vscode-light .gx-ftype {
   filter: brightness(0.72) saturate(1.25);
+}
+
+body.gx-font-native {
+  --gx-font: var(--vscode-font-family, system-ui), sans-serif;
 }
 
 /* High contrast: no translucent tints to lean on, so give surfaces real borders
@@ -2575,7 +2616,7 @@ body.vscode-high-contrast-light .gx-file:hover {
   display: inline-block;
   font-size: 10px;
   font-weight: 700;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--gx-mono);
   letter-spacing: 0.02em;
   color: var(--gx-accent);
   background: rgba(31, 156, 240, 0.1);
@@ -2798,7 +2839,7 @@ body.vscode-high-contrast-light .gx-file:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--gx-mono);
   font-size: 10.5px;
 }
 .gx-rep-model-count {

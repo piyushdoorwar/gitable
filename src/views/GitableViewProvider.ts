@@ -2112,6 +2112,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     const csp = [
       `default-src 'none'`,
       `img-src ${webview.cspSource}`,
+      `font-src ${webview.cspSource}`,
       `style-src ${webview.cspSource}`,
       `script-src 'nonce-${nonce}'`
     ].join("; ");
