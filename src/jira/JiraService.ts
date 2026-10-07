@@ -101,8 +101,9 @@ export class JiraService {
     }
     JiraService.normalizeBaseUrl(baseUrl); // refuse a stored non-https URL
     const base = `assignee = currentUser() AND statusCategory != Done`;
-    const jql = query.trim()
-      ? `${base} AND text ~ "${query.replace(/"/g, '\\"')}" ORDER BY updated DESC`
+    const search = query.trim();
+    const jql = search
+      ? `${base} AND text ~ "${search.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}" ORDER BY updated DESC`
       : `${base} ORDER BY updated DESC`;
     const url = `${baseUrl}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status,issuetype`;
     const res = await fetchWithTimeout(url, { headers: this.buildHeaders(email, token) });

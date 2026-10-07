@@ -556,7 +556,7 @@
     const list = el("div", "gx-select-list");
     root.append(button, list);
 
-    const iconHtml = (url) => (url ? `<img class="gx-opt-ic" src="${url}" alt="" />` : "");
+    const iconHtml = (url) => (url ? `<img class="gx-opt-ic" src="${escapeHtml(url)}" alt="" />` : "");
     const optIcon = (it) => (it.iconSvg ? `<span class="gx-ic sm">${it.iconSvg}</span>` : iconHtml(it.icon));
 
     let items = [];
@@ -2213,6 +2213,14 @@
   const BADGE_DOWN = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3C12.5523 3 13 3.44772 13 4V17.5858L18.2929 12.2929C18.6834 11.9024 19.3166 11.9024 19.7071 12.2929C20.0976 12.6834 20.0976 13.3166 19.7071 13.7071L12.7071 20.7071C12.3166 21.0976 11.6834 21.0976 11.2929 20.7071L4.29289 13.7071C3.90237 13.3166 3.90237 12.6834 4.29289 12.2929C4.68342 11.9024 5.31658 11.9024 5.70711 12.2929L11 17.5858V4C11 3.44772 11.4477 3 12 3Z" fill="currentColor"/></svg>`;
   const BADGE_TAG = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
 
+  const badgeIconTemplates = Object.fromEntries(
+    Object.entries({ up: BADGE_UP, down: BADGE_DOWN, tag: BADGE_TAG }).map(([name, markup]) => {
+      const template = document.createElement("template");
+      template.innerHTML = markup;
+      return [name, template];
+    })
+  );
+
   // Split Pull (incoming) and Push (outgoing) buttons. Ahead and behind are
   // independent dimensions, so a diverged branch lights up BOTH simultaneously —
   // something the old single combo button could not represent.
@@ -2227,15 +2235,26 @@
     const syncAction = s.syncAction || "";
     const fetchedText = timeAgo(s.lastFetchedAt || 0);
 
-    // Sets the badge HTML + an optional semantic color class on the badge span.
-    const setBadge = (el, html, colorClass) => {
+    // Insert counts as text; only the fixed SVG templates become markup.
+    const setBadge = (el, segments, colorClass) => {
       el.classList.remove("gx-badge-in", "gx-badge-out", "gx-badge-tag");
-      if (html) {
-        el.innerHTML = html;
+      el.replaceChildren();
+      if (segments.length) {
+        segments.forEach(({ count, icon, color }, index) => {
+          if (index) {
+            const separator = document.createElement("span");
+            separator.className = "gx-badge-sep";
+            separator.textContent = "·";
+            el.append(separator);
+          }
+          const target = segments.length > 1 ? document.createElement("span") : el;
+          if (target !== el) target.className = `gx-badge-seg ${color}`;
+          target.append(String(count), badgeIconTemplates[icon].content.firstElementChild.cloneNode(true));
+          if (target !== el) el.append(target);
+        });
         if (colorClass) el.classList.add(colorClass);
         el.classList.remove("hidden");
       } else {
-        el.innerHTML = "";
         el.classList.add("hidden");
       }
     };
@@ -2275,20 +2294,20 @@
       pullBtn.classList.remove("gx-sync-error");
       pullIcon.innerHTML = ICONS.pull;
       setLabel(pullBtn, `Pull ${s.behind} commit${s.behind > 1 ? "s" : ""} from origin`);
-      setBadge(pullBadge, `${s.behind}${BADGE_DOWN}`, "gx-badge-in");
+      setBadge(pullBadge, [{ count: s.behind, icon: "down" }], "gx-badge-in");
     } else if (syncError) {
       // A background fetch failed (offline/auth/no network) — say so instead of
       // showing a clean "up to date" state. Clicking retries the fetch.
       pullBtn.classList.add("gx-sync-error");
       pullIcon.innerHTML = ICONS.warning || ICONS.refresh;
       setLabel(pullBtn, `Couldn't reach origin — click to retry (${syncError})`);
-      setBadge(pullBadge, "");
+      setBadge(pullBadge, []);
     } else {
       // Up to date or no upstream — the incoming button fetches.
       pullBtn.classList.remove("gx-sync-error");
       pullIcon.innerHTML = ICONS.refresh;
       setLabel(pullBtn, fetchedText || "Fetch origin");
-      setBadge(pullBadge, "");
+      setBadge(pullBadge, []);
     }
     setDisabled(pullBtn, blocked);
 
@@ -2296,27 +2315,27 @@
     pushIcon.innerHTML = ICONS.push;
     if (!s.hasUpstream) {
       setLabel(pushBtn, "Publish branch to origin");
-      setBadge(pushBadge, "");
+      setBadge(pushBadge, []);
       setDisabled(pushBtn, blocked);
     } else if (s.ahead > 0) {
       if (pendingTags > 0) {
         setLabel(pushBtn, `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} + ${pendingTags} tag${pendingTags > 1 ? "s" : ""}`);
-        setBadge(pushBadge,
-          `<span class="gx-badge-seg gx-badge-out">${s.ahead}${BADGE_UP}</span>`
-          + `<span class="gx-badge-sep">·</span>`
-          + `<span class="gx-badge-seg gx-badge-tag">${pendingTags}${BADGE_TAG}</span>`);
+        setBadge(pushBadge, [
+          { count: s.ahead, icon: "up", color: "gx-badge-out" },
+          { count: pendingTags, icon: "tag", color: "gx-badge-tag" }
+        ]);
       } else {
         setLabel(pushBtn, `Push ${s.ahead} commit${s.ahead > 1 ? "s" : ""} to origin`);
-        setBadge(pushBadge, `${s.ahead}${BADGE_UP}`, "gx-badge-out");
+        setBadge(pushBadge, [{ count: s.ahead, icon: "up" }], "gx-badge-out");
       }
       setDisabled(pushBtn, blocked);
     } else if (pendingTags > 0) {
       setLabel(pushBtn, `Push ${pendingTags} unpushed tag${pendingTags > 1 ? "s" : ""} to origin`);
-      setBadge(pushBadge, `${pendingTags}${BADGE_TAG}`, "gx-badge-tag");
+      setBadge(pushBadge, [{ count: pendingTags, icon: "tag" }], "gx-badge-tag");
       setDisabled(pushBtn, blocked);
     } else {
       setLabel(pushBtn, "Nothing to push");
-      setBadge(pushBadge, "");
+      setBadge(pushBadge, []);
       setDisabled(pushBtn, true);
     }
   }
@@ -2810,13 +2829,24 @@
     }
 
     const providerLabel = (PROVIDERS.find((p) => p.value === s.provider) || {}).label || s.provider;
-    const keyBadge = s.hasApiKey
-      ? `<span class="gx-badge ok">key saved</span>`
-      : `<span class="gx-badge missing">no key</span>`;
-    const provIcon = icons[s.provider] ? `<img class="gx-opt-ic" src="${icons[s.provider]}" alt="" />` : "";
-    byId("settingsStatus").innerHTML =
-      `${provIcon}<span class="gx-strong">${escapeHtml(providerLabel)}</span> ${keyBadge}` +
-      `<span>model: <span class="gx-strong">${escapeHtml(s.model || "—")}</span></span>`;
+    const status = byId("settingsStatus");
+    status.replaceChildren();
+    if (icons[s.provider]) {
+      const providerIcon = document.createElement("img");
+      providerIcon.className = "gx-opt-ic";
+      providerIcon.src = icons[s.provider];
+      providerIcon.alt = "";
+      status.append(providerIcon);
+    }
+    const providerName = el("span", "gx-strong");
+    providerName.textContent = providerLabel;
+    const keyBadge = el("span", `gx-badge ${s.hasApiKey ? "ok" : "missing"}`);
+    keyBadge.textContent = s.hasApiKey ? "key saved" : "no key";
+    const model = document.createElement("span");
+    const modelName = el("span", "gx-strong");
+    modelName.textContent = s.model || "—";
+    model.append("model: ", modelName);
+    status.append(providerName, " ", keyBadge, model);
   }
 
   // ---------- Jira ----------
