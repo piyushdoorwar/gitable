@@ -148,11 +148,11 @@
     "lint": "echo \"(no linter configured)\" && exit 0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.19.1",
     "@types/vscode": "^1.96.0",
     "@vscode/vsce": "^4.0.0",
     "chart.js": "^4.5.1",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.7.0",
     "vitest": "^4.1.8"
   }
