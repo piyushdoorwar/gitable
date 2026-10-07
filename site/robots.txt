@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://piyushdoorwar.github.io/gitable/sitemap.xml
+Sitemap: https://gitable.piyushdoorwar.com/sitemap.xml
