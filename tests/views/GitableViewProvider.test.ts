@@ -1,15 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as vscode from "vscode";
+import { PendingRestoreStore } from "../../src/config/PendingRestoreStore";
 import { GitableViewProvider } from "../../src/views/GitableViewProvider";
 
-function makeProvider(git: unknown = {}): GitableViewProvider {
+/** In-memory stand-in for `context.workspaceState`. */
+function memento(): vscode.Memento {
+  const data = new Map<string, unknown>();
+  return {
+    keys: () => [...data.keys()],
+    get: (key: string, fallback?: unknown) => (data.has(key) ? data.get(key) : fallback),
+    update: async (key: string, value: unknown) => {
+      data.set(key, value);
+    }
+  } as unknown as vscode.Memento;
+}
+
+function makeProvider(git: object = {}, pendingRestores = new PendingRestoreStore(memento())): GitableViewProvider {
   return new GitableViewProvider(
     {} as any,
-    git as any,
+    { getActiveRoot: () => "/repo", ...git } as any,
     {} as any,
     {} as any,
     {} as any,
     {} as any,
     {} as any,
+    pendingRestores,
     { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
   );
 }
@@ -196,5 +211,192 @@ describe("GitableViewProvider message errors", () => {
     expect((provider as any).busyKind).toBe("");
     expect((provider as any).busyText).toBe("");
     expect((provider as any).pendingError).toBe("boom");
+  });
+});
+
+describe("GitableViewProvider conflict flow", () => {
+  const idle = { kind: null };
+  const clean = { staged: [], unstaged: [], conflicts: [] };
+  const dirty = { staged: [], unstaged: [{ path: "a.ts" }], conflicts: [] };
+  const conflicted = { staged: [], unstaged: [], conflicts: [{ path: "a.ts", conflict: "both-modified" }] };
+
+  function quiet(provider: GitableViewProvider): void {
+    (provider as any).postState = vi.fn().mockResolvedValue(undefined);
+  }
+
+  beforeEach(() => {
+    vi.mocked(vscode.window.showErrorMessage).mockClear();
+  });
+
+  it("keeps local changes stashed when a pull stops on conflicts, without an error toast", async () => {
+    const store = new PendingRestoreStore(memento());
+    let paused = false;
+    const git = {
+      getSyncInfo: vi.fn().mockResolvedValue({ ahead: 0, behind: 1, hasUpstream: true }),
+      getChanges: vi.fn(async () => (paused ? conflicted : dirty)),
+      getOperationState: vi.fn(async () => (paused ? { kind: "merge", onto: "origin/main" } : idle)),
+      stashAll: vi.fn().mockResolvedValue("abc123"),
+      pull: vi.fn(async () => {
+        paused = true;
+        throw new Error("CONFLICT (content): Merge conflict in a.ts");
+      }),
+      restoreStash: vi.fn()
+    };
+    const provider = makeProvider(git, store);
+    quiet(provider);
+
+    await (provider as any).pullWithLocalChangesCheck();
+
+    expect(git.stashAll).toHaveBeenCalledWith("Gitable auto-stash before pull");
+    expect(git.restoreStash).not.toHaveBeenCalled();
+    expect(store.get("/repo")).toEqual({ sha: "abc123", phase: "after-operation" });
+    expect((provider as any).pendingError).toMatch(/merge stopped on conflicts in 1 file/);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("restores set-aside changes immediately when a pull fails for another reason", async () => {
+    const git = {
+      getSyncInfo: vi.fn().mockResolvedValue({ ahead: 0, behind: 1, hasUpstream: true }),
+      getChanges: vi.fn().mockResolvedValue(dirty),
+      getOperationState: vi.fn().mockResolvedValue(idle),
+      stashAll: vi.fn().mockResolvedValue("abc123"),
+      pull: vi.fn().mockRejectedValue(new Error("Could not resolve host")),
+      restoreStash: vi.fn().mockResolvedValue({ status: "restored" })
+    };
+    const provider = makeProvider(git);
+    quiet(provider);
+
+    await (provider as any).pullWithLocalChangesCheck();
+
+    expect(git.restoreStash).toHaveBeenCalledWith("abc123");
+    expect((provider as any).pendingError).toBe("Could not resolve host");
+  });
+
+  it("brings set-aside changes back once the paused operation is gone", async () => {
+    const store = new PendingRestoreStore(memento());
+    store.set("/repo", { sha: "abc123", phase: "after-operation" });
+    const git = {
+      hasStash: vi.fn().mockResolvedValue(true),
+      getOperationState: vi.fn().mockResolvedValue(idle),
+      getChanges: vi.fn().mockResolvedValue(clean),
+      restoreStash: vi.fn().mockResolvedValue({ status: "restored" })
+    };
+    const provider = makeProvider(git, store);
+    quiet(provider);
+
+    await provider.refresh();
+
+    expect(git.restoreStash).toHaveBeenCalledWith("abc123");
+    expect(store.get("/repo")).toBeUndefined();
+  });
+
+  it("finishes a conflicted restore once its last conflict is resolved", async () => {
+    const store = new PendingRestoreStore(memento());
+    store.set("/repo", { sha: "abc123", phase: "conflicts", files: ["a.ts"] });
+    const git = {
+      hasStash: vi.fn().mockResolvedValue(true),
+      getOperationState: vi.fn().mockResolvedValue(idle),
+      getChanges: vi.fn().mockResolvedValue(clean),
+      finishStashRestore: vi.fn().mockResolvedValue(undefined)
+    };
+    const provider = makeProvider(git, store);
+    quiet(provider);
+
+    await provider.refresh();
+
+    expect(git.finishStashRestore).toHaveBeenCalledWith("abc123", ["a.ts"]);
+    expect(store.get("/repo")).toBeUndefined();
+  });
+
+  it("does not finish a restore while conflicts remain", async () => {
+    const store = new PendingRestoreStore(memento());
+    store.set("/repo", { sha: "abc123", phase: "conflicts", files: ["a.ts"] });
+    const git = {
+      hasStash: vi.fn().mockResolvedValue(true),
+      getOperationState: vi.fn().mockResolvedValue(idle),
+      getChanges: vi.fn().mockResolvedValue(conflicted),
+      finishStashRestore: vi.fn()
+    };
+    const provider = makeProvider(git, store);
+    quiet(provider);
+
+    await provider.refresh();
+
+    expect(git.finishStashRestore).not.toHaveBeenCalled();
+    expect(store.get("/repo")).toBeDefined();
+  });
+
+  it.each([
+    ["merge", "mine", "ours"],
+    ["merge", "incoming", "theirs"],
+    ["cherry-pick", "mine", "ours"],
+    ["rebase", "mine", "theirs"],
+    ["rebase", "incoming", "ours"],
+    [null, "mine", "theirs"]
+  ])("maps %s / keep %s to git's --%s", async (kind, keep, side) => {
+    const git = {
+      getOperationState: vi.fn().mockResolvedValue({ kind }),
+      getChanges: vi.fn().mockResolvedValue(conflicted),
+      resolveConflict: vi.fn().mockResolvedValue(undefined),
+      hasStash: vi.fn().mockResolvedValue(false)
+    };
+    const provider = makeProvider(git);
+    quiet(provider);
+
+    await (provider as any).resolveConflict("a.ts", keep);
+
+    expect(git.resolveConflict).toHaveBeenCalledWith("a.ts", side);
+  });
+
+  it("continues the paused operation by itself when the last conflict is resolved", async () => {
+    let resolved = false;
+    let done = false;
+    const git = {
+      getOperationState: vi.fn(async () => (done ? idle : { kind: "rebase", onto: "main" })),
+      getChanges: vi.fn(async () => (resolved ? clean : conflicted)),
+      markResolved: vi.fn(async () => {
+        resolved = true;
+      }),
+      hasConflictMarkers: vi.fn().mockResolvedValue(false),
+      continueOperation: vi.fn(async () => {
+        done = true;
+      })
+    };
+    const provider = makeProvider(git);
+    quiet(provider);
+
+    await (provider as any).markResolved("a.ts");
+
+    expect(git.continueOperation).toHaveBeenCalledWith("rebase");
+    expect((provider as any).pendingNotice).toBe("Rebase completed.");
+  });
+
+  it("asks before marking a file that still has conflict markers", async () => {
+    const git = {
+      hasConflictMarkers: vi.fn().mockResolvedValue(true),
+      markResolved: vi.fn()
+    };
+    const provider = makeProvider(git);
+    quiet(provider);
+
+    await (provider as any).markResolved("a.ts");
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalled();
+    expect(git.markResolved).not.toHaveBeenCalled();
+  });
+
+  it("refuses to pull while a merge is paused", async () => {
+    const git = {
+      getOperationState: vi.fn().mockResolvedValue({ kind: "merge" }),
+      getChanges: vi.fn().mockResolvedValue(conflicted),
+      pull: vi.fn()
+    };
+    const provider = makeProvider(git);
+    quiet(provider);
+
+    await (provider as any).pullWithLocalChangesCheck();
+
+    expect(git.pull).not.toHaveBeenCalled();
+    expect((provider as any).pendingError).toMatch(/merge is in progress/);
   });
 });

@@ -4,7 +4,24 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { GitService, GitServiceError, PullStrategy } from "./GitService";
-import { cliStatusToLetter, CommitInfo, CommitStat, FileChange, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
+import {
+  cliStatusToLetter,
+  CommitInfo,
+  CommitStat,
+  conflictKindFromXY,
+  FileChange,
+  OperationKind,
+  OperationState,
+  RebaseState,
+  RepoChanges,
+  RepoSummary,
+  StashEntry,
+  StashRestoreResult,
+  SyncInfo
+} from "./models";
+
+/** Which side of an unmerged path to keep, in git's own stage terms. */
+export type ConflictSide = "ours" | "theirs";
 
 /**
  * Git implementation backed by the `git` CLI via {@link execFile}.
@@ -103,10 +120,9 @@ export class GitCliService implements GitService {
       }
 
       // Merge conflict: U in either XY column, or both-added (AA), both-deleted (DD).
-      const isConflict =
-        x === "U" || y === "U" || (x === "A" && y === "A") || (x === "D" && y === "D");
-      if (isConflict) {
-        conflicts.push({ path: filePath, displayPath: filePath, status: "X", staged: false });
+      const conflict = conflictKindFromXY(x, y);
+      if (conflict) {
+        conflicts.push({ path: filePath, displayPath: filePath, status: "X", staged: false, conflict });
         continue;
       }
 
@@ -347,32 +363,30 @@ export class GitCliService implements GitService {
     await this.run(["checkout", name], this.requireRoot());
   }
 
-  async checkoutBranchWithLocalChanges(name: string): Promise<void> {
+  async checkoutBranchWithLocalChanges(name: string): Promise<{ stash?: string; restore?: StashRestoreResult }> {
     const root = this.requireRoot();
-    const stashed = await this.stashLocalChanges(`Gitable carry changes to ${name}`, root);
+    const stash = await this.stashPush(`Gitable carry changes to ${name}`, root);
     try {
       await this.run(["checkout", name], root);
     } catch (error) {
-      if (stashed) {
-        await this.popLatestStash(root).catch((restoreError) => {
+      if (stash) {
+        await this.restoreStash(stash).catch((restoreError) => {
           this.logger.error("Failed to restore stashed changes after checkout failure.", restoreError);
         });
       }
       throw error;
     }
-    if (stashed) {
-      await this.popLatestStash(root);
-    }
+    return stash ? { stash, restore: await this.restoreStash(stash) } : {};
   }
 
   async checkoutBranchKeepingLocalChanges(sourceBranch: string, targetBranch: string): Promise<void> {
     const root = this.requireRoot();
-    const stashed = await this.stashLocalChanges(this.branchStashMessage(sourceBranch), root);
+    const stash = await this.stashPush(this.branchStashMessage(sourceBranch), root);
     try {
       await this.run(["checkout", targetBranch], root);
     } catch (error) {
-      if (stashed) {
-        await this.popLatestStash(root).catch((restoreError) => {
+      if (stash) {
+        await this.restoreStash(stash).catch((restoreError) => {
           this.logger.error("Failed to restore stashed changes after checkout failure.", restoreError);
         });
       }
@@ -380,15 +394,13 @@ export class GitCliService implements GitService {
     }
   }
 
-  async restoreSavedBranchChanges(branch: string): Promise<boolean> {
+  async restoreSavedBranchChanges(branch: string): Promise<{ stash: string; restore: StashRestoreResult } | undefined> {
     const root = this.requireRoot();
     const stash = await this.findBranchStash(branch, root);
     if (!stash) {
-      return false;
+      return undefined;
     }
-    await this.run(["stash", "apply", "--index", stash], root);
-    await this.run(["stash", "drop", stash], root);
-    return true;
+    return { stash, restore: await this.restoreStash(stash) };
   }
 
   async push(): Promise<void> {
@@ -481,9 +493,99 @@ export class GitCliService implements GitService {
     await this.run([...args, "--", ...paths], this.requireRoot());
   }
 
-  async stashAll(): Promise<void> {
+  async stashAll(message = "Gitable auto-stash before pull"): Promise<string | undefined> {
     // Labelled so a stash left behind by a conflicting restore is recognisable.
-    await this.run(["stash", "push", "--include-untracked", "-m", "Gitable auto-stash before pull"], this.requireRoot());
+    return this.stashPush(message, this.requireRoot());
+  }
+
+  /**
+   * Re-applies a stash Gitable created on the user's behalf (pull, branch carry),
+   * following git's own advice at each failure instead of giving up:
+   *
+   * 1. `stash apply --index` — restores staged vs unstaged exactly.
+   * 2. "Conflicts in index. Try without --index." — git applied *nothing*; retry
+   *    without `--index` and re-stage the files that were fully staged.
+   * 3. Content conflicts — leave the conflict markers for the user and keep the
+   *    stash; {@link finishStashRestore} drops it once they are resolved.
+   * 4. An untracked file of ours now exists upstream ("already exists, no
+   *    checkout") — git has applied everything else; identical copies need
+   *    nothing, differing ones become ordinary add/add conflicts.
+   *
+   * Always addresses the stash by commit SHA, never `stash@{0}`, which shifts as
+   * other stashes are pushed or popped.
+   */
+  async restoreStash(sha: string): Promise<StashRestoreResult> {
+    const root = this.requireRoot();
+    let failure = "";
+    try {
+      await this.run(["stash", "apply", "--index", sha], root);
+      await this.dropStash(sha, root);
+      return { status: "restored" };
+    } catch (error) {
+      failure = errorText(error);
+    }
+
+    if (/conflicts in index|without --index/i.test(failure)) {
+      try {
+        await this.run(["stash", "apply", sha], root);
+        await this.restageFromStash(sha, [], root);
+        await this.dropStash(sha, root);
+        return { status: "restored" };
+      } catch (error) {
+        failure = errorText(error);
+      }
+    }
+
+    const collisions = [...failure.matchAll(/^(.+?) already exists, no checkout$/gm)].map((m) => m[1].trim());
+    for (const file of collisions) {
+      await this.conflictUntrackedCollision(sha, file, root);
+    }
+
+    const conflicts = (await this.getChanges()).conflicts.map((f) => f.path);
+    if (conflicts.length > 0) {
+      return { status: "conflicts", files: conflicts };
+    }
+    if (collisions.length > 0) {
+      // Every collision was identical to upstream's copy — nothing is missing.
+      await this.dropStash(sha, root);
+      return { status: "restored" };
+    }
+    return { status: "blocked", reason: failure || "git stash apply failed", files: [] };
+  }
+
+  /**
+   * Completes a restore that stopped on conflicts, once they are resolved: drops
+   * the stash and puts the index back the way the user had it — resolved files
+   * become ordinary unstaged changes (git leaves them staged after `git add`),
+   * and files that were fully staged when stashed are staged again.
+   */
+  async finishStashRestore(sha: string, conflictedFiles: string[]): Promise<void> {
+    const root = this.requireRoot();
+    await this.run(["reset", "-q"], root);
+    await this.restageFromStash(sha, conflictedFiles, root);
+    await this.dropStash(sha, root);
+  }
+
+  /**
+   * Abandons a conflicted restore: resets tracked files to HEAD and removes the
+   * untracked files the restore recreated (they'd collide on the next apply).
+   * The stash itself is kept for the user to apply later.
+   */
+  async undoStashRestore(sha: string): Promise<void> {
+    const root = this.requireRoot();
+    await this.run(["reset", "--hard", "-q", "HEAD"], root);
+    const untracked = (await this.run(["ls-tree", "-r", "-z", "--name-only", `${sha}^3`], root).catch(() => ""))
+      .split("\0")
+      .filter(Boolean);
+    if (untracked.length > 0) {
+      // `clean` only ever touches untracked paths, so files HEAD tracks are safe.
+      await this.run(["clean", "-f", "-q", "--", ...untracked], root);
+    }
+  }
+
+  /** True when the stash commit is still in the stash list. */
+  async hasStash(sha: string): Promise<boolean> {
+    return (await this.findStashRef(sha, this.requireRoot())) !== undefined;
   }
 
   async stashList(): Promise<StashEntry[]> {
@@ -513,6 +615,112 @@ export class GitCliService implements GitService {
           hash: hash || undefined
         };
       });
+  }
+
+  async getOperationState(): Promise<OperationState> {
+    const root = this.requireRoot();
+    const rebase = await this.getRebaseState();
+    if (rebase.inProgress) {
+      return { kind: "rebase", branch: rebase.branch, onto: rebase.onto };
+    }
+    const gitDir = await this.resolveGitDir(root);
+    const readHead = async (name: string): Promise<string> => {
+      try {
+        return (await readFile(path.join(gitDir, name), "utf8")).trim();
+      } catch {
+        return "";
+      }
+    };
+    const merge = await readHead("MERGE_HEAD");
+    if (merge) {
+      let onto = merge.split("\n")[0].slice(0, 7);
+      try {
+        const name = (await this.run(["name-rev", "--name-only", "--no-undefined", merge.split("\n")[0]], root)).trim();
+        onto = name.replace(/^remotes\//, "").replace(/[~^]\d*$/, "");
+      } catch {
+        // keep the short SHA
+      }
+      return { kind: "merge", onto };
+    }
+    const pick = await readHead("CHERRY_PICK_HEAD");
+    if (pick) {
+      return { kind: "cherry-pick", commit: pick.slice(0, 7) };
+    }
+    const revert = await readHead("REVERT_HEAD");
+    if (revert) {
+      return { kind: "revert", commit: revert.slice(0, 7) };
+    }
+    return { kind: null };
+  }
+
+  /**
+   * Concludes a paused operation after its conflicts are resolved and staged.
+   * The editor is suppressed so the prepared message is used. A cherry-pick or
+   * revert whose resolution left nothing to commit is skipped, as git suggests —
+   * a rebase already drops such a step on its own.
+   */
+  async continueOperation(kind: OperationKind): Promise<void> {
+    const root = this.requireRoot();
+    const env = { ...process.env, GIT_EDITOR: "true" };
+    if (kind === "merge") {
+      await this.run(["commit", "--no-edit"], root, env);
+      return;
+    }
+    try {
+      await this.run([kind, "--continue"], root, env);
+    } catch (error) {
+      if ((kind === "cherry-pick" || kind === "revert") && /now empty|nothing to commit/i.test(errorText(error))) {
+        await this.run([kind, "--skip"], root, env);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async abortOperation(kind: OperationKind): Promise<void> {
+    await this.run([kind, "--abort"], this.requireRoot());
+  }
+
+  /** Drops the current rebase / cherry-pick / revert step (merges have no steps). */
+  async skipOperation(kind: Exclude<OperationKind, "merge">): Promise<void> {
+    await this.run([kind, "--skip"], this.requireRoot(), { ...process.env, GIT_EDITOR: "true" });
+  }
+
+  /**
+   * Resolves an unmerged path by taking one side wholesale and staging it. When
+   * that side deleted the file (e.g. "deleted by them" + theirs), the deletion is
+   * what gets staged.
+   */
+  async resolveConflict(filePath: string, side: ConflictSide): Promise<void> {
+    const root = this.requireRoot();
+    try {
+      await this.run(["checkout", `--${side}`, "--", filePath], root);
+    } catch (error) {
+      if (/does not have (our|their) version/i.test(errorText(error))) {
+        await this.run(["rm", "--quiet", "--", filePath], root);
+        return;
+      }
+      throw error;
+    }
+    await this.run(["add", "--", filePath], root);
+  }
+
+  /** Marks unmerged paths resolved — `add -A` so a deletion is staged as one. */
+  async markResolved(paths: string[]): Promise<void> {
+    if (!paths.length) {
+      return;
+    }
+    await this.run(["add", "-A", "--", ...paths], this.requireRoot());
+  }
+
+  /** True when the working copy still contains `<<<<<<<` / `>>>>>>>` conflict markers. */
+  async hasConflictMarkers(filePath: string): Promise<boolean> {
+    try {
+      const text = await readFile(path.join(this.requireRoot(), filePath), "utf8");
+      return /^(<{7}|>{7})(\s|$)/m.test(text);
+    } catch {
+      return false;
+    }
   }
 
   async stashPop(ref: string): Promise<void> {
@@ -686,28 +894,97 @@ export class GitCliService implements GitService {
     return `${GitCliService.branchStashPrefix}${branch}`;
   }
 
-  private async stashLocalChanges(message: string, root: string): Promise<boolean> {
+  /** Stashes everything (incl. untracked); returns the stash commit SHA, or
+   *  undefined when there was nothing to stash. */
+  private async stashPush(message: string, root: string): Promise<string | undefined> {
     const output = await this.run(["stash", "push", "--include-untracked", "-m", message], root);
-    return !/No local changes to save/i.test(output);
+    if (/No local changes to save/i.test(output)) {
+      return undefined;
+    }
+    return (await this.run(["rev-parse", "stash@{0}"], root)).trim();
   }
 
-  private async popLatestStash(root: string): Promise<void> {
-    await this.run(["stash", "pop", "--index"], root);
+  /** `stash@{N}` for a stash commit SHA — `stash drop` only accepts reflog refs. */
+  private async findStashRef(sha: string, root: string): Promise<string | undefined> {
+    const output = await this.run(["stash", "list", "--format=%gd%x09%H"], root).catch(() => "");
+    for (const line of output.split("\n")) {
+      const [ref, hash] = line.trim().split("\t");
+      if (hash === sha) {
+        return ref;
+      }
+    }
+    return undefined;
   }
 
+  private async dropStash(sha: string, root: string): Promise<void> {
+    const ref = await this.findStashRef(sha, root);
+    if (ref) {
+      await this.run(["stash", "drop", ref], root);
+    }
+  }
+
+  /**
+   * Re-stages files that were *fully* staged when the stash was made (index
+   * == working copy), skipping `exclude`. Partially staged files stay unstaged:
+   * re-adding them would also stage the hunks the user had left out.
+   */
+  private async restageFromStash(sha: string, exclude: string[], root: string): Promise<void> {
+    const names = async (args: string[]) =>
+      (await this.run(["diff", "--name-only", "-z", ...args], root).catch(() => ""))
+        .split("\0")
+        .filter(Boolean);
+    const staged = await names([`${sha}^1`, `${sha}^2`]);
+    if (staged.length === 0) {
+      return;
+    }
+    const partial = new Set(await names([`${sha}^2`, sha]));
+    const skip = new Set(exclude);
+    const paths = staged.filter((p) => !partial.has(p) && !skip.has(p));
+    if (paths.length > 0) {
+      await this.run(["add", "-A", "--", ...paths], root);
+    }
+  }
+
+  /**
+   * An untracked file we stashed now exists in HEAD, so `stash apply` skipped it.
+   * Unless the two copies are identical, record it as an add/add conflict —
+   * stage 2 = upstream's (HEAD), stage 3 = the user's stashed copy, the same
+   * sides a conflicted stash apply uses — and write the markers with
+   * `checkout -m`. It then resolves through the normal conflict UI.
+   */
+  private async conflictUntrackedCollision(sha: string, file: string, root: string): Promise<void> {
+    const entry = async (tree: string) => {
+      const line = (await this.run(["ls-tree", tree, "--", file], root)).trim();
+      const [mode, , blob] = line.split(/\s+/);
+      return { mode, blob };
+    };
+    const ours = await entry("HEAD");
+    const theirs = await entry(`${sha}^3`);
+    if (!ours.blob || !theirs.blob || ours.blob === theirs.blob) {
+      return;
+    }
+    const info =
+      `0 ${"0".repeat(40)}\t${file}\n` +
+      `${ours.mode} ${ours.blob} 2\t${file}\n` +
+      `${theirs.mode} ${theirs.blob} 3\t${file}\n`;
+    await this.runWithInput(["update-index", "--index-info"], root, info);
+    await this.run(["checkout", "-m", "--", file], root);
+  }
+
+  /** SHA of the stash saved for `branch` by "Keep changes on <branch>". */
   private async findBranchStash(branch: string, root: string): Promise<string | undefined> {
-    const output = await this.run(["stash", "list", "--format=%gd%x09%s"], root);
+    const output = await this.run(["stash", "list", "--format=%H%x09%s"], root);
     const marker = this.branchStashMessage(branch);
     const match = output
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [ref, ...subjectParts] = line.split("\t");
-        return { ref, subject: subjectParts.join("\t") };
+        const [sha, ...subjectParts] = line.split("\t");
+        return { sha, subject: subjectParts.join("\t") };
       })
       .find((item) => item.subject.endsWith(marker));
-    return match?.ref;
+    return match?.sha;
   }
 
   private requireRoot(): string {
@@ -747,6 +1024,20 @@ export class GitCliService implements GitService {
     }
   }
 
+  /** `git <args>` with `input` on stdin (plumbing such as `update-index --index-info`). */
+  private runWithInput(args: string[], cwd: string, input: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const child = execFile("git", args, { cwd, windowsHide: true }, (error, stdout, stderr) => {
+        if (error) {
+          reject(new GitServiceError((stderr || error.message).toString().trim(), error));
+          return;
+        }
+        resolve(stdout.toString());
+      });
+      child.stdin?.end(input);
+    });
+  }
+
   /** One `git` invocation. Rejects with a {@link GitServiceError} carrying stderr. */
   private exec(args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -765,4 +1056,9 @@ export class GitCliService implements GitService {
       );
     });
   }
+}
+
+/** stderr text of a failed git call. */
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

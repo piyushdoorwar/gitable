@@ -6,13 +6,14 @@ import { buildCommitSummaryPrompt, buildSecurityReviewPrompt } from "../ai/promp
 import { parseGeneratedMessage, parseSecurityReview } from "../ai/AiProvider";
 import { SecretService } from "../config/SecretService";
 import { SettingsService } from "../config/SettingsService";
+import { PendingRestoreStore } from "../config/PendingRestoreStore";
 import { StashNoteStore } from "../config/StashNoteStore";
 import { UsageStore } from "../analytics/UsageStore";
 import { JiraService } from "../jira/JiraService";
 import { HISTORY_LIMIT, PROVIDER_IDS, ProviderId, VIEW_ID } from "../constants";
 import { VsCodeGitService } from "../git/VsCodeGitService";
 import { PullStrategy } from "../git/GitService";
-import { RebaseState, RepoChanges, StashEntry } from "../git/models";
+import { OperationKind, OperationState, RepoChanges, StashEntry, StashRestoreResult } from "../git/models";
 import { DiffLimiter } from "../utils/DiffLimiter";
 import { Logger } from "../utils/Logger";
 
@@ -26,6 +27,25 @@ const MIN_STAGE_BUSY_VISIBLE_MS = 350;
 const REFRESH_DEBOUNCE_MS = 120;
 /** Minimum gap between fetches triggered by the panel becoming visible. */
 const VISIBILITY_FETCH_INTERVAL_MS = 30_000;
+/** Lower-case noun for each paused operation, used in user-facing messages. */
+const OPERATION_NOUN: Record<OperationKind, string> = {
+  merge: "merge",
+  rebase: "rebase",
+  "cherry-pick": "cherry-pick",
+  revert: "revert"
+};
+
+/**
+ * Thrown when git stopped mid-operation on conflicts. Not a failure — the
+ * repository is in a normal paused state the panel knows how to drive — so
+ * {@link GitableViewProvider.fail} shows it as guidance rather than an error toast.
+ */
+class OperationPaused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OperationPaused";
+  }
+}
 
 /**
  * Backs the Gitable sidebar webview. Owns the bidirectional message protocol,
@@ -61,6 +81,8 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   /** Serializes state builds so two never run (and spawn git processes) at once. */
   private stateChain: Promise<void> = Promise.resolve();
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Re-entrancy guard for {@link reconcilePendingRestore}. */
+  private reconciling = false;
   /** True while a background fetch is running, so we never stack `git fetch` calls. */
   private fetchInFlight = false;
   private lastVisibilityFetchAt = 0;
@@ -74,6 +96,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     private readonly usage: UsageStore,
     private readonly jira: JiraService,
     private readonly stashNotes: StashNoteStore,
+    private readonly pendingRestores: PendingRestoreStore,
     private readonly logger: Logger
   ) {}
 
@@ -149,6 +172,11 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   // ---- Public entry points (used by commands) ----
 
   async refresh(): Promise<void> {
+    // Picks up conflicts resolved (or operations finished) outside Gitable too —
+    // in the editor, VS Code's SCM view, or a terminal.
+    if (!this.busyKind && !this.syncAction) {
+      await this.reconcilePendingRestore();
+    }
     await this.postState();
   }
 
@@ -401,20 +429,24 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       }
       case "revertCommit": {
         const short = String(message.hash ?? "").slice(0, 7);
+        if (!(await this.ensureIdle("revert a commit"))) break;
         // Revert/cherry-pick create a new HEAD; a stale "Undo last commit" bar
         // would otherwise reset --soft that new commit, not the original.
-        await this.runBusyGit("git", `Reverting ${short}…`, async () => {
-          await this.git.revertCommit(message.hash);
-          this.lastCommitSummary = "";
-        }, `Reverted ${short}.`);
+        this.lastCommitSummary = "";
+        await this.runBusyGit("git", `Reverting ${short}…`, () =>
+          this.withLocalChangesSetAside("revert", () => this.git.revertCommit(message.hash)),
+          `Reverted ${short}.`
+        );
         break;
       }
       case "cherryPickCommit": {
         const short = String(message.hash ?? "").slice(0, 7);
-        await this.runBusyGit("git", `Cherry-picking ${short}…`, async () => {
-          await this.git.cherryPickCommit(message.hash);
-          this.lastCommitSummary = "";
-        }, `Cherry-picked ${short}.`);
+        if (!(await this.ensureIdle("cherry-pick"))) break;
+        this.lastCommitSummary = "";
+        await this.runBusyGit("git", `Cherry-picking ${short}…`, () =>
+          this.withLocalChangesSetAside("cherry-pick", () => this.git.cherryPickCommit(message.hash)),
+          `Cherry-picked ${short}.`
+        );
         break;
       }
       case "createBranch":
@@ -458,11 +490,19 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       case "rebaseBranch":
         await this.rebaseBranch(String(message.name ?? ""));
         break;
+      case "operationContinue":
       case "rebaseContinue":
-        await this.rebaseContinue();
+        await this.continueOperation();
         break;
+      case "operationAbort":
       case "rebaseAbort":
-        await this.rebaseAbort();
+        await this.abortOperation();
+        break;
+      case "operationSkip":
+        await this.skipOperation();
+        break;
+      case "resolveConflict":
+        await this.resolveConflict(String(message.filePath ?? ""), message.keep === "incoming" ? "incoming" : "mine");
         break;
       case "setUpstream":
         await this.setUpstreamForBranch(String(message.name ?? ""));
@@ -484,11 +524,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "stashPop": {
+        if (!(await this.ensureIdle("restore a stash"))) break;
         const ref = String(message.ref ?? "");
         await this.runBusyGit("git", "Restoring stash…", () => this.git.stashPop(ref), "Stash applied and removed.");
         break;
       }
       case "stashApply": {
+        if (!(await this.ensureIdle("apply a stash"))) break;
         const ref = String(message.ref ?? "");
         await this.runBusyGit("git", "Applying stash…", () => this.git.stashApply(ref), "Stash applied.");
         break;
@@ -521,11 +563,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "markResolved":
-        await this.runGit(
-          () => this.git.stageFiles([String(message.filePath ?? "")]),
-          "stage",
-          "Marking as resolved…"
-        );
+        await this.markResolved(String(message.filePath ?? ""));
         break;
       case "createTag": {
         const tagHash = String(message.hash ?? "").trim();
@@ -804,6 +842,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (!(await this.ensureIdle("switch branches"))) {
+      return;
+    }
     const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [] }));
     const hasLocalChanges = changes.staged.length > 0 || changes.unstaged.length > 0;
     const choice = hasLocalChanges
@@ -816,7 +857,10 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
     await this.runBranchSwitch(targetBranch, async () => {
       if (choice === "bring") {
-        await this.git.checkoutBranchWithLocalChanges(targetBranch);
+        const carried = await this.git.checkoutBranchWithLocalChanges(targetBranch);
+        if (carried.stash && carried.restore) {
+          this.handleRestoreResult(carried.stash, carried.restore);
+        }
         return `Switched to ${targetBranch} with your changes.`;
       }
       if (choice === "keep" && currentBranch) {
@@ -825,8 +869,11 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       }
 
       await this.git.checkoutBranch(targetBranch);
-      const restored = await this.git.restoreSavedBranchChanges(targetBranch);
-      return restored
+      const saved = await this.git.restoreSavedBranchChanges(targetBranch);
+      if (!saved) {
+        return `Switched to ${targetBranch}.`;
+      }
+      return this.handleRestoreResult(saved.stash, saved.restore)
         ? `Switched to ${targetBranch} and restored saved changes.`
         : `Switched to ${targetBranch}.`;
     });
@@ -1175,20 +1222,16 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   private async mergeBranch(name: string): Promise<void> {
     if (!name) return;
+    if (!(await this.ensureIdle("merge"))) return;
     const summary = await this.git.getRepoSummary().catch(() => undefined);
     const current = summary?.branch ?? "current branch";
     this.setBusy("git", `Merging ${name}…`);
     await this.postState();
     try {
-      await this.git.mergeBranch(name);
+      await this.withLocalChangesSetAside("merge", () => this.git.mergeBranch(name));
       this.notifySuccess(`Merged ${name} into ${current}.`);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes("CONFLICT") || msg.includes("Automatic merge failed")) {
-        this.pendingError = "Merge conflict — resolve conflicts, stage all files, and commit.";
-      } else {
-        this.fail(error);
-      }
+      this.fail(error);
     } finally {
       this.clearBusy();
       await this.refresh();
@@ -1197,6 +1240,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
 
   private async rebaseBranch(name: string): Promise<void> {
     if (!name) return;
+    if (!(await this.ensureIdle("rebase"))) return;
     const summary = await this.git.getRepoSummary().catch(() => undefined);
     const current = summary?.branch ?? "current branch";
     const picked = await vscode.window.showWarningMessage(
@@ -1208,63 +1252,347 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     this.setBusy("git", `Rebasing onto ${name}…`);
     await this.postState();
     try {
-      await this.git.rebase(name);
+      await this.withLocalChangesSetAside("rebase", () => this.git.rebase(name));
       this.pendingNotice = `Rebased ${current} onto ${name}.`;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes("CONFLICT") || msg.includes("conflict")) {
-        this.pendingError = `Rebase paused — resolve conflicts, stage all files, then click Continue Rebase.`;
-      } else {
-        this.fail(error);
-      }
-    } finally {
-      this.clearBusy();
-      await this.refresh();
-    }
-  }
-
-  private async rebaseContinue(): Promise<void> {
-    this.setBusy("git", "Continuing rebase…");
-    await this.postState();
-    try {
-      await this.git.rebaseContinue();
-      const rebaseState = await this.git.getRebaseState();
-      if (!rebaseState.inProgress) {
-        this.pendingNotice = "Rebase completed.";
-      } else {
-        this.pendingError = "More conflicts to resolve — stage all files, then continue.";
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes("CONFLICT") || msg.includes("conflict")) {
-        this.pendingError = "More conflicts to resolve — stage all files, then continue.";
-      } else {
-        this.fail(error);
-      }
-    } finally {
-      this.clearBusy();
-      await this.refresh();
-    }
-  }
-
-  private async rebaseAbort(): Promise<void> {
-    const picked = await vscode.window.showWarningMessage(
-      "Abort rebase?",
-      { modal: true, detail: "This will stop the rebase and restore the branch to its state before the rebase started." },
-      "Abort Rebase"
-    );
-    if (!picked) return;
-    this.setBusy("git", "Aborting rebase…");
-    await this.postState();
-    try {
-      await this.git.rebaseAbort();
-      this.pendingNotice = "Rebase aborted. Branch restored.";
     } catch (error) {
       this.fail(error);
     } finally {
       this.clearBusy();
       await this.refresh();
     }
+  }
+
+  // ---- Conflicts & paused operations ----
+
+  /**
+   * Runs a history-changing command (pull, merge, rebase, cherry-pick, revert)
+   * with the user's local changes set aside in a stash, then puts them back —
+   * no confirmation needed, since nothing can be lost:
+   *
+   * - Success → the changes are re-applied ({@link restoreSetAside}).
+   * - Git stopped on conflicts → the changes stay stashed (recorded in
+   *   {@link PendingRestoreStore}) until the operation is continued or aborted,
+   *   exactly like git's own `--autostash`; an {@link OperationPaused} explains.
+   * - Any other failure → the changes are re-applied straight away.
+   */
+  private async withLocalChangesSetAside(label: string, op: () => Promise<void>): Promise<void> {
+    const root = this.git.getActiveRoot();
+    const changes = await this.git.getChanges().catch(() => undefined);
+    const dirty = !!changes && (changes.staged.length > 0 || changes.unstaged.length > 0);
+    const sha = dirty ? await this.git.stashAll(`Gitable auto-stash before ${label}`) : undefined;
+    try {
+      await op();
+    } catch (error) {
+      const paused = await this.git.getOperationState().catch((): OperationState => ({ kind: null }));
+      if (paused.kind) {
+        if (sha && root) {
+          this.pendingRestores.set(root, { sha, phase: "after-operation" });
+        }
+        const conflicts = (await this.git.getChanges().catch(() => undefined))?.conflicts.length ?? 0;
+        throw new OperationPaused(this.pausedMessage(paused.kind, conflicts, !!sha));
+      }
+      if (sha) {
+        await this.restoreSetAside(sha);
+      }
+      throw error;
+    }
+    if (sha) {
+      await this.restoreSetAside(sha);
+    }
+  }
+
+  private pausedMessage(kind: OperationKind, conflicts: number, setAside: boolean): string {
+    const noun = OPERATION_NOUN[kind];
+    const what = conflicts > 0 ? `on conflicts in ${this.plural(conflicts, "file")}` : "before finishing";
+    const tail = setAside ? " Your local changes are set aside and come back once it's done." : "";
+    return (
+      `The ${noun} stopped ${what}. Keep your version, take the incoming one, or edit and mark resolved — ` +
+      `Gitable continues the ${noun} when the last conflict is resolved.${tail}`
+    );
+  }
+
+  /** Re-applies set-aside changes; true when they are fully back. */
+  private async restoreSetAside(sha: string): Promise<boolean> {
+    return this.handleRestoreResult(sha, await this.git.restoreStash(sha));
+  }
+
+  /**
+   * Records and explains the outcome of re-applying a Gitable stash. Overlapping
+   * changes are left as ordinary conflicts; the stash is kept until they are
+   * resolved, at which point {@link reconcilePendingRestore} drops it.
+   */
+  private handleRestoreResult(sha: string, result: StashRestoreResult): boolean {
+    const root = this.git.getActiveRoot();
+    if (result.status === "restored") {
+      this.pendingRestores.clear(root);
+      return true;
+    }
+    if (result.status === "conflicts") {
+      if (root) {
+        this.pendingRestores.set(root, { sha, phase: "conflicts", files: result.files });
+      }
+      this.pendingError =
+        `Your local changes overlap with the new commits in ${this.plural(result.files.length, "file")}. ` +
+        "Keep yours, take the incoming version, or edit and mark resolved — your changes are restored " +
+        "as soon as the last one is resolved.";
+      this.showChangesTab();
+      return false;
+    }
+    this.pendingRestores.clear(root);
+    this.fail(
+      new Error(`Couldn't put your local changes back (${result.reason}). They're safe in the Stashes tab.`)
+    );
+    return false;
+  }
+
+  /**
+   * Moves a set-aside restore forward once the user has done their part:
+   * re-applies changes held back by an operation that has since finished or
+   * been aborted, and drops the stash once restore conflicts are all resolved.
+   * Runs on every refresh, so it also catches work done outside Gitable.
+   */
+  private async reconcilePendingRestore(): Promise<void> {
+    const root = this.git.getActiveRoot();
+    const pending = this.pendingRestores.get(root);
+    if (!pending || this.reconciling) {
+      return;
+    }
+    this.reconciling = true;
+    try {
+      if (!(await this.git.hasStash(pending.sha))) {
+        // Popped or dropped by hand — nothing left to restore.
+        this.pendingRestores.clear(root);
+        return;
+      }
+      const [operation, changes] = await Promise.all([this.git.getOperationState(), this.git.getChanges()]);
+      if (operation.kind || changes.conflicts.length > 0) {
+        return;
+      }
+      if (pending.phase === "after-operation") {
+        if (await this.restoreSetAside(pending.sha)) {
+          this.notifySuccess("Done — your local changes are back.");
+        }
+        return;
+      }
+      await this.git.finishStashRestore(pending.sha, pending.files ?? []);
+      this.pendingRestores.clear(root);
+      this.pendingError = "";
+      this.notifySuccess("Conflicts resolved — your local changes are restored.");
+    } catch (error) {
+      this.logger.error("Failed to complete the pending restore", error);
+    } finally {
+      this.reconciling = false;
+    }
+  }
+
+  /**
+   * Refuses to start `action` while an operation or restore is unfinished. Git
+   * would refuse most of these too, but with a far less useful message — and a
+   * pull on top of a conflicted restore would bury the user's changes deeper.
+   */
+  private async ensureIdle(action: string): Promise<boolean> {
+    const [operation, changes] = await Promise.all([
+      this.git.getOperationState().catch((): OperationState => ({ kind: null })),
+      this.git.getChanges().catch((): RepoChanges => ({ staged: [], unstaged: [], conflicts: [] }))
+    ]);
+    let reason = "";
+    if (operation.kind) {
+      reason = `A ${OPERATION_NOUN[operation.kind]} is in progress — finish or abort it before you ${action}.`;
+    } else if (changes.conflicts.length > 0) {
+      reason = `Resolve the ${this.plural(changes.conflicts.length, "conflicted file")} before you ${action}.`;
+    }
+    if (!reason) {
+      return true;
+    }
+    this.pendingError = reason;
+    this.showChangesTab();
+    await this.postState();
+    return false;
+  }
+
+  /**
+   * Resolves one conflicted file by taking a side. The webview speaks in the
+   * user's terms ("mine" / "incoming"); git's "ours" is whatever HEAD is, which
+   * during a rebase is the upstream being replayed onto and during a stash
+   * restore is the freshly pulled commit — the user's own work is "theirs" there.
+   */
+  private async resolveConflict(filePath: string, keep: "mine" | "incoming"): Promise<void> {
+    if (!filePath) return;
+    const operation = await this.git.getOperationState().catch((): OperationState => ({ kind: null }));
+    const mineIsTheirs = operation.kind === "rebase" || operation.kind === null;
+    const side = (keep === "mine") === mineIsTheirs ? "theirs" : "ours";
+    await this.runConflictAction(`Resolving ${path.basename(filePath)}…`, () => this.git.resolveConflict(filePath, side));
+  }
+
+  private async markResolved(filePath: string): Promise<void> {
+    if (!filePath) return;
+    if (await this.git.hasConflictMarkers(filePath).catch(() => false)) {
+      const picked = await vscode.window.showWarningMessage(
+        `${path.basename(filePath)} still contains conflict markers.`,
+        {
+          modal: true,
+          detail: "Lines starting with <<<<<<< or >>>>>>> are still in the file. Mark it as resolved anyway?"
+        },
+        "Mark Resolved"
+      );
+      if (!picked) return;
+    }
+    await this.runConflictAction("Marking as resolved…", () => this.git.markResolved([filePath]));
+  }
+
+  /** Applies a per-file resolution, then carries the flow on by itself once the
+   *  last conflict is gone: continues the paused operation, or finishes a restore. */
+  private async runConflictAction(text: string, action: () => Promise<void>): Promise<void> {
+    this.setBusy("stage", text);
+    await this.postState();
+    try {
+      await action();
+    } catch (error) {
+      this.fail(error);
+      this.clearBusy();
+      await this.refresh();
+      return;
+    }
+    this.clearBusy();
+    const [operation, changes] = await Promise.all([
+      this.git.getOperationState().catch((): OperationState => ({ kind: null })),
+      this.git.getChanges().catch((): RepoChanges => ({ staged: [], unstaged: [], conflicts: [] }))
+    ]);
+    if (operation.kind && changes.conflicts.length === 0) {
+      await this.continueOperation();
+      return;
+    }
+    await this.refresh();
+  }
+
+  private async continueOperation(): Promise<void> {
+    const operation = await this.git.getOperationState().catch((): OperationState => ({ kind: null }));
+    const kind = operation.kind;
+    if (!kind) {
+      await this.refresh();
+      return;
+    }
+    const noun = OPERATION_NOUN[kind];
+    this.setBusy("git", `Continuing ${noun}…`);
+    await this.postState();
+    try {
+      await this.git.continueOperation(kind);
+      await this.reportOperationProgress(kind);
+    } catch (error) {
+      // A rebase/cherry-pick range that hits conflicts on its next commit exits
+      // non-zero but is simply paused again.
+      if ((await this.git.getOperationState().catch((): OperationState => ({ kind: null }))).kind) {
+        await this.reportOperationProgress(kind);
+      } else {
+        this.fail(error);
+      }
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
+  }
+
+  private async reportOperationProgress(kind: OperationKind): Promise<void> {
+    const [operation, changes] = await Promise.all([this.git.getOperationState(), this.git.getChanges()]);
+    const noun = OPERATION_NOUN[kind];
+    if (!operation.kind) {
+      this.pendingError = "";
+      this.notifySuccess(`${noun.charAt(0).toUpperCase()}${noun.slice(1)} completed.`);
+      return;
+    }
+    this.pendingError =
+      changes.conflicts.length > 0
+        ? `The next commit conflicts in ${this.plural(changes.conflicts.length, "file")} — resolve ${changes.conflicts.length === 1 ? "it" : "them"} and Gitable carries on.`
+        : `The ${noun} is still paused — click Continue to carry on.`;
+    this.showChangesTab();
+  }
+
+  private async abortOperation(): Promise<void> {
+    const root = this.git.getActiveRoot();
+    const operation = await this.git.getOperationState().catch((): OperationState => ({ kind: null }));
+    const pending = this.pendingRestores.get(root);
+    if (!operation.kind) {
+      if (pending?.phase === "conflicts") {
+        await this.undoRestore(pending.sha);
+      } else {
+        await this.refresh();
+      }
+      return;
+    }
+    const noun = OPERATION_NOUN[operation.kind];
+    const restoreNote = pending ? " Your set-aside local changes are then restored." : "";
+    const picked = await vscode.window.showWarningMessage(
+      `Abort the ${noun}?`,
+      {
+        modal: true,
+        detail: `The branch goes back to how it was before the ${noun} started, and any conflict resolutions are discarded.${restoreNote}`
+      },
+      `Abort ${noun.charAt(0).toUpperCase()}${noun.slice(1)}`
+    );
+    if (!picked) return;
+    await this.runBusyGit("git", `Aborting ${noun}…`, async () => {
+      await this.git.abortOperation(operation.kind!);
+      this.pendingError = "";
+    }, `The ${noun} was aborted.`);
+  }
+
+  private async skipOperation(): Promise<void> {
+    const operation = await this.git.getOperationState().catch((): OperationState => ({ kind: null }));
+    const kind = operation.kind;
+    if (!kind || kind === "merge") {
+      await this.refresh();
+      return;
+    }
+    const picked = await vscode.window.showWarningMessage(
+      "Skip this commit?",
+      { modal: true, detail: `Its changes are left out and the ${OPERATION_NOUN[kind]} moves on to the next commit.` },
+      "Skip Commit"
+    );
+    if (!picked) return;
+    this.setBusy("git", "Skipping commit…");
+    await this.postState();
+    try {
+      await this.git.skipOperation(kind);
+      await this.reportOperationProgress(kind);
+    } catch (error) {
+      if ((await this.git.getOperationState().catch((): OperationState => ({ kind: null }))).kind) {
+        await this.reportOperationProgress(kind);
+      } else {
+        this.fail(error);
+      }
+    } finally {
+      this.clearBusy();
+      await this.refresh();
+    }
+  }
+
+  /** Abandons a conflicted restore: resets the files to HEAD, keeping the stash. */
+  private async undoRestore(sha: string): Promise<void> {
+    const root = this.git.getActiveRoot();
+    const picked = await vscode.window.showWarningMessage(
+      "Undo restoring your local changes?",
+      {
+        modal: true,
+        detail:
+          "Files go back to the latest commit, discarding any edits made while resolving. " +
+          "Your local changes stay safe in the Stashes tab to apply later."
+      },
+      "Undo Restore"
+    );
+    if (!picked) return;
+    await this.runBusyGit("git", "Undoing restore…", async () => {
+      await this.git.undoStashRestore(sha);
+      this.pendingRestores.clear(root);
+      this.pendingError = "";
+    }, "Restore undone — your changes are in the Stashes tab.");
+  }
+
+  private showChangesTab(): void {
+    this.view?.webview.postMessage({ type: "switchTab", tab: "changes" });
+  }
+
+  private plural(count: number, noun: string): string {
+    return `${count} ${noun}${count === 1 ? "" : "s"}`;
   }
 
   private async pushCurrentBranch(): Promise<void> {
@@ -1705,10 +2033,13 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async pullWithLocalChangesCheck(): Promise<void> {
+    if (!(await this.ensureIdle("pull"))) {
+      return;
+    }
     // When the branch has both local and remote commits (diverged), git cannot
     // fast-forward and needs an explicit reconciliation. Ask the user rather
-    // than silently rewriting history; a rebase pull leaves the in-progress
-    // state our Continue/Abort bar already handles.
+    // than silently rewriting history; a pull that conflicts pauses in the
+    // operation bar either way.
     const sync = await this.git.getSyncInfo().catch(() => ({ ahead: 0, behind: 0, hasUpstream: false }));
     let strategy: PullStrategy | undefined;
     if (sync.hasUpstream && sync.ahead > 0 && sync.behind > 0) {
@@ -1725,43 +2056,11 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       strategy = choice === "Rebase" ? "rebase" : "merge";
     }
 
-    const changes = await this.git.getChanges().catch(() => ({ staged: [], unstaged: [], conflicts: [] } as RepoChanges));
-    const hasLocalChanges = changes.staged.length > 0 || changes.unstaged.length > 0;
-
-    if (!hasLocalChanges) {
-      await this.runSyncOp("Pulling", true, () => this.git.pull(strategy));
-      return;
-    }
-
-    const picked = await vscode.window.showWarningMessage(
-      "You have local changes.",
-      {
-        modal: true,
-        detail: "Stash your changes, pull from origin, then restore them? Conflicts will be shown if any arise.",
-      },
-      "Stash, pull & restore"
+    // Uncommitted changes are set aside and restored around the pull — no
+    // prompt, since the stash guarantees nothing is lost either way.
+    await this.runSyncOp("Pulling", true, () =>
+      this.withLocalChangesSetAside("pull", () => this.git.pull(strategy))
     );
-    if (!picked) return;
-
-    await this.runSyncOp("Pulling", true, async () => {
-      await this.git.stashAll();
-      try {
-        await this.git.pull(strategy);
-      } catch (err) {
-        // Pull failed — restore changes so nothing is lost
-        await this.git.stashPop("stash@{0}").catch(() => {});
-        throw err;
-      }
-      try {
-        await this.git.stashPop("stash@{0}");
-      } catch {
-        // Pop produced conflicts — refresh will surface them in the Conflicts section
-        // A conflicting pop leaves the stash entry in place, so nothing is lost.
-        this.pendingError =
-          "Pulled, but restoring your changes hit conflicts. Resolve them in Conflicts; " +
-          "your changes are also kept in the Stashes tab (\"Gitable auto-stash before pull\").";
-      }
-    });
   }
 
   /** Runs a sync operation (fetch/pull/push), showing state in the sync button.
@@ -1836,6 +2135,16 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
   }
 
   private fail(error: unknown): void {
+    if (error instanceof OperationPaused) {
+      // A paused merge/rebase is a state to work through, not an error to dismiss.
+      this.pendingError = error.message;
+      this.logger.info(error.message);
+      this.showChangesTab();
+      if (!this.view?.visible) {
+        vscode.window.showWarningMessage(`Gitable: ${error.message}`);
+      }
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     this.pendingError = message;
     this.logger.error("Operation failed", error);
@@ -1985,7 +2294,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
     let ahead = 0;
     let behind = 0;
     let hasUpstream = false;
-    let rebaseState: RebaseState = { inProgress: false };
+    let operation: OperationState = { kind: null };
     let lastCommit: { summary: string; description: string } | null = null;
     let stateError = this.pendingError;
 
@@ -2004,7 +2313,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           nextBranches,
           nextStashes,
           sync,
-          nextRebaseState,
+          nextOperation,
           nextLastCommit
         ] = await Promise.all([
           this.git.getChanges(),
@@ -2013,7 +2322,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
           this.git.getBranches(),
           this.git.stashList(),
           this.git.getSyncInfo(),
-          this.git.getRebaseState(),
+          this.git.getOperationState(),
           this.git.getLastCommitMessage()
         ]);
         changes = nextChanges;
@@ -2026,7 +2335,7 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         ahead = sync.ahead;
         behind = sync.behind;
         hasUpstream = sync.hasUpstream;
-        rebaseState = nextRebaseState;
+        operation = nextOperation;
         lastCommit = nextLastCommit;
       }
     } catch (error) {
@@ -2069,12 +2378,28 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       busyText: this.busyText,
       isLoading: !!this.busyKind,
       hasConflicts: changes.conflicts.length > 0,
-      rebaseState,
+      operation: this.describeOperation(operation),
       jiraConfig,
       jiraHasToken,
       error: stateError,
       notice: this.pendingNotice
     };
+  }
+
+  /**
+   * The paused-operation bar's model. A conflicted restore has no git operation
+   * behind it, so it is surfaced as its own `restore` kind; `restoreAfter` tells
+   * the bar that set-aside changes come back once the operation ends.
+   */
+  private describeOperation(operation: OperationState) {
+    const pending = this.pendingRestores.get(this.git.getActiveRoot());
+    if (operation.kind) {
+      return { ...operation, restoreAfter: pending?.phase === "after-operation" };
+    }
+    if (pending?.phase === "conflicts") {
+      return { kind: "restore" as const, restoreAfter: false };
+    }
+    return { kind: null, restoreAfter: false };
   }
 
   /** Webview-safe URIs for the provider brand icons (computed once). */

@@ -1,4 +1,15 @@
-import { CommitInfo, CommitStat, RebaseState, RepoChanges, RepoSummary, StashEntry, SyncInfo } from "./models";
+import {
+  CommitInfo,
+  CommitStat,
+  OperationKind,
+  OperationState,
+  RebaseState,
+  RepoChanges,
+  RepoSummary,
+  StashEntry,
+  StashRestoreResult,
+  SyncInfo
+} from "./models";
 
 /** How a divergent pull reconciles local and remote commits. */
 export type PullStrategy = "merge" | "rebase";
@@ -74,14 +85,15 @@ export interface GitService {
   /** Switches to an existing branch. */
   checkoutBranch(name: string): Promise<void>;
 
-  /** Switches branches by stashing, checking out, then applying local changes on the target. */
-  checkoutBranchWithLocalChanges(name: string): Promise<void>;
+  /** Switches branches by stashing, checking out, then applying local changes on the target.
+   *  Returns the stash used and how restoring it went (absent when the tree was clean). */
+  checkoutBranchWithLocalChanges(name: string): Promise<{ stash?: string; restore?: StashRestoreResult }>;
 
   /** Saves local changes for the source branch, then switches to the target branch. */
   checkoutBranchKeepingLocalChanges(sourceBranch: string, targetBranch: string): Promise<void>;
 
-  /** Restores local changes previously saved for the named branch. */
-  restoreSavedBranchChanges(branch: string): Promise<boolean>;
+  /** Restores local changes previously saved for the named branch; undefined when none were saved. */
+  restoreSavedBranchChanges(branch: string): Promise<{ stash: string; restore: StashRestoreResult } | undefined>;
 
   /** Pushes the current branch to its remote. */
   push(): Promise<void>;
@@ -133,8 +145,21 @@ export interface GitService {
   /** Stashes only the currently staged files (git stash push --staged). */
   stashStaged(): Promise<void>;
 
-  /** Stashes all local changes including untracked files. */
-  stashAll(): Promise<void>;
+  /** Stashes all local changes including untracked files. Returns the stash
+   *  commit SHA, or undefined when there was nothing to stash. */
+  stashAll(message?: string): Promise<string | undefined>;
+
+  /** Re-applies a Gitable-created stash (by SHA), dropping it only on full success. */
+  restoreStash(sha: string): Promise<StashRestoreResult>;
+
+  /** Drops the stash and normalises the index once a conflicted restore is resolved. */
+  finishStashRestore(sha: string, conflictedFiles: string[]): Promise<void>;
+
+  /** Resets the tree to HEAD, abandoning a conflicted restore (the stash is kept). */
+  undoStashRestore(sha: string): Promise<void>;
+
+  /** True while the stash commit is still in the stash list. */
+  hasStash(sha: string): Promise<boolean>;
 
   /** Stashes only the given paths (working-tree and untracked), no staging needed. */
   stashFiles(paths: string[], message?: string): Promise<void>;
@@ -183,4 +208,25 @@ export interface GitService {
 
   /** Returns the current rebase state — whether one is in progress and which branches are involved. */
   getRebaseState(): Promise<RebaseState>;
+
+  /** Which merge / rebase / cherry-pick / revert (if any) is paused in the repository. */
+  getOperationState(): Promise<OperationState>;
+
+  /** Concludes the paused operation once its conflicts are resolved. */
+  continueOperation(kind: OperationKind): Promise<void>;
+
+  /** Abandons the paused operation, restoring the pre-operation state. */
+  abortOperation(kind: OperationKind): Promise<void>;
+
+  /** Skips the current step of a rebase / cherry-pick / revert. */
+  skipOperation(kind: Exclude<OperationKind, "merge">): Promise<void>;
+
+  /** Resolves a conflicted path by keeping git's "ours" or "theirs" side, then stages it. */
+  resolveConflict(filePath: string, side: "ours" | "theirs"): Promise<void>;
+
+  /** Stages conflicted paths as resolved (a missing file is staged as deleted). */
+  markResolved(paths: string[]): Promise<void>;
+
+  /** True when the working copy still contains conflict markers. */
+  hasConflictMarkers(filePath: string): Promise<boolean>;
 }

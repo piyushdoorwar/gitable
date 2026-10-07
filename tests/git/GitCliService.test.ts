@@ -378,7 +378,7 @@ describe("GitCliService integration", () => {
     await service.checkoutBranch("main");
     const restored = await service.restoreSavedBranchChanges("main");
 
-    expect(restored).toBe(true);
+    expect(restored?.restore).toEqual({ status: "restored" });
     expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("base\nmain work\n");
     expect(await readFile(path.join(root, "kept.txt"), "utf8")).toBe("kept\n");
     expect((await git(["stash", "list"], root)).trim()).toBe("");
@@ -1149,6 +1149,204 @@ describe("GitCliService integration", () => {
       const history = await service.getHistory(5);
       expect(history[0].subject).toBe("branch: resolve me");
       expect(history[1].subject).toBe("main: edit");
+    });
+  });
+
+  describe("restoring a Gitable stash (stash → pull → restore)", () => {
+    /** Commits `content` to `file` directly, standing in for what a pull brings in. */
+    async function upstreamCommit(file: string, content: string): Promise<void> {
+      await writeFile(path.join(root, file), content);
+      await git(["add", file], root);
+      await git(["commit", "-m", `upstream: ${file}`], root);
+    }
+
+    async function stashList(): Promise<string> {
+      return git(["stash", "list"], root);
+    }
+
+    it("returns undefined from stashAll when there is nothing to stash", async () => {
+      expect(await service.stashAll()).toBeUndefined();
+    });
+
+    it("restores staged and unstaged changes exactly and drops the stash", async () => {
+      await writeFile(path.join(root, "staged.txt"), "s\n");
+      await git(["add", "staged.txt"], root);
+      await writeFile(path.join(root, "tracked.txt"), "base\nlocal\n");
+      const sha = await service.stashAll();
+      expect(sha).toMatch(/^[0-9a-f]{40}$/);
+      await upstreamCommit("other.txt", "upstream\n");
+
+      expect(await service.restoreStash(sha!)).toEqual({ status: "restored" });
+      const changes = await service.getChanges();
+      expect(changes.staged.map((f) => f.path)).toEqual(["staged.txt"]);
+      expect(changes.unstaged.map((f) => f.path)).toEqual(["tracked.txt"]);
+      expect(await stashList()).toBe("");
+    });
+
+    it("falls back to a plain apply when the staged change no longer applies to the index", async () => {
+      // `apply --index` refuses outright ("Conflicts in index") and applies nothing.
+      await writeFile(path.join(root, "a.txt"), "one\n");
+      await git(["add", "a.txt"], root);
+      await git(["commit", "-m", "a"], root);
+      await writeFile(path.join(root, "a.txt"), "one\nlocal\n");
+      await git(["add", "a.txt"], root);
+      await writeFile(path.join(root, "b.txt"), "b\n");
+      await git(["add", "b.txt"], root);
+      const sha = await service.stashAll();
+      await upstreamCommit("a.txt", "zero\none\n");
+
+      expect(await service.restoreStash(sha!)).toEqual({ status: "restored" });
+      expect(await readFile(path.join(root, "a.txt"), "utf8")).toBe("zero\none\nlocal\n");
+      const changes = await service.getChanges();
+      // Fully staged files are staged again.
+      expect(changes.staged.map((f) => f.path).sort()).toEqual(["a.txt", "b.txt"]);
+      expect(await stashList()).toBe("");
+    });
+
+    it("leaves conflicts for the user, keeps the stash, and finishing unstages and drops it", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "local\n");
+      await writeFile(path.join(root, "clean.txt"), "c\n");
+      await git(["add", "clean.txt"], root);
+      const sha = await service.stashAll();
+      await upstreamCommit("tracked.txt", "upstream\n");
+
+      const result = await service.restoreStash(sha!);
+      expect(result).toEqual({ status: "conflicts", files: ["tracked.txt"] });
+      expect(await service.hasStash(sha!)).toBe(true);
+      expect((await service.getChanges()).conflicts[0]).toMatchObject({ conflict: "both-modified" });
+      expect(await service.hasConflictMarkers("tracked.txt")).toBe(true);
+
+      await writeFile(path.join(root, "tracked.txt"), "merged\n");
+      await service.markResolved(["tracked.txt"]);
+      await service.finishStashRestore(sha!, ["tracked.txt"]);
+
+      const changes = await service.getChanges();
+      expect(changes.conflicts).toEqual([]);
+      expect(changes.unstaged.map((f) => f.path)).toEqual(["tracked.txt"]);
+      expect(changes.staged.map((f) => f.path)).toEqual(["clean.txt"]);
+      expect(await service.hasStash(sha!)).toBe(false);
+    });
+
+    it("turns an untracked file that upstream also added into an add/add conflict", async () => {
+      await writeFile(path.join(root, "new.txt"), "mine\n");
+      await writeFile(path.join(root, "extra.txt"), "extra\n");
+      await writeFile(path.join(root, "tracked.txt"), "base\nlocal\n");
+      const sha = await service.stashAll();
+      await upstreamCommit("new.txt", "theirs\n");
+
+      const result = await service.restoreStash(sha!);
+      expect(result).toEqual({ status: "conflicts", files: ["new.txt"] });
+      const changes = await service.getChanges();
+      expect(changes.conflicts[0]).toMatchObject({ path: "new.txt", conflict: "both-added" });
+      expect(changes.unstaged.map((f) => f.path).sort()).toEqual(["extra.txt", "tracked.txt"]);
+      expect(await service.hasConflictMarkers("new.txt")).toBe(true);
+      expect(await service.hasStash(sha!)).toBe(true);
+
+      // "theirs" is the stashed (user's) side of a restore.
+      await service.resolveConflict("new.txt", "theirs");
+      expect(await readFile(path.join(root, "new.txt"), "utf8")).toBe("mine\n");
+    });
+
+    it("restores past an untracked file that upstream added with identical content", async () => {
+      await writeFile(path.join(root, "same.txt"), "same\n");
+      await writeFile(path.join(root, "tracked.txt"), "base\nlocal\n");
+      const sha = await service.stashAll();
+      await upstreamCommit("same.txt", "same\n");
+
+      expect(await service.restoreStash(sha!)).toEqual({ status: "restored" });
+      const changes = await service.getChanges();
+      expect(changes.unstaged.map((f) => f.path)).toEqual(["tracked.txt"]);
+      expect(await stashList()).toBe("");
+    });
+
+    it("undoing a conflicted restore clears it so the stash can be applied again later", async () => {
+      await writeFile(path.join(root, "tracked.txt"), "local\n");
+      await writeFile(path.join(root, "fresh.txt"), "untracked\n");
+      const sha = await service.stashAll();
+      await upstreamCommit("tracked.txt", "upstream\n");
+      expect((await service.restoreStash(sha!)).status).toBe("conflicts");
+
+      await service.undoStashRestore(sha!);
+
+      expect(await service.getChanges()).toEqual({ staged: [], unstaged: [], conflicts: [] });
+      expect(await service.hasStash(sha!)).toBe(true);
+      expect((await service.restoreStash(sha!)).status).toBe("conflicts");
+    });
+
+    it("carries changes across a branch switch even when they conflict there", async () => {
+      await git(["checkout", "-b", "other"], root);
+      await upstreamCommit("tracked.txt", "other\n");
+      await git(["checkout", "main"], root);
+      await writeFile(path.join(root, "tracked.txt"), "local\n");
+
+      const outcome = await service.checkoutBranchWithLocalChanges("other");
+      expect(outcome.restore).toEqual({ status: "conflicts", files: ["tracked.txt"] });
+      expect(await service.hasStash(outcome.stash!)).toBe(true);
+    });
+  });
+
+  describe("paused operations", () => {
+    async function divergeOn(file: string): Promise<void> {
+      await git(["checkout", "-b", "other"], root);
+      await writeFile(path.join(root, file), "theirs\n");
+      await git(["add", file], root);
+      await git(["commit", "-m", "other edit"], root);
+      await git(["checkout", "main"], root);
+      await writeFile(path.join(root, file), "ours\n");
+      await git(["add", file], root);
+      await git(["commit", "-m", "main edit"], root);
+    }
+
+    it("reports idle when nothing is in progress", async () => {
+      expect(await service.getOperationState()).toEqual({ kind: null });
+    });
+
+    it("detects, resolves and continues a conflicted merge", async () => {
+      await divergeOn("tracked.txt");
+      await service.mergeBranch("other").catch(() => {});
+      expect(await service.getOperationState()).toEqual({ kind: "merge", onto: "other" });
+
+      await service.resolveConflict("tracked.txt", "theirs");
+      expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("theirs\n");
+      await service.continueOperation("merge");
+
+      expect((await service.getOperationState()).kind).toBeNull();
+      expect((await service.getHistory(1))[0].subject).toMatch(/^Merge branch 'other'/);
+    });
+
+    it("aborts a conflicted merge back to the pre-merge commit", async () => {
+      await divergeOn("tracked.txt");
+      await service.mergeBranch("other").catch(() => {});
+      await service.abortOperation("merge");
+      expect((await service.getOperationState()).kind).toBeNull();
+      expect((await service.getChanges()).conflicts).toEqual([]);
+    });
+
+    it("skips a cherry-pick that the resolution made empty instead of failing", async () => {
+      await divergeOn("tracked.txt");
+      await service.cherryPickCommit("other").catch(() => {});
+      expect((await service.getOperationState()).kind).toBe("cherry-pick");
+
+      await service.resolveConflict("tracked.txt", "ours");
+      await service.continueOperation("cherry-pick");
+
+      expect((await service.getOperationState()).kind).toBeNull();
+      expect((await service.getHistory(1))[0].subject).toBe("main edit");
+    });
+
+    it("resolves a delete/modify conflict by staging the deletion", async () => {
+      await git(["checkout", "-b", "other"], root);
+      await git(["rm", "-q", "tracked.txt"], root);
+      await git(["commit", "-m", "delete"], root);
+      await git(["checkout", "main"], root);
+      await writeFile(path.join(root, "tracked.txt"), "edited\n");
+      await git(["commit", "-am", "edit"], root);
+      await service.mergeBranch("other").catch(() => {});
+
+      expect((await service.getChanges()).conflicts[0]).toMatchObject({ path: "tracked.txt", conflict: "deleted-by-them" });
+      await service.resolveConflict("tracked.txt", "theirs");
+      expect((await service.getChanges()).conflicts).toEqual([]);
+      expect(await fileExists(path.join(root, "tracked.txt"))).toBe(false);
     });
   });
 });

@@ -10,6 +10,36 @@ export interface FileChange {
   staged: boolean;
   /** Original path for renames/copies. */
   originalPath?: string;
+  /** Kind of merge conflict (only set on entries in {@link RepoChanges.conflicts}). */
+  conflict?: ConflictKind;
+}
+
+/**
+ * The porcelain XY code of an unmerged path, named. "Us"/"them" are git's own
+ * stage-2/stage-3 sides — during a rebase or a stash restore they are swapped
+ * relative to what the user thinks of as "mine", which the provider accounts for.
+ */
+export type ConflictKind =
+  | "both-modified"   // UU
+  | "both-added"      // AA
+  | "both-deleted"    // DD
+  | "added-by-us"     // AU
+  | "added-by-them"   // UA
+  | "deleted-by-us"   // DU
+  | "deleted-by-them"; // UD
+
+/** Maps a porcelain XY pair to a conflict kind, or undefined if the path is not unmerged. */
+export function conflictKindFromXY(x: string, y: string): ConflictKind | undefined {
+  switch (x + y) {
+    case "UU": return "both-modified";
+    case "AA": return "both-added";
+    case "DD": return "both-deleted";
+    case "AU": return "added-by-us";
+    case "UA": return "added-by-them";
+    case "DU": return "deleted-by-us";
+    case "UD": return "deleted-by-them";
+    default: return undefined;
+  }
 }
 
 export interface RepoChanges {
@@ -59,6 +89,29 @@ export interface StashEntry {
   hash?: string;    // full 40-char SHA of the stash commit — stable id used to key user notes
   note?: string;    // optional user annotation describing what's in the stash (from StashNoteStore)
 }
+
+/** A multi-step Git operation paused mid-way (usually on conflicts). */
+export type OperationKind = "merge" | "rebase" | "cherry-pick" | "revert";
+
+export interface OperationState {
+  /** The operation in progress, or null when the repository is idle. */
+  kind: OperationKind | null;
+  /** Rebase: branch being rebased. */
+  branch?: string;
+  /** Rebase: target it is replayed onto. Merge: the branch being merged in. */
+  onto?: string;
+  /** Cherry-pick / revert: short SHA of the commit being applied. */
+  commit?: string;
+}
+
+/** Outcome of re-applying a stash Gitable created on the user's behalf. */
+export type StashRestoreResult =
+  /** Fully re-applied and the stash entry dropped. */
+  | { status: "restored" }
+  /** Applied with merge conflicts; the stash entry is kept until they are resolved. */
+  | { status: "conflicts"; files: string[] }
+  /** Nothing applied (e.g. an untracked file now exists upstream); the stash is kept. */
+  | { status: "blocked"; reason: string; files: string[] };
 
 export interface RebaseState {
   /** True when a rebase is in progress (rebase-merge or rebase-apply dir exists). */

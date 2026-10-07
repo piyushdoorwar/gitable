@@ -50,6 +50,7 @@ src/
     SecretService.ts       API keys via context.secrets (SecretStorage only)
     SettingsService.ts     provider + per-provider model via context.globalState
     StashNoteStore.ts      user notes describing stashes, keyed by stash commit SHA (globalState)
+    PendingRestoreStore.ts set-aside local changes still owed back, per repo root (workspaceState)
   utils/
     DiffLimiter.ts         ignore noisy files + truncate to MAX_DIFF_CHARS
     Logger.ts              OutputChannel("Gitable")
@@ -93,9 +94,10 @@ tests/
   `push`, `pull`, `fetchOrigin`,
   `createBranch`, `switchBranch`, `checkoutBranchWithChanges`, `checkoutBranchKeepingChanges`,
   `restoreBranchChanges`, `renameBranch`, `deleteBranch`, `copyBranchName`, `setUpstream`,
-  `mergeBranch`, `rebaseBranch`, `rebaseContinue`, `rebaseAbort`,
+  `mergeBranch`, `rebaseBranch`,
+  `operationContinue`, `operationAbort`, `operationSkip` (`rebaseContinue`/`rebaseAbort` still accepted),
   `copySha`, `copyTag`, `revertCommit`, `cherryPickCommit`,
-  `openMergeEditor`, `markResolved`,
+  `openMergeEditor`, `markResolved`, `resolveConflict {filePath, keep: "mine"|"incoming"}`,
   `stashStaged`, `stashFiles {filePaths}`, `stashPop`, `stashApply`, `stashDrop`, `annotateStash {hash}`,
   `createTag {hash}`, `deleteTag {name}`, `pushTags`,
   `addToGitignore {filePath}`, `undoLastCommit`,
@@ -122,7 +124,7 @@ history, branches, hasMoreHistory,
 ahead, behind, hasUpstream, syncAction, syncError, lastFetchedAt,
 pendingTagCount, canUndoCommit, lastCommitSummary,
 lastCommit:{summary, description} | null,
-rebaseState:{inProgress, branch?, onto?},
+operation:{kind: merge|rebase|cherry-pick|revert|restore|null, branch?, onto?, commit?, restoreAfter},
 hasConflicts,
 provider, model, models, hasApiKey, providerIcons,
 busyKind, busyText, isLoading, error, notice,
@@ -176,9 +178,8 @@ first. When the branch is diverged (`ahead > 0 && behind > 0`) it shows a modal
 plain fast-forward pull (only behind) passes no strategy. `GitCliService.pull`
 runs `git pull` with `--rebase`, `--no-rebase`, or no flag accordingly — **no
 `--autostash`**: local working-tree changes are carried by the provider's
-explicit stash → pull → restore wrapper so there is a single conflict surface. A
-rebase pull that conflicts leaves `.git/rebase-merge`, which the existing
-`rebaseState` Continue/Abort bar picks up automatically. `VsCodeGitService.pull`
+`withLocalChangesSetAside()` wrapper (see *Conflict handling* below), with no
+confirmation prompt. A pull that conflicts pauses in the operation bar. `VsCodeGitService.pull`
 routes any explicit strategy to the CLI (the Git API's `repo.pull()` cannot force
 rebase/merge); a strategy-less pull still prefers the API.
 
@@ -395,13 +396,45 @@ workspace, never committed to the repo.
   `else activity.clear()`), so an undefined badge left the stale count on the Activity Bar
   icon until the next non-zero write. The Activity Bar renders a number badge only when the
   summed value is `> 0`, so a zero badge reads as "no badge".
-- **Conflict resolution state.** When a pull or merge leaves unresolved conflicts,
-  `RepoChanges.conflicts` is populated (CLI detects XY porcelain codes containing `U`,
-  `AA`, or `DD`; VS Code Git API uses `mergeChanges`). The Changes tab shows a
-  warning banner and a dedicated Conflicts section. Each file gets two row actions:
-  "Open in merge editor" (`git.openMergeEditor` command, falls back to plain open)
-  and "Mark as resolved" (stages the file via `stageFiles`). The Commit and AI
-  generate buttons are disabled until all conflicts are cleared.
+- **Conflict handling.** The goal is that a user never has to know git's recovery
+  incantations, and never loses work.
+  - *Set-aside wrapper.* Pull, merge, rebase, cherry-pick and revert run through
+    `withLocalChangesSetAside()`: a dirty tree is stashed (`stashAll()` returns the stash
+    **SHA** — never address it as `stash@{0}`), the command runs, and the changes are put
+    back. If git stops mid-operation the stash is *not* applied on top of the conflicted
+    state (that fails with "needs merge"); it is recorded in `PendingRestoreStore` as
+    `after-operation` and re-applied once the operation is continued or aborted — the same
+    contract as git's `--autostash`. Any other failure restores immediately.
+  - *Restore* (`GitCliService.restoreStash`) follows git's advice per failure:
+    `apply --index`; on "Conflicts in index. Try without --index" (which applies
+    *nothing*) retry plain `apply` and re-stage the fully-staged files; on content
+    conflicts keep the stash and record `conflicts`; on "X already exists, no checkout"
+    (git has applied everything else) identical files need nothing and differing ones are
+    turned into real add/add conflicts (`update-index --index-info` stages 2/3 +
+    `checkout -m`). Only a full success drops the stash.
+  - *Auto-progress.* `refresh()` runs `reconcilePendingRestore()`, so it also catches work
+    done outside Gitable: an `after-operation` restore is applied when the operation is
+    gone; a `conflicts` restore is finished (`finishStashRestore`: `reset`, re-stage the
+    originally fully-staged files, drop the stash — resolved files end up unstaged, as
+    they were before the pull) once no conflicts remain. Resolving the last conflict
+    through Gitable (Keep mine / Take incoming / Mark resolved) also auto-continues a
+    paused operation (`continueOperation`: `commit --no-edit` for merges, `--continue`
+    with `GIT_EDITOR=true` otherwise; an emptied cherry-pick/revert is `--skip`ped).
+  - *Operation state.* `getOperationState()` detects rebase (`rebase-merge`/`rebase-apply`)
+    and `MERGE_HEAD` / `CHERRY_PICK_HEAD` / `REVERT_HEAD` under the real git dir. Success
+    vs. conflict is decided by this state, not by matching git's (localised) error text;
+    a paused operation is thrown as `OperationPaused`, which `fail()` shows as panel
+    guidance without an error toast. `ensureIdle()` blocks pull/merge/rebase/branch
+    switch/cherry-pick/revert/stash pop+apply while an operation or conflict is open.
+  - *UI.* One operation bar (`#operationBar`) covers merge (Commit merge / Abort), rebase,
+    cherry-pick, revert (Continue / Skip / Abort) and a conflicted restore (`restore`
+    kind: Undo restore — `reset --hard` + `clean` of the stash's untracked paths, stash
+    kept). The commit card hides while any operation is active. Conflict rows carry the
+    porcelain kind (`FileChange.conflict`: both-modified, deleted-by-them, …) and offer
+    merge editor (two-sided kinds only), **Keep mine**, **Take incoming** and **Mark
+    resolved** (warns if `<<<<<<<`/`>>>>>>>` markers remain; `add -A` so a deletion
+    stages). "Mine"/"incoming" are mapped to git's sides by the host: git's *ours* is
+    HEAD, so during a rebase or a stash restore the user's work is *theirs*.
 - **Stash (staged-only).** `git stash push --staged` stashes only currently staged
   files, leaving unstaged changes intact. Pop / Apply restores the stash with
   `--index` so previously staged files return checked. The Stashes subtab lists
@@ -427,8 +460,8 @@ workspace, never committed to the repo.
   exposes **Set upstream…** for branches that already exist remotely but are not
   tracking yet.
 - **Merge branch.** Right-click a branch in the Branches tab → "Merge into current".
-  Conflict detection surfaces the error as a panel notice pointing users to the
-  conflict resolution flow.
+  Runs through the set-aside wrapper; a conflicting merge pauses in the operation bar
+  (**Commit merge** / **Abort**).
 - **Add to .gitignore.** Right-clicking an untracked file (status `U`) in the Changes list shows "Add to .gitignore" in the context menu. The host appends the relative path to `<repo-root>/.gitignore` (creating it if absent, skipping if the path is already listed). The entry only appears for untracked files; `openFileMenu` toggles it based on `data-status === "U"`.
 - **Undo last commit.** After a commit, `GitableViewProvider` stores the commit summary in `lastCommitSummary` and sets `canUndoCommit: true` in state. The Changes tab shows an undo bar below the Commit button. Clicking "Undo" posts `undoLastCommit` → `git reset --soft HEAD~1`, moving staged changes back to the index. The bar disappears after undo or after a successful push. Auto-stage tracking is reset on undo so the re-staged files remain checked. The History commit context menu also exposes **"Undo commit (drop)"** on the latest commit *only while it is unpushed* (`isHead && ahead > 0`); it switches to Changes → Staged and posts the same `undoLastCommit`. Distinct from **Revert commit** (`git revert`, which adds an inverse commit and never removes history). Revert and cherry-pick clear `lastCommitSummary` so a stale Undo bar can't `reset --soft` the newly created commit.
 - **Tag management.** Tags are created via right-click on a commit row → "Create tag…"
@@ -440,7 +473,7 @@ workspace, never committed to the repo.
   When `ahead > 0` the push also calls `pushAllTags()` and clears the set. When
   `ahead === 0` the Push button badge shows `M🏷` and `pushSync` posts `pushTags`.
   Pending tags are reset on any successful push and when a tag is deleted.
-- **Rebase with conflict resolution.** Right-click any non-current branch → "Rebase onto this". `GitableViewProvider` shows a modal confirmation, then calls `git rebase`. On conflict, `getRebaseState()` detects `.git/rebase-merge/head-name` and sets `rebaseState.inProgress: true` in state. The Changes tab shows a rebase bar with **Continue Rebase** and **Abort** buttons. `rebaseContinue()` uses `GIT_EDITOR=true` to suppress the editor. Multi-commit rebases cycle through each conflict automatically. The commit card and commit button are hidden during rebase.
+- **Rebase.** Right-click any non-current branch → "Rebase onto this". `GitableViewProvider` shows a modal confirmation, then calls `git rebase` through the set-aside wrapper. Conflicts pause in the operation bar (see *Conflict handling*); multi-commit rebases cycle through each conflicting commit, auto-continuing as each is resolved.
 - **Amend last commit.** Right-click the HEAD commit in History → "Amend commit…". The handler switches to Changes → Staged, pre-fills the commit fields from `state.lastCommit` (fetched fresh via `git log -1 --format=%B` on every state build), and checks the amend toggle. The toggle label changes to "Amending — uncheck to cancel" when active. On submit the webview posts `amend` instead of `commit`; the host calls `git commit --amend`. Works with or without new staged files (pure message edit is valid). `clearCommitFields` also resets the toggle.
 - **Force push with lease.** A normal push that is rejected (error matches `/rejected|non-fast-forward|fetch first/i`) triggers a VS Code warning modal offering **Force Push**. If confirmed, `git push --force-with-lease` is used — this refuses if someone else has pushed to the remote since the last fetch, preventing accidental clobbers.
 - **Auto-select file checkboxes.** Files in the Working and Staged lists are checked by default when they first appear. A `_seenFileKeys` Set tracks which keys have been seen; only genuinely new keys are auto-checked. Files the user explicitly unchecks stay unchecked across re-renders. Moving a file between Working and Staged changes its key (`path:false` vs `path:true`), so it is auto-checked in its new section. The "Stage all" and "Unstage all" buttons were removed — "Stage selected" / "Unstage selected" cover all cases when everything is pre-checked.

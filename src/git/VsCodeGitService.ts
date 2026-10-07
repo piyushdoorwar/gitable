@@ -3,8 +3,17 @@ import * as vscode from "vscode";
 import { Logger } from "../utils/Logger";
 import { emptyDocumentUri } from "./EmptyDocumentProvider";
 import { GitCliService } from "./GitCliService";
-import { GitService, PullStrategy } from "./GitService";
-import { CommitInfo, FileChange, RepoChanges, RepoSummary, SyncInfo } from "./models";
+import { GitService, GitServiceError, PullStrategy } from "./GitService";
+import {
+  CommitInfo,
+  FileChange,
+  OperationKind,
+  OperationState,
+  RepoChanges,
+  RepoSummary,
+  StashRestoreResult,
+  SyncInfo
+} from "./models";
 
 // ---- Minimal typings for the built-in `vscode.git` extension API ----
 // We only declare the members Gitable uses, to avoid depending on the full
@@ -318,7 +327,7 @@ export class VsCodeGitService implements GitService {
     );
   }
 
-  checkoutBranchWithLocalChanges(name: string): Promise<void> {
+  checkoutBranchWithLocalChanges(name: string): Promise<{ stash?: string; restore?: StashRestoreResult }> {
     this.syncCliRoot();
     return this.cli.checkoutBranchWithLocalChanges(name);
   }
@@ -328,7 +337,7 @@ export class VsCodeGitService implements GitService {
     return this.cli.checkoutBranchKeepingLocalChanges(sourceBranch, targetBranch);
   }
 
-  restoreSavedBranchChanges(branch: string): Promise<boolean> {
+  restoreSavedBranchChanges(branch: string): Promise<{ stash: string; restore: StashRestoreResult } | undefined> {
     this.syncCliRoot();
     return this.cli.restoreSavedBranchChanges(branch);
   }
@@ -365,7 +374,15 @@ export class VsCodeGitService implements GitService {
       return this.cli.pull(strategy);
     }
     const repo = this.getActiveRepository();
-    return this.apiOrCli(repo ? () => repo.pull() : undefined, () => this.cli.pull());
+    return this.apiOrCli(repo ? () => repo.pull() : undefined, async () => {
+      // An API pull that stopped on conflicts has already left a merge/rebase
+      // in progress; re-running it through the CLI would only replace that
+      // state's useful error with "you have unmerged files".
+      if ((await this.cli.getOperationState()).kind) {
+        throw new GitServiceError("Pull stopped on merge conflicts.");
+      }
+      await this.cli.pull();
+    });
   }
 
   fetchOrigin(): Promise<void> {
@@ -430,9 +447,29 @@ export class VsCodeGitService implements GitService {
     return this.cli.stashFiles(paths, message);
   }
 
-  stashAll(): Promise<void> {
+  stashAll(message?: string): Promise<string | undefined> {
     this.syncCliRoot();
-    return this.cli.stashAll();
+    return this.cli.stashAll(message);
+  }
+
+  restoreStash(sha: string): Promise<StashRestoreResult> {
+    this.syncCliRoot();
+    return this.cli.restoreStash(sha);
+  }
+
+  finishStashRestore(sha: string, conflictedFiles: string[]): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.finishStashRestore(sha, conflictedFiles);
+  }
+
+  undoStashRestore(sha: string): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.undoStashRestore(sha);
+  }
+
+  hasStash(sha: string): Promise<boolean> {
+    this.syncCliRoot();
+    return this.cli.hasStash(sha);
   }
 
   stashList() {
@@ -508,6 +545,41 @@ export class VsCodeGitService implements GitService {
   getRebaseState(): Promise<import("./models").RebaseState> {
     this.syncCliRoot();
     return this.cli.getRebaseState();
+  }
+
+  getOperationState(): Promise<OperationState> {
+    this.syncCliRoot();
+    return this.cli.getOperationState();
+  }
+
+  continueOperation(kind: OperationKind): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.continueOperation(kind);
+  }
+
+  abortOperation(kind: OperationKind): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.abortOperation(kind);
+  }
+
+  skipOperation(kind: Exclude<OperationKind, "merge">): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.skipOperation(kind);
+  }
+
+  resolveConflict(filePath: string, side: "ours" | "theirs"): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.resolveConflict(filePath, side);
+  }
+
+  markResolved(paths: string[]): Promise<void> {
+    this.syncCliRoot();
+    return this.cli.markResolved(paths);
+  }
+
+  hasConflictMarkers(filePath: string): Promise<boolean> {
+    this.syncCliRoot();
+    return this.cli.hasConflictMarkers(filePath);
   }
 
   // ---- internals ----

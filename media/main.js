@@ -99,7 +99,12 @@
     folder:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.6.8L12 7.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
     info:
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="8.01"/><line x1="12" y1="12" x2="12" y2="16"/></svg>'
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="8.01"/><line x1="12" y1="12" x2="12" y2="16"/></svg>',
+    // Conflict sides: a person for "keep my version", an arrow into a tray for "take incoming".
+    keepMine:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+    takeIncoming:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>'
   };
 
   /** Extension -> a colour class for the file-type icon. */
@@ -773,11 +778,12 @@
             <button class="gx-undo-btn" data-action="undoLastCommit" title="Undo last commit (git reset --soft HEAD~1)" aria-label="Undo last commit" type="button">Undo</button>
           </div>
         </div>
-        <div id="rebaseBar" class="gx-rebase-bar hidden">
-          <span class="gx-rebase-bar-label">${icon("rebase", "sm")}<span id="rebaseBarLabel">Rebasing</span></span>
+        <div id="operationBar" class="gx-rebase-bar hidden">
+          <span class="gx-rebase-bar-label"><span id="operationBarIcon" class="gx-ic sm"></span><span id="operationBarLabel"></span></span>
           <div class="gx-rebase-bar-actions">
-            <button id="rebaseContinueBtn" class="gx-btn gx-btn-primary" data-action="rebaseContinue" type="button">Continue Rebase</button>
-            <button id="rebaseAbortBtn" class="gx-btn gx-btn-secondary" data-action="rebaseAbort" type="button">Abort</button>
+            <button id="operationContinueBtn" class="gx-btn gx-btn-primary" data-action="operationContinue" type="button">Continue</button>
+            <button id="operationSkipBtn" class="gx-btn gx-btn-secondary" data-action="operationSkip" title="Leave this commit out and move on" aria-label="Skip this commit" type="button">Skip</button>
+            <button id="operationAbortBtn" class="gx-btn gx-btn-secondary" data-action="operationAbort" type="button">Abort</button>
           </div>
         </div>
       </div>
@@ -1274,11 +1280,10 @@
       case "undoLastCommit":
         post({ type: "undoLastCommit" });
         break;
-      case "rebaseContinue":
-        post({ type: "rebaseContinue" });
-        break;
-      case "rebaseAbort":
-        post({ type: "rebaseAbort" });
+      case "operationContinue":
+      case "operationSkip":
+      case "operationAbort":
+        post({ type: action });
         break;
       case "discardOne":
         post({ type: "discardFiles", filePaths: [elm.getAttribute("data-path")], staged: elm.getAttribute("data-staged") === "1" });
@@ -1379,6 +1384,14 @@
         break;
       case "markResolved":
         post({ type: "markResolved", filePath: elm.getAttribute("data-path") });
+        break;
+      case "keepMine":
+      case "takeIncoming":
+        post({
+          type: "resolveConflict",
+          filePath: elm.getAttribute("data-path"),
+          keep: action === "keepMine" ? "mine" : "incoming"
+        });
         break;
       case "openBranches":
         switchTab("branches");
@@ -1937,19 +1950,61 @@
     }).join("");
   }
 
-  function renderConflictList(files) {
+  /** How each git conflict code reads to a person, plus which git side deleted the file. */
+  const CONFLICT_KINDS = {
+    "both-modified": { label: "Both modified", deleted: null },
+    "both-added": { label: "Both added", deleted: null },
+    "both-deleted": { label: "Both deleted", deleted: "both" },
+    "added-by-us": { label: "Added on one side", deleted: "theirs" },
+    "added-by-them": { label: "Added on one side", deleted: "ours" },
+    "deleted-by-us": { label: "Deleted on one side", deleted: "ours" },
+    "deleted-by-them": { label: "Deleted on one side", deleted: "theirs" }
+  };
+
+  /**
+   * Who "mine" and "incoming" are for the paused operation. Git's "ours" is
+   * HEAD: in a rebase that's the upstream being replayed onto, and in a stash
+   * restore (kind "restore", or no operation) it's the freshly pulled commit —
+   * the user's own work is git's "theirs" in both cases.
+   */
+  function conflictSides(op) {
+    const kind = op && op.kind;
+    const mineIsTheirs = !kind || kind === "rebase" || kind === "restore";
+    let mine = "your branch";
+    let incoming = "the incoming changes";
+    if (kind === "merge") incoming = op.onto ? op.onto : incoming;
+    else if (kind === "rebase") { mine = "your commit"; incoming = op.onto ? op.onto : incoming; }
+    else if (kind === "cherry-pick") incoming = op.commit ? `commit ${op.commit}` : "the picked commit";
+    else if (kind === "revert") incoming = "the revert";
+    else { mine = "your local changes"; incoming = "the new commits"; }
+    return { mine, incoming, mineIsTheirs };
+  }
+
+  function renderConflictList(files, op) {
     if (!files || !files.length) return "";
-    return files.map((f) =>
-      `<li class="gx-file gx-file-conflict" data-path="${escapeHtml(f.path)}" data-staged="0" data-status="X">
+    const sides = conflictSides(op);
+    return files.map((f) => {
+      const p = escapeHtml(f.path);
+      const info = CONFLICT_KINDS[f.conflict] || { label: "Conflict", deleted: null };
+      const mineSide = sides.mineIsTheirs ? "theirs" : "ours";
+      const incomingSide = sides.mineIsTheirs ? "ours" : "theirs";
+      const deletes = (side) => info.deleted === "both" || info.deleted === side;
+      const keepTip = `Keep ${sides.mine}${deletes(mineSide) ? " (deletes the file)" : ""}`;
+      const takeTip = `Take ${sides.incoming}${deletes(incomingSide) ? " (deletes the file)" : ""}`;
+      // The merge editor needs both sides of the file; delete conflicts have one.
+      const mergeable = !info.deleted;
+      return `<li class="gx-file gx-file-conflict" data-path="${p}" data-staged="0" data-status="X">
         ${fileIcon(f.path)}
-        <span class="gx-path" title="${escapeHtml(f.path)}">${escapeHtml(f.displayPath || f.path)}</span>
+        <span class="gx-path" title="${p}">${escapeHtml(f.displayPath || f.path)}</span>
         <span class="gx-right">
-          <button class="gx-row-action" data-action="openMergeEditor" data-path="${escapeHtml(f.path)}" title="Open in merge editor" aria-label="Open in merge editor" type="button">${ICONS.merge}</button>
-          <button class="gx-row-action gx-conflict-resolve-btn" data-action="markResolved" data-path="${escapeHtml(f.path)}" title="Mark as resolved (stages the file)" aria-label="Mark as resolved" type="button">${ICONS.check}</button>
-          ${statusGlyph("X")}
+          ${mergeable ? `<button class="gx-row-action" data-action="openMergeEditor" data-path="${p}" title="Open in merge editor" aria-label="Open in merge editor" type="button">${ICONS.merge}</button>` : ""}
+          <button class="gx-row-action" data-action="keepMine" data-path="${p}" title="${escapeHtml(keepTip)}" aria-label="${escapeHtml(keepTip)}" type="button">${ICONS.keepMine}</button>
+          <button class="gx-row-action" data-action="takeIncoming" data-path="${p}" title="${escapeHtml(takeTip)}" aria-label="${escapeHtml(takeTip)}" type="button">${ICONS.takeIncoming}</button>
+          <button class="gx-row-action gx-conflict-resolve-btn" data-action="markResolved" data-path="${p}" title="Mark as resolved (keeps the file as edited)" aria-label="Mark as resolved" type="button">${ICONS.check}</button>
+          <span class="gx-stat gx-stat-X" data-tooltip="${escapeHtml(info.label)}" aria-label="${escapeHtml(info.label)}">${ICONS.conflict}</span>
         </span>
-      </li>`
-    ).join("");
+      </li>`;
+    }).join("");
   }
 
   function setHint(elm, text) {
@@ -2003,39 +2058,68 @@
       applyFolderIndeterminate(byId("unstagedList"), false);
     }
 
-    // Declared up front: the rebase bar below reads it, and reading a `const`
+    // Declared up front: the operation bar below reads it, and reading a `const`
     // before its declaration throws — which froze the whole panel mid-rebase.
     const busy = !!s.isLoading;
 
     // Conflicts section
     const conflicts = (s.changes && s.changes.conflicts) || [];
     const hasConflicts = conflicts.length > 0;
-    const rebase = s.rebaseState || { inProgress: false };
+    const op = s.operation || { kind: null };
+    const opActive = !!op.kind;
     const conflictsBanner = byId("conflictsBanner");
     const conflictsSection = byId("conflictsSection");
     if (hasConflicts) {
       conflictsBanner.classList.remove("hidden");
-      byId("conflictsBannerText").textContent = rebase.inProgress
-        ? `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all to continue rebase`
-        : `${conflicts.length} conflict${conflicts.length === 1 ? "" : "s"} — resolve all before committing`;
+      const goal = {
+        merge: "the merge continues",
+        rebase: "the rebase continues",
+        "cherry-pick": "the cherry-pick continues",
+        revert: "the revert continues",
+        restore: "your local changes are restored"
+      }[op.kind] || "you can commit";
+      byId("conflictsBannerText").textContent =
+        `${plural(conflicts.length, "conflict")} — resolve ${conflicts.length === 1 ? "it" : "all"} and ${goal}`;
       conflictsSection.classList.remove("hidden");
       byId("conflictsCount").textContent = String(conflicts.length);
-      setHtml(byId("conflictsList"), renderConflictList(conflicts));
+      setHtml(byId("conflictsList"), renderConflictList(conflicts, op));
     } else {
       conflictsBanner.classList.add("hidden");
       conflictsSection.classList.add("hidden");
     }
 
-    // Rebase action bar (replaces commit button area when rebase is in progress)
-    const rebaseBar = byId("rebaseBar");
-    if (rebase.inProgress) {
-      rebaseBar.classList.remove("hidden");
-      const label = rebase.onto ? `onto ${rebase.onto}` : "";
-      byId("rebaseBarLabel").textContent = `Rebasing${label ? " " + label : ""}`;
-      setDisabled(byId("rebaseContinueBtn"), busy || hasConflicts);
-      setDisabled(byId("rebaseAbortBtn"), busy);
+    // Paused-operation bar (replaces the commit card while a merge, rebase,
+    // cherry-pick, revert or conflicted restore is unfinished).
+    const opBar = byId("operationBar");
+    if (opActive) {
+      opBar.classList.remove("hidden");
+      const labels = {
+        merge: { icon: "merge", text: `Merging${op.onto ? " " + op.onto : ""}`, cont: "Commit merge", abort: "Abort" },
+        rebase: { icon: "rebase", text: `Rebasing${op.onto ? " onto " + op.onto : ""}`, cont: "Continue", abort: "Abort" },
+        "cherry-pick": { icon: "cherryPick", text: `Cherry-picking${op.commit ? " " + op.commit : ""}`, cont: "Continue", abort: "Abort" },
+        revert: { icon: "revert", text: `Reverting${op.commit ? " " + op.commit : ""}`, cont: "Continue", abort: "Abort" },
+        restore: { icon: "stash", text: "Restoring your local changes", cont: "", abort: "Undo restore" }
+      }[op.kind];
+      byId("operationBarIcon").innerHTML = ICONS[labels.icon];
+      byId("operationBarLabel").textContent = labels.text + (op.restoreAfter ? " · local changes set aside" : "");
+      setHint(
+        byId("operationBarLabel"),
+        op.restoreAfter
+          ? "Your uncommitted changes are stashed and come back automatically when this finishes or is aborted"
+          : labels.text
+      );
+      const contBtn = byId("operationContinueBtn");
+      contBtn.textContent = labels.cont;
+      contBtn.classList.toggle("hidden", !labels.cont);
+      setDisabled(contBtn, busy || hasConflicts);
+      const skipBtn = byId("operationSkipBtn");
+      skipBtn.classList.toggle("hidden", !(op.kind === "rebase" || op.kind === "cherry-pick" || op.kind === "revert"));
+      setDisabled(skipBtn, busy);
+      const abortBtn = byId("operationAbortBtn");
+      abortBtn.textContent = labels.abort;
+      setDisabled(abortBtn, busy);
     } else {
-      rebaseBar.classList.add("hidden");
+      opBar.classList.add("hidden");
     }
 
     // Stash section
@@ -2063,7 +2147,7 @@
         : `<span class="gx-ic">${ICONS.sparkle}</span>`);
     setHint(genBtn, generateHint);
     setDisabled(genBtn, busy || !commitPanelActive || !hasStaged || hasConflicts);
-    const isAmend = ui.amendMode && !!s.lastCommit && !rebase.inProgress;
+    const isAmend = ui.amendMode && !!s.lastCommit && !opActive;
     if (!isAmend && ui.amendMode) ui.amendMode = false;
     byId("amendBar").classList.toggle("hidden", !isAmend || !commitPanelActive);
 
@@ -2072,7 +2156,7 @@
     commitBtn.innerHTML = isAmend
       ? `${icon("commit")}<span>Amend commit</span>`
       : `${icon("commit")}<span>Commit${branch}</span>`;
-    const canSubmit = isAmend ? !hasConflicts && !rebase.inProgress : hasStaged && !hasConflicts && !rebase.inProgress;
+    const canSubmit = isAmend ? !hasConflicts && !opActive : hasStaged && !hasConflicts && !opActive;
     setHint(
       commitBtn,
       hasConflicts
@@ -2086,7 +2170,7 @@
             : "Stage files before committing"
     );
     setDisabled(commitBtn, busy || !commitPanelActive || !canSubmit);
-    byId("commitCard").classList.toggle("hidden", !commitPanelActive || rebase.inProgress);
+    byId("commitCard").classList.toggle("hidden", !commitPanelActive || opActive);
     setInputDisabled(byId("commitPrefix"), busy);
     setInputDisabled(byId("commitSummary"), busy);
     setInputDisabled(byId("commitDescription"), busy);
