@@ -8,15 +8,29 @@ import {
 } from "./AiProvider";
 import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
-import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { AI_GENERATE_TIMEOUT_MS, fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 /**
+ * Output cap per call. Current Claude models (Haiku/Sonnet/Opus 5.x, Fable)
+ * think on every request and thinking tokens count toward `max_tokens`, so the
+ * old 2048 could be spent entirely on reasoning and leave no JSON. 16k stays
+ * well inside non-streaming limits.
+ */
+const MAX_TOKENS = 16_000;
+
+/**
  * Anthropic Claude provider. Auth uses `x-api-key` plus the `anthropic-version`
  * header. Validation and model listing hit `GET /v1/models`; generation uses
  * `POST /v1/messages` with a JSON-only system prompt.
+ *
+ * No sampling parameters are sent: `temperature` / `top_p` / `top_k` are
+ * rejected with a 400 by current models ("`temperature` is deprecated for this
+ * model"), and the defaults work fine on older ones. No `thinking` config
+ * either — omitting it is the one setting every model accepts (newer models
+ * think adaptively, older ones don't think).
  *
  * (The browser-only `anthropic-dangerous-direct-browser-access` header is not
  * needed here — Gitable runs in the Node-based extension host, not a browser.)
@@ -59,16 +73,33 @@ export class ClaudeProvider implements AiProvider {
   }
 
   async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
-    const response = await fetchWithTimeout(`${BASE_URL}/messages`, {
-      method: "POST",
-      headers: this.headers(apiKey),
-      body: JSON.stringify({ model, system, max_tokens: 2048, temperature: 0.2, messages: [{ role: "user", content: user }] })
-    });
+    const response = await fetchWithTimeout(
+      `${BASE_URL}/messages`,
+      {
+        method: "POST",
+        headers: this.headers(apiKey),
+        body: JSON.stringify({ model, system, max_tokens: MAX_TOKENS, messages: [{ role: "user", content: user }] })
+      },
+      AI_GENERATE_TIMEOUT_MS
+    );
     if (!response.ok) await throwForStatus(response);
     const data: any = await response.json();
+    const stopReason = String(data?.stop_reason ?? "");
+    if (stopReason === "refusal") {
+      const explanation = data?.stop_details?.explanation;
+      throw new AiProviderError(
+        `Claude declined this request${explanation ? `: ${explanation}` : "."} Try a different model or a smaller diff.`
+      );
+    }
     const blocks: any[] = Array.isArray(data?.content) ? data.content : [];
     const text = blocks.map((b) => (b?.type === "text" && typeof b?.text === "string" ? b.text : "")).join("").trim();
-    if (!text) throw new AiProviderError("Claude returned an empty response.");
+    if (!text) {
+      throw new AiProviderError(
+        stopReason === "max_tokens"
+          ? "Claude ran out of output tokens before answering. Try a smaller selection or a lower token budget."
+          : "Claude returned an empty response."
+      );
+    }
     return text;
   }
 

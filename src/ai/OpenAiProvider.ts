@@ -9,7 +9,7 @@ import {
 
 import { MODEL_FETCH_LIMIT } from "../constants";
 import { buildCommitPrompt } from "./prompts";
-import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { AI_GENERATE_TIMEOUT_MS, fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://api.openai.com/v1";
 
@@ -35,9 +35,14 @@ function isMainOpenAIModel(id: string): boolean {
 }
 
 /**
- * OpenAI provider. Validation and model listing use `GET /v1/models`; commit
- * messages use `POST /v1/chat/completions` with JSON-object response format,
- * which reliably yields the structured `{summary, description}` Gitable expects.
+ * OpenAI provider. Validation and model listing use `GET /v1/models`;
+ * generation uses the Responses API (`POST /v1/responses`) with a JSON-object
+ * text format, which reliably yields the structured JSON Gitable expects.
+ *
+ * Responses (not Chat Completions) is OpenAI's current API and the only one
+ * some newer models (e.g. `*-codex`, `*-pro`) are served on. No `temperature`
+ * is sent: reasoning models (o-series, GPT-5 family) reject anything but the
+ * default, and the default is fine for the rest.
  */
 export class OpenAiProvider implements AiProvider {
   async validateApiKey(apiKey: string): Promise<boolean> {
@@ -69,21 +74,47 @@ export class OpenAiProvider implements AiProvider {
   }
 
   async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
-    const response = await fetchWithTimeout(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        response_format: { type: "json_object" },
-        temperature: 0.2
-      })
-    });
+    const response = await fetchWithTimeout(
+      `${BASE_URL}/responses`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          instructions: system,
+          input: user,
+          text: { format: { type: "json_object" } },
+          store: false
+        })
+      },
+      AI_GENERATE_TIMEOUT_MS
+    );
     if (!response.ok) await throwForStatus(response);
     const data: any = await response.json();
-    const content: string = data?.choices?.[0]?.message?.content ?? "";
-    if (!content) throw new AiProviderError("OpenAI returned an empty response.");
-    return content;
+    if (data?.error?.message) throw new AiProviderError(`OpenAI error: ${data.error.message}`);
+
+    // `output` mixes reasoning items with the final message; read message text
+    // (and refusals) only. `output_text` is an SDK convenience, not on the wire.
+    const content: any[] = (Array.isArray(data?.output) ? data.output : [])
+      .filter((item: any) => item?.type === "message")
+      .flatMap((item: any) => (Array.isArray(item?.content) ? item.content : []));
+    const refusal = content.find((c) => c?.type === "refusal" && typeof c?.refusal === "string");
+    if (refusal) throw new AiProviderError(`OpenAI declined this request: ${refusal.refusal}`);
+    const text = content
+      .map((c) => (c?.type === "output_text" && typeof c?.text === "string" ? c.text : ""))
+      .join("")
+      .trim();
+    if (!text) {
+      const reason = data?.status === "incomplete" ? data?.incomplete_details?.reason : undefined;
+      throw new AiProviderError(
+        reason === "max_output_tokens"
+          ? "OpenAI ran out of output tokens before answering. Try a smaller selection or a lower token budget."
+          : reason
+            ? `OpenAI returned an incomplete response (${reason}).`
+            : "OpenAI returned an empty response."
+      );
+    }
+    return text;
   }
 
   async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {

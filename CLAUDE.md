@@ -41,7 +41,7 @@ src/
     GitCliService.ts       execFile-based implementation of the full contract (fallback)
   ai/
     AiProvider.ts          AiProvider interface, error mapping, SecurityFinding/SecurityReview types
-    OpenAiProvider.ts      chat/completions (JSON mode) + /v1/models
+    OpenAiProvider.ts      /v1/responses (JSON mode) + /v1/models
     GeminiProvider.ts      :generateContent (JSON mime) + /v1beta/models
     ClaudeProvider.ts      /v1/messages + /v1/models
     AiProviderFactory.ts   create(providerId) -> AiProvider
@@ -62,6 +62,7 @@ tests/
   ai/
     AiProvider.test.ts     unit tests for parseGeneratedMessage + error mapping
     prompts.test.ts        unit tests for buildCommitPrompt
+    providers.test.ts      request shape + response/stop-reason parsing per provider (mocked fetch)
   utils/
     DiffLimiter.test.ts    unit tests for isIgnored + prepare
   mocks/
@@ -350,6 +351,13 @@ workspace, never committed to the repo.
   rejection: no notification, no `state.error`, and the busy spinner stuck on screen. The
   boundary clears busy state, routes the error through `fail()` (notification + Logger +
   `state.error`), and posts fresh state.
+- **No sampling parameters.** Providers send no `temperature`/`top_p`: current Claude models
+  400 on them, OpenAI reasoning models reject non-default values, and Google advises keeping
+  Gemini 3 at its default. Claude sends no `thinking` config (omitting it is valid on every
+  model) and uses `max_tokens: 16000` because thinking tokens count toward the cap. Each
+  provider turns refusals / blocked prompts / output-token truncation into a specific
+  `AiProviderError` instead of "empty response". Generation calls use
+  `AI_GENERATE_TIMEOUT_MS` (120 s) since reasoning models are slower; Jira stays at 45 s.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from
   the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
 - **Selectable commit history.** Files are lazy-loaded on first expand and cached
