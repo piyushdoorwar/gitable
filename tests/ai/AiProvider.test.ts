@@ -130,3 +130,23 @@ describe("parseGeneratedMessage", () => {
     expect(result.description).toBe("detail");
   });
 });
+
+describe("parseGeneratedMessage — malformed JSON", () => {
+  // Real Claude Sonnet reply that once became the commit summary verbatim:
+  // the description contains an unescaped "empty response".
+  const raw =
+    '{"summary": "feat: migrate providers", "description": "- Switch OpenAI to the Responses API (`/v1/responses`)\\n- Surface specific errors instead of generic "empty response"\\n- Add tests"}';
+
+  it("salvages summary and description despite unescaped quotes", () => {
+    const result = parseGeneratedMessage(raw);
+    expect(result.summary).toBe("feat: migrate providers");
+    expect(result.description).toBe(
+      '- Switch OpenAI to the Responses API (`/v1/responses`)\n- Surface specific errors instead of generic "empty response"\n- Add tests'
+    );
+  });
+
+  it("never returns a JSON blob as the summary", () => {
+    expect(() => parseGeneratedMessage('{"summery": oops')).toThrow(/malformed JSON/);
+    expect(parseGeneratedMessage('{"summary": "x", "description": ""}')).toEqual({ summary: "x", description: undefined });
+  });
+});

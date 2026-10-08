@@ -1,7 +1,60 @@
+/**
+ * JSON Schema for the expected reply, passed to each provider's constrained
+ * JSON mode (Claude `output_config.format`, OpenAI `json_schema`, Gemini
+ * `responseJsonSchema`) so the model cannot emit malformed JSON — e.g. an
+ * unescaped `"` inside the description, which once turned a whole JSON blob
+ * into the commit summary. Kept to the subset all three accept: every object
+ * has `additionalProperties: false` and lists every property as required.
+ */
+export interface OutputSchema {
+  name: string;
+  schema: Record<string, unknown>;
+}
+
 export interface CommitPrompt {
   system: string;
   user: string;
+  schema: OutputSchema;
 }
+
+const string = { type: "string" };
+
+/** `{summary, description}` — used by commit messages and commit summaries. */
+export const COMMIT_MESSAGE_SCHEMA: OutputSchema = {
+  name: "commit_message",
+  schema: {
+    type: "object",
+    properties: { summary: string, description: string },
+    required: ["summary", "description"],
+    additionalProperties: false
+  }
+};
+
+export const SECURITY_REVIEW_SCHEMA: OutputSchema = {
+  name: "security_review",
+  schema: {
+    type: "object",
+    properties: {
+      findings: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            severity: { type: "string", enum: ["critical", "high", "medium", "low", "info"] },
+            category: string,
+            title: string,
+            detail: string
+          },
+          required: ["severity", "category", "title", "detail"],
+          additionalProperties: false
+        }
+      },
+      safe: { type: "boolean" }
+    },
+    required: ["findings", "safe"],
+    additionalProperties: false
+  }
+};
 
 /**
  * Builds the system + user prompt for a security review of a diff.
@@ -29,7 +82,7 @@ export function buildSecurityReviewPrompt(diff: string, diffStat?: string): Comm
 
   const statBlock = diffStat && diffStat.trim() ? `Diff stat:\n${diffStat.trim()}\n\n` : "";
   const user = `Review the following code changes for security vulnerabilities only.\n\n${statBlock}Unified diff:\n${diff}`;
-  return { system, user };
+  return { system, user, schema: SECURITY_REVIEW_SCHEMA };
 }
 
 /**
@@ -48,7 +101,7 @@ export function buildCommitSummaryPrompt(subject: string, diff: string): CommitP
 
   const commitLine = subject ? `Commit: ${subject}\n\n` : "";
   const user = `${commitLine}Diff:\n${diff}`;
-  return { system, user };
+  return { system, user, schema: COMMIT_MESSAGE_SCHEMA };
 }
 
 /**
@@ -62,11 +115,11 @@ export function buildCommitPrompt(diff: string, diffStat?: string): CommitPrompt
     "Follow these rules strictly:",
     "- Use the Conventional Commits style (e.g. feat:, fix:, chore:, refactor:, docs:, test:).",
     "- The summary must be concise, in imperative mood, and under 72 characters where possible.",
-    "- Provide a description only when it adds value; otherwise omit it.",
+    '- Provide a description only when it adds value; otherwise set it to "".',
     "- The description should explain the why/what at a high level, optionally as short bullet points.",
     "- Do not mention file names mechanically unless it genuinely helps the reader.",
     "- Return ONLY a JSON object, with no markdown fences or commentary.",
-    'The JSON shape is: {"summary": string, "description"?: string}.'
+    'The JSON shape is: {"summary": string, "description": string}.'
   ].join("\n");
 
   const statBlock = diffStat && diffStat.trim() ? `Diff stat:\n${diffStat.trim()}\n\n` : "";
@@ -77,5 +130,5 @@ export function buildCommitPrompt(diff: string, diffStat?: string): CommitPrompt
     diff
   ].join("\n");
 
-  return { system, user };
+  return { system, user, schema: COMMIT_MESSAGE_SCHEMA };
 }

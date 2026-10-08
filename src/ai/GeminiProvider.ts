@@ -4,10 +4,11 @@ import {
   GeneratedCommitMessage,
   GenerateCommitMessageInput,
   parseGeneratedMessage,
-  throwForStatus
+  throwForStatus,
+  withSchemaFallback
 } from "./AiProvider";
 import { MODEL_FETCH_LIMIT } from "../constants";
-import { buildCommitPrompt } from "./prompts";
+import { buildCommitPrompt, OutputSchema } from "./prompts";
 import { AI_GENERATE_TIMEOUT_MS, fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -76,7 +77,17 @@ export class GeminiProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
+  async generate(system: string, user: string, model: string, apiKey: string, schema?: OutputSchema): Promise<string> {
+    return withSchemaFallback(schema, (s) => this.request(system, user, model, apiKey, s));
+  }
+
+  private async request(
+    system: string,
+    user: string,
+    model: string,
+    apiKey: string,
+    schema: OutputSchema | undefined
+  ): Promise<string> {
     const url = `${BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
     const response = await fetchWithTimeout(
       url,
@@ -86,7 +97,10 @@ export class GeminiProvider implements AiProvider {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: { responseMimeType: "application/json" }
+          generationConfig: {
+            responseMimeType: "application/json",
+            ...(schema && { responseJsonSchema: schema.schema })
+          }
         })
       },
       AI_GENERATE_TIMEOUT_MS
@@ -117,7 +131,7 @@ export class GeminiProvider implements AiProvider {
   }
 
   async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
-    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
-    return parseGeneratedMessage(await this.generate(system, user, input.model, apiKey));
+    const { system, user, schema } = buildCommitPrompt(input.diff, input.diffStat);
+    return parseGeneratedMessage(await this.generate(system, user, input.model, apiKey, schema));
   }
 }

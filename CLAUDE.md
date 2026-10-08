@@ -358,6 +358,14 @@ workspace, never committed to the repo.
   provider turns refusals / blocked prompts / output-token truncation into a specific
   `AiProviderError` instead of "empty response". Generation calls use
   `AI_GENERATE_TIMEOUT_MS` (120 s) since reasoning models are slower; Jira stays at 45 s.
+- **Schema-constrained JSON.** Each prompt builder returns an `OutputSchema` (`COMMIT_MESSAGE_SCHEMA`,
+  `SECURITY_REVIEW_SCHEMA`) that `generate()` passes to the provider's constrained mode — Claude
+  `output_config.format`, OpenAI Responses `json_schema` (strict), Gemini `responseJsonSchema`.
+  `withSchemaFallback()` retries once without it on a 400 for models that don't support schemas.
+  Schemas list every property as `required` with `additionalProperties: false` (the subset all three
+  accept), so "no description" is `""`. `parseGeneratedMessage()` still salvages invalid JSON
+  (unescaped quotes) by position and throws rather than ever using a JSON blob as the summary —
+  that once happened when Sonnet wrote `"empty response"` unescaped inside the description.
 - **Live model lists only.** No hardcoded fallback lists. Models are fetched from
   the provider on Save & Validate, then cached via `preloadModels()` on `ready`.
 - **Selectable commit history.** Files are lazy-loaded on first expand and cached

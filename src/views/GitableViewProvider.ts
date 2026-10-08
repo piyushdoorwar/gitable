@@ -966,9 +966,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const { providerId, apiKey, model } = ai;
       const rawDiff = await this.git.getCommitDiff(hash);
       const { diff } = DiffLimiter.prepare(rawDiff, maxChars);
-      const { system, user } = buildCommitSummaryPrompt(subject, diff);
+      const { system, user, schema } = buildCommitSummaryPrompt(subject, diff);
       const provider = AiProviderFactory.create(providerId);
-      const text = await provider.generate(system, user, model, apiKey);
+      const text = await provider.generate(system, user, model, apiKey, schema);
       const result = parseGeneratedMessage(text);
       this.usage.record({ provider: providerId, model, type: "commitSummary" });
       post({ type: "commitSummary", hash, summary: result.summary, description: result.description });
@@ -995,9 +995,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       const subject = this.selectedCommitSubject(commits);
-      const { system, user } = buildCommitSummaryPrompt(subject, prepared.diff);
+      const { system, user, schema } = buildCommitSummaryPrompt(subject, prepared.diff);
       const provider = AiProviderFactory.create(providerId);
-      const text = await provider.generate(system, user, model, apiKey);
+      const text = await provider.generate(system, user, model, apiKey, schema);
       const result = parseGeneratedMessage(text);
       this.usage.record({ provider: providerId, model, type: "commitSummary" });
       post({
@@ -1026,9 +1026,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
       const diff = staged ? await this.git.getStagedDiff() : await this.git.getUnstagedDiff();
       const diffStat = staged ? await this.git.getStagedDiffStat() : undefined;
       const { diff: limitedDiff } = DiffLimiter.prepare(diff, maxChars);
-      const { system, user } = buildSecurityReviewPrompt(limitedDiff, diffStat);
+      const { system, user, schema } = buildSecurityReviewPrompt(limitedDiff, diffStat);
       const provider = AiProviderFactory.create(providerId);
-      const text = await provider.generate(system, user, model, apiKey);
+      const text = await provider.generate(system, user, model, apiKey, schema);
       const review = parseSecurityReview(text);
       this.usage.record({ provider: providerId, model, type: "security" });
       post({ type: "securityReview", findings: review.findings, safe: review.safe });
@@ -1054,9 +1054,9 @@ export class GitableViewProvider implements vscode.WebviewViewProvider {
         post({ type: "securityReview", scope, error: "No reviewable diff found for the selected commits." });
         return;
       }
-      const { system, user } = buildSecurityReviewPrompt(prepared.diff, this.selectedCommitSubject(commits));
+      const { system, user, schema } = buildSecurityReviewPrompt(prepared.diff, this.selectedCommitSubject(commits));
       const provider = AiProviderFactory.create(providerId);
-      const text = await provider.generate(system, user, model, apiKey);
+      const text = await provider.generate(system, user, model, apiKey, schema);
       const review = parseSecurityReview(text);
       this.usage.record({ provider: providerId, model, type: "security" });
       post({

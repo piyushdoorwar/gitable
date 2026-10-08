@@ -4,10 +4,11 @@ import {
   GeneratedCommitMessage,
   GenerateCommitMessageInput,
   parseGeneratedMessage,
-  throwForStatus
+  throwForStatus,
+  withSchemaFallback
 } from "./AiProvider";
 import { MODEL_FETCH_LIMIT } from "../constants";
-import { buildCommitPrompt } from "./prompts";
+import { buildCommitPrompt, OutputSchema } from "./prompts";
 import { AI_GENERATE_TIMEOUT_MS, fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 const BASE_URL = "https://api.anthropic.com/v1";
@@ -24,7 +25,8 @@ const MAX_TOKENS = 16_000;
 /**
  * Anthropic Claude provider. Auth uses `x-api-key` plus the `anthropic-version`
  * header. Validation and model listing hit `GET /v1/models`; generation uses
- * `POST /v1/messages` with a JSON-only system prompt.
+ * `POST /v1/messages` with a JSON-only system prompt, constrained to the
+ * prompt's JSON Schema via `output_config.format` (structured outputs).
  *
  * No sampling parameters are sent: `temperature` / `top_p` / `top_k` are
  * rejected with a 400 by current models ("`temperature` is deprecated for this
@@ -72,13 +74,29 @@ export class ClaudeProvider implements AiProvider {
       .slice(0, MODEL_FETCH_LIMIT);
   }
 
-  async generate(system: string, user: string, model: string, apiKey: string): Promise<string> {
+  async generate(system: string, user: string, model: string, apiKey: string, schema?: OutputSchema): Promise<string> {
+    return withSchemaFallback(schema, (s) => this.request(system, user, model, apiKey, s));
+  }
+
+  private async request(
+    system: string,
+    user: string,
+    model: string,
+    apiKey: string,
+    schema: OutputSchema | undefined
+  ): Promise<string> {
     const response = await fetchWithTimeout(
       `${BASE_URL}/messages`,
       {
         method: "POST",
         headers: this.headers(apiKey),
-        body: JSON.stringify({ model, system, max_tokens: MAX_TOKENS, messages: [{ role: "user", content: user }] })
+        body: JSON.stringify({
+          model,
+          system,
+          max_tokens: MAX_TOKENS,
+          messages: [{ role: "user", content: user }],
+          ...(schema && { output_config: { format: { type: "json_schema", schema: schema.schema } } })
+        })
       },
       AI_GENERATE_TIMEOUT_MS
     );
@@ -104,7 +122,7 @@ export class ClaudeProvider implements AiProvider {
   }
 
   async generateCommitMessage(input: GenerateCommitMessageInput, apiKey: string): Promise<GeneratedCommitMessage> {
-    const { system, user } = buildCommitPrompt(input.diff, input.diffStat);
-    return parseGeneratedMessage(await this.generate(system, user, input.model, apiKey));
+    const { system, user, schema } = buildCommitPrompt(input.diff, input.diffStat);
+    return parseGeneratedMessage(await this.generate(system, user, input.model, apiKey, schema));
   }
 }

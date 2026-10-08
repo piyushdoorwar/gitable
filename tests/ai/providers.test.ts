@@ -72,3 +72,39 @@ describe("GeminiProvider.generate", () => {
     await expect(new GeminiProvider().generate("s", "u", "m", "k")).rejects.toThrow(/SAFETY/);
   });
 });
+
+describe("structured output schemas", () => {
+  const schema = { name: "commit_message", schema: { type: "object" } };
+
+  it("sends each provider's schema parameter", async () => {
+    let fn = mockFetch({ stop_reason: "end_turn", content: [{ type: "text", text: "{}" }] });
+    await new ClaudeProvider().generate("s", "u", "m", "k", schema);
+    expect(sentBody(fn).output_config.format).toEqual({ type: "json_schema", schema: schema.schema });
+
+    fn = mockFetch({ output: [{ type: "message", content: [{ type: "output_text", text: "{}" }] }] });
+    await new OpenAiProvider().generate("s", "u", "m", "k", schema);
+    expect(sentBody(fn).text.format).toMatchObject({ type: "json_schema", name: "commit_message", strict: true });
+
+    fn = mockFetch({ candidates: [{ content: { parts: [{ text: "{}" }] } }] });
+    await new GeminiProvider().generate("s", "u", "m", "k", schema);
+    expect(sentBody(fn).generationConfig.responseJsonSchema).toEqual(schema.schema);
+  });
+
+  it("retries without the schema when the model rejects it (400)", async () => {
+    const fn = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: { message: "output_config not supported" } }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ content: [{ type: "text", text: "{}" }] }) });
+    vi.stubGlobal("fetch", fn);
+    expect(await new ClaudeProvider().generate("s", "u", "claude-3-haiku", "k", schema)).toBe("{}");
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fn.mock.calls[1][1].body)).not.toHaveProperty("output_config");
+  });
+
+  it("does not retry non-400 failures", async () => {
+    const fn = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+    vi.stubGlobal("fetch", fn);
+    await expect(new ClaudeProvider().generate("s", "u", "m", "k", schema)).rejects.toThrow(/401/);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
