@@ -153,6 +153,7 @@ img { max-width: 100%; display: block; }
 .btn .ic { width: 17px; height: 17px; }
 .btn-stack { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; line-height: 1.15; }
 .btn-stack small { color: var(--muted); font-size: 11.5px; font-weight: 500; line-height: 1.2; }
+.btn-primary .btn-stack small { color: inherit; opacity: 0.75; }
 
 /* ── Type helpers ────────────────────────────────────────── */
 .eyebrow {
